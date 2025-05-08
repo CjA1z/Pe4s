@@ -59,6 +59,7 @@ export interface CompiledDocument {
   issue_number?: number;
   department?: string;
   category?: string;
+  foreword?: string;
   created_at: string;
   updated_at?: string;
   document_count?: number;
@@ -573,6 +574,7 @@ export async function createCompiledDocument(
     issue_number?: number;
     department?: string;
     category?: string;
+    foreword?: string;
   },
   documentIds: number[] = []
 ): Promise<number> {
@@ -595,9 +597,10 @@ export async function createCompiledDocument(
           issue_number, 
           department, 
           category,
+          foreword,
           created_at
         ) 
-        VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
         RETURNING id
       `;
       
@@ -607,7 +610,8 @@ export async function createCompiledDocument(
         compiledDoc.volume || null,
         compiledDoc.issue_number || null,
         compiledDoc.department || null,
-        compiledDoc.category || 'CONFLUENCE'
+        compiledDoc.category || 'CONFLUENCE',
+        compiledDoc.foreword || null
       ];
       
       const compiledResult = await client.queryObject(compiledQuery, compiledParams);
@@ -748,29 +752,65 @@ export async function removeDocumentFromCompilation(compiledDocId: number, docum
  */
 export async function getCompiledDocument(compiledDocId: number): Promise<CompiledDocument | null> {
   try {
+    // Get detailed compiled document data with all fields, especially foreword
     const query = `
-      SELECT * FROM compiled_documents
-      WHERE id = $1
+      SELECT cd.*, 
+             COUNT(cdi.document_id) as document_count,
+             COALESCE(
+               (SELECT title FROM documents WHERE id = cd.id),
+               (cd.category || ' Vol. ' || COALESCE(cd.volume::text, '1') || 
+                CASE WHEN cd.start_year IS NOT NULL 
+                     THEN ' (' || cd.start_year::text || 
+                          CASE WHEN cd.end_year IS NOT NULL 
+                               THEN '-' || cd.end_year::text 
+                               ELSE '' 
+                          END || ')'
+                     ELSE ''
+                END)
+             ) as title
+      FROM compiled_documents cd
+      LEFT JOIN compiled_document_items cdi ON cd.id = cdi.compiled_document_id
+      WHERE cd.id = $1
+      GROUP BY cd.id
     `;
     
     const result = await client.queryObject(query, [compiledDocId]);
     
     if (result.rows.length === 0) {
+      console.log(`No compiled document found with ID ${compiledDocId}`);
       return null;
     }
     
     // Convert the row to CompiledDocument type
     const row = result.rows[0] as Record<string, unknown>;
-    return {
+    
+    // Log all fields for debugging
+    console.log(`Compiled document data for ID ${compiledDocId}:`, row);
+    
+    // Create a complete CompiledDocument object including the foreword field
+    const compiledDoc: CompiledDocument = {
       id: typeof row.id === 'bigint' ? Number(row.id) : row.id as number,
+      title: row.title as string,
       start_year: row.start_year as number | undefined,
       end_year: row.end_year as number | undefined,
       volume: row.volume as number | undefined,
       issue_number: row.issue_number as number | undefined,
       department: row.department as string | undefined,
       category: row.category as string | undefined,
-      created_at: row.created_at as string
+      foreword: row.foreword as string | undefined,
+      created_at: row.created_at as string,
+      updated_at: row.updated_at as string | undefined,
+      document_count: typeof row.document_count === 'bigint' ? Number(row.document_count) : row.document_count as number | undefined
     };
+    
+    // Log specifically the foreword field to verify it's being retrieved
+    if (compiledDoc.foreword) {
+      console.log(`Retrieved foreword for document ${compiledDocId}: ${compiledDoc.foreword}`);
+    } else {
+      console.log(`No foreword found for compiled document ${compiledDocId}`);
+    }
+    
+    return compiledDoc;
   } catch (error) {
     console.error(`Error fetching compiled document with ID ${compiledDocId}:`, error);
     return null;

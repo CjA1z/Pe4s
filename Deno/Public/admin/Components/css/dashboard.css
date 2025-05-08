@@ -36,6 +36,11 @@ body {
     min-width: 0; /* Prevents flex items from overflowing */
 }
 
+/* Visits column takes 50% less space */
+.visits-column {
+    flex: 0.5;  /* Takes half the space of a regular column */
+}
+
 /*For Chart container*/
 
 
@@ -80,12 +85,12 @@ body {
 /*for Top Authors*/
 .top-authors-container {
     background-color: #fffff5;
-    
     border-radius: 15px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     text-align: center;
-    flex: 1;
+    flex: 1.5; /* Takes more space than before */
     box-sizing: border-box;
+    overflow: hidden; /* Ensure contents don't overflow */
 }
 
 .top-authors-container h3 {
@@ -95,13 +100,14 @@ body {
 .authors-list {
     display: flex;
     justify-content: space-around;
-    gap: 10px;
+    gap: 15px; /* Increased gap for better spacing */
+    padding: 0 10px; /* Added padding for better appearance */
     overflow-x: auto; 
-    white-space: nowrap; 
+    white-space: nowrap;
+    min-height: 120px; /* Ensure minimum height to prevent layout shift */
 }
 
 .author {
-    
     padding: 0px;
     border-radius: 5px;
     text-align: center;
@@ -112,6 +118,11 @@ body {
     flex-direction: column;
     align-items: center;
     width: 150px;
+    transition: transform 0.2s ease;
+}
+
+.author:hover {
+    transform: translateY(-3px);
 }
 
 .author-image {
@@ -126,6 +137,11 @@ body {
 .author-name {
     font-weight: bold;
     margin-bottom: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 145px; /* Slightly less than the author card width */
+    display: block;
 }
 
 .author-visits {

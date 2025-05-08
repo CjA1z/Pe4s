@@ -28,8 +28,7 @@
                                     <option value="">Select document type</option>
                                     <option value="THESIS">Thesis</option>
                                     <option value="DISSERTATION">Dissertation</option>
-                                    <option value="CONFLUENCE">Confluence</option>
-                                    <option value="SYNERGY">Synergy</option>
+                                    
                                 </select>
                             </div>
                             <div class="form-group">
@@ -65,8 +64,9 @@
                                 <p>Drag & drop a new file or click to browse</p>
                                 <p class="file-types">Accepts PDF documents only</p>
                                 <input type="file" id="edit-single-document-file" name="document_file" style="display: none;" accept=".pdf">
+                                <div id="edit-single-document-file-indicator"></div>
                             </div>
-                            <div id="edit-single-document-file-indicator"></div>
+                            
                         </div>
                         
                         <div class="submit-container">
@@ -138,8 +138,7 @@
                                 <label for="edit-compiled-document-type">Document Type</label>
                                 <select id="edit-compiled-document-type" name="document_type" required>
                                     <option value="">Select document type</option>
-                                    <option value="THESIS">Thesis</option>
-                                    <option value="DISSERTATION">Dissertation</option>
+                                    
                                     <option value="CONFLUENCE">Confluence</option>
                                     <option value="SYNERGY">Synergy</option>
                                 </select>
@@ -171,14 +170,15 @@
                         </div>
                         
                         <div class="form-group">
-                            <label>Compiled Document File</label>
+                            <label>Attach Foreword Document</label>
                             <div class="file-upload">
                                 <i class="fas fa-cloud-upload-alt"></i>
                                 <p>Drag & drop a new file or click to browse</p>
                                 <p class="file-types">Accepts PDF documents only</p>
                                 <input type="file" id="edit-compiled-document-file" name="document_file" style="display: none;" accept=".pdf">
+                                <div id="edit-compiled-document-file-indicator"></div>
                             </div>
-                            <div id="edit-compiled-document-file-indicator"></div>
+                            
                         </div>
                         
                         <div class="form-group">
@@ -186,9 +186,6 @@
                             <div id="edit-compiled-document-children" class="compilation-studies-list">
                                 <div class="no-children-message">No child documents added yet.</div>
                             </div>
-                            <button type="button" id="add-child-document-btn">
-                                <i class="fas fa-plus"></i> Add Child Document
-                            </button>
                         </div>
                         
                         <div class="submit-container">

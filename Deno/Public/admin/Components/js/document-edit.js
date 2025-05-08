@@ -294,16 +294,16 @@ window.documentEdit = {
         
         // First, load the modals HTML if not already loaded
         this.loadModalHTML().then(() => {
-            // Get the modal elements
-            const modal = document.getElementById('edit-compiled-document-modal');
-            if (!modal) {
-                console.error('Compiled edit modal not found in DOM');
+        // Find the modal and ensure it exists
+        const modal = document.getElementById('edit-compiled-document-modal');
+        if (!modal) {
+            console.error('Compiled document edit modal not found!');
                 showToast('Error loading edit modal. Please refresh the page and try again.', 'error');
-                return;
-            }
+            return;
+        }
             
             // Show a loading indicator
-            showToast('Loading compilation data...', 'info');
+            showToast('Loading compiled document data...', 'info');
             
             // Set the document ID in the form
             document.getElementById('edit-compiled-document-id').value = documentId;
@@ -316,24 +316,31 @@ window.documentEdit = {
             if (form) {
                 const loadingOverlay = document.createElement('div');
                 loadingOverlay.className = 'loading-overlay';
-                loadingOverlay.innerHTML = '<div class="spinner"><i class="fas fa-spinner fa-spin"></i></div><div class="loading-text">Loading compilation data...</div>';
+                loadingOverlay.innerHTML = '<div class="spinner"></div><div class="loading-text">Loading compiled document data...</div>';
                 form.appendChild(loadingOverlay);
-            }
-            
-            // Fetch compiled document data and populate the form
-            this.fetchDocumentData(documentId, true)
-                .then(data => {
+        }
+        
+        // Set up the modal event listeners
+        this.setupModalEventListeners();
+        
+            // Fetch document data - use a proper compiled endpoint
+            console.log('Fetching compiled document data for ID:', documentId);
+            this.fetchCompiledDocumentData(documentId)
+            .then(data => {
+                // Log data for debugging
+                    console.log('Compiled document data fetched successfully:', data);
+                    
                     // Remove loading overlay
                     const loadingOverlay = modal.querySelector('.loading-overlay');
                     if (loadingOverlay) {
                         loadingOverlay.remove();
-                    }
-                    
-                    this.populateCompiledEditForm(data);
-                })
-                .catch(error => {
+                }
+                
+                // Populate form with data
+                this.populateCompiledEditForm(data);
+            })
+            .catch(error => {
                     console.error('Error fetching compiled document data:', error);
-                    showToast('Error loading compilation data. Please try again.', 'error');
                     
                     // Remove loading overlay
                     const loadingOverlay = modal.querySelector('.loading-overlay');
@@ -347,7 +354,7 @@ window.documentEdit = {
                         formContent.innerHTML = `
                             <div class="error-container">
                                 <i class="fas fa-exclamation-triangle"></i>
-                                <h3>Error Loading Compilation</h3>
+                                <h3>Error Loading Compiled Document</h3>
                                 <p>${error.message}</p>
                                 <button class="btn-secondary cancel-edit-btn">Close</button>
                             </div>
@@ -360,11 +367,238 @@ window.documentEdit = {
                             });
                         }
                     }
+                    
+                    showToast('Error loading compiled document data. Please try again.', 'error');
                 });
         }).catch(error => {
             console.error('Error loading modal HTML:', error);
             showToast('Error loading edit modal. Please refresh the page and try again.', 'error');
+            });
+    },
+    
+    // Specialized function to fetch compiled document data
+    fetchCompiledDocumentData: function(documentId) {
+        return new Promise(async (resolve, reject) => {
+            console.log(`Fetching compiled document data for ID: ${documentId}`);
+            
+            // Define compiled-specific endpoints to try in sequence
+            const compiledEndpoints = [
+                `/api/compiled-documents/${documentId}?include_children=true&include_authors=true&include_topics=true`,
+                `/api/compiled-documents/${documentId}`,
+                `/api/documents/${documentId}?include_children=true&include_authors=true&include_topics=true`,
+                `/api/documents/${documentId}`
+            ];
+            
+            let documentData = null;
+            let lastError = null;
+            
+            // Try each endpoint in sequence until we get data
+            for (const endpoint of compiledEndpoints) {
+                try {
+                    console.log(`Trying to fetch from compiled endpoint: ${endpoint}`);
+                    const response = await fetch(endpoint);
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log(`Got data from compiled endpoint: ${endpoint}`, data);
+                        
+                        // Detailed logging of the received data
+                        console.log('Received document structure:', Object.keys(data));
+                        if (data.children) console.log(`Children data: ${data.children.length} items`);
+                        if (data.authors) console.log(`Authors data: ${data.authors.length} items`);
+                        if (data.research_agenda) console.log(`Research agenda data: ${data.research_agenda.length} items`);
+                        if (data.topics) console.log(`Topics data: ${data.topics.length} items`);
+                        
+                        // Process and normalize the data
+                        documentData = this.normalizeCompiledDocumentData(data, documentId);
+                        break; // We have data, break out of the loop
+                    } else {
+                        console.warn(`Compiled endpoint ${endpoint} failed with status ${response.status}`);
+                        lastError = new Error(`Failed to fetch compiled document: ${response.status}`);
+                    }
+                } catch (error) {
+                    console.warn(`Error trying compiled endpoint ${endpoint}:`, error);
+                    lastError = error;
+                }
+            }
+            
+            // If we have data, only fetch missing pieces if necessary
+            if (documentData) {
+                console.log('Document data after normalization:', documentData);
+                
+                try {
+                    const promises = [];
+                    
+                    // Only fetch children if not already included and they should be included
+                    if ((!documentData.children || documentData.children.length === 0) && 
+                        !compiledEndpoints[0].includes('failed_already')) {
+                        // Only add this promise if we need it
+                        promises.push(this.fetchChildrenIfNeeded(documentId, documentData));
+                    } else {
+                        console.log('Using existing children data:', documentData.children.length, 'items');
+                    }
+                    
+                    // Only fetch authors if not already included
+                    if (!documentData.authors || documentData.authors.length === 0) {
+                        promises.push(this.fetchAuthorsIfNeeded(documentId, documentData));
+                    } else {
+                        console.log('Using existing authors data:', documentData.authors.length, 'items');
+                    }
+                    
+                    // Only fetch research agenda if not already included
+                    if ((!documentData.research_agenda || documentData.research_agenda.length === 0) &&
+                        (!documentData.topics || documentData.topics.length === 0)) {
+                        promises.push(this.fetchResearchAgendaIfNeeded(documentId, documentData));
+                    } else {
+                        console.log('Using existing research agenda data:', 
+                            documentData.research_agenda ? documentData.research_agenda.length : 0, 'items');
+                    }
+                    
+                    // Wait for any needed fetches to complete
+                    if (promises.length > 0) {
+                        console.log(`Fetching ${promises.length} additional data pieces`);
+                        await Promise.all(promises);
+                    } else {
+                        console.log('All data available, no additional fetches needed');
+                    }
+                    
+                    console.log('Final compiled document data:', documentData);
+                    // Resolve with the complete data
+                    resolve(documentData);
+                } catch (error) {
+                    console.error('Error fetching additional compiled document data:', error);
+                    // Still resolve with partial data
+                    resolve(documentData);
+                }
+            } else {
+                // No data found, reject with error
+                reject(lastError || new Error('Failed to fetch compiled document data'));
+            }
         });
+    },
+    
+    // Helper function to fetch children only if needed
+    fetchChildrenIfNeeded: async function(documentId, documentData) {
+        if (!documentData.children || documentData.children.length === 0) {
+            const childrenEndpoints = [
+                `/api/compiled-documents/${documentId}/children`,
+                `/compiled-documents/${documentId}/children`
+            ];
+            
+            for (const childEndpoint of childrenEndpoints) {
+                try {
+                    console.log(`Trying to fetch children from: ${childEndpoint}`);
+                    const childResponse = await fetch(childEndpoint);
+                    if (childResponse.ok) {
+                        const childData = await childResponse.json();
+                        console.log('Children data response:', childData);
+                        if (childData.children && Array.isArray(childData.children)) {
+                            documentData.children = childData.children;
+                            console.log(`Fetched ${documentData.children.length} child documents from ${childEndpoint}`);
+                            return;
+                        } else if (Array.isArray(childData)) {
+                            documentData.children = childData;
+                            console.log(`Fetched ${documentData.children.length} child documents (array format) from ${childEndpoint}`);
+                            return;
+                        }
+                    } else {
+                        console.warn(`Children endpoint ${childEndpoint} failed: ${childResponse.status}`);
+                    }
+                } catch (childError) {
+                    console.warn(`Error fetching children from ${childEndpoint}:`, childError);
+                }
+            }
+            console.log('Could not fetch children, using empty array');
+            documentData.children = [];
+        }
+    },
+    
+    // Helper function to fetch authors only if needed
+    fetchAuthorsIfNeeded: async function(documentId, documentData) {
+        try {
+            console.log('Fetching authors separately');
+            const authors = await this.fetchAuthorsForDocument(documentId);
+            if (authors && authors.length > 0) {
+                documentData.authors = authors;
+                console.log(`Fetched ${authors.length} authors separately`);
+            } else {
+                console.log('No authors found, using empty array');
+                documentData.authors = [];
+            }
+        } catch (authorError) {
+            console.warn('Failed to fetch authors separately:', authorError);
+            documentData.authors = [];
+        }
+    },
+    
+    // Helper function to fetch research agenda only if needed
+    fetchResearchAgendaIfNeeded: async function(documentId, documentData) {
+        try {
+            console.log('Fetching research agenda separately');
+            const topics = await this.fetchResearchAgendaForDocument(documentId);
+            if (topics && topics.length > 0) {
+                documentData.research_agenda = topics;
+                console.log(`Fetched ${topics.length} research agenda items separately`);
+            } else {
+                console.log('No research agenda items found, using empty array');
+                documentData.research_agenda = [];
+            }
+        } catch (topicError) {
+            console.warn('Failed to fetch research agenda separately:', topicError);
+            documentData.research_agenda = [];
+        }
+    },
+    
+    // Helper function to normalize compiled document data
+    normalizeCompiledDocumentData: function(data, documentId) {
+        // Ensure we have the basic structure
+        const normalizedData = {
+            id: data.id || documentId,
+            title: data.title || 'Untitled Compiled Document',
+            document_type: data.document_type || data.category || data.type || 'CONFLUENCE',
+            is_compiled: true
+        };
+        
+        // Copy all other fields
+        Object.keys(data).forEach(key => {
+            normalizedData[key] = data[key];
+        });
+        
+        // Normalize date fields - if publication_date exists but date_published doesn't
+        if (data.publication_date && !normalizedData.date_published) {
+            normalizedData.date_published = data.publication_date;
+            console.log('Mapped publication_date to date_published:', data.publication_date);
+        }
+        
+        // Handle the case where topics is populated but research_agenda isn't
+        if (data.topics && Array.isArray(data.topics) && (!normalizedData.research_agenda || normalizedData.research_agenda.length === 0)) {
+            normalizedData.research_agenda = data.topics;
+            console.log('Mapped topics to research_agenda:', data.topics.length, 'items');
+        }
+        
+        // Make sure children is an array
+        if (!normalizedData.children) {
+            normalizedData.children = [];
+        } else if (!Array.isArray(normalizedData.children)) {
+            normalizedData.children = [];
+        }
+        
+        // Make sure authors is an array
+        if (!normalizedData.authors) {
+            normalizedData.authors = [];
+        } else if (!Array.isArray(normalizedData.authors)) {
+            normalizedData.authors = [];
+        }
+        
+        // Make sure research_agenda is an array
+        if (!normalizedData.research_agenda) {
+            normalizedData.research_agenda = [];
+        } else if (!Array.isArray(normalizedData.research_agenda)) {
+            normalizedData.research_agenda = [];
+        }
+        
+        console.log('Normalized document data:', normalizedData);
+        return normalizedData;
     },
     
     // Load the modal HTML if not already present
@@ -720,8 +954,43 @@ window.documentEdit = {
                 const readBtnListener = function() {
                     console.log('Read document button clicked');
                     const docId = document.getElementById('edit-compiled-document-id').value;
-                    console.log('Document ID for PDF viewer:', docId);
+                    
+                    // Check if document has a foreword and open it instead
+                    fetch(`/api/documents/${docId}`)
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`Error fetching document: ${response.status}`);
+                            }
+                            return response.json();
+                        })
+                        .then(document => {
+                            if (document && document.foreword) {
+                                console.log(`Opening foreword: ${document.foreword}`);
+                                // Ensure we have a fully qualified URL by adding protocol and host if missing
+                                let forewordPath = document.foreword;
+                                
+                                // If the path doesn't start with http or /, add the leading /
+                                if (!forewordPath.startsWith('http') && !forewordPath.startsWith('/')) {
+                                    forewordPath = '/' + forewordPath;
+                                }
+                                
+                                // If the path is relative (starts with /), prepend the current origin
+                                if (forewordPath.startsWith('/')) {
+                                    forewordPath = window.location.origin + forewordPath;
+                                }
+                                
+                                // Open in new tab
+                                window.open(forewordPath, '_blank');
+                            } else {
+                                console.log('No foreword found, falling back to document PDF');
                     self.showPdfViewer(docId);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error opening foreword:', error);
+                            // Fallback to normal document view
+                            self.showPdfViewer(docId);
+                        });
                 };
                 
                 // Store reference to listener for future removal
@@ -816,7 +1085,7 @@ window.documentEdit = {
     // Fetch document data for editing
     fetchDocumentData: function(documentId, isCompiled) {
         return new Promise((resolve, reject) => {
-            console.log(`Fetching document data for ID: ${documentId}`);
+            console.log(`Fetching document data for ID: ${documentId}, isCompiled: ${isCompiled}`);
             
             // Try different potential endpoints for the document
             let endpoints = [];
@@ -824,9 +1093,10 @@ window.documentEdit = {
             if (isCompiled) {
                 // For compiled documents, try compiled-specific endpoints first
                 endpoints = [
+                    `/api/compiled-documents/${documentId}?include_children=true&include_authors=true&include_topics=true`,
                     `/api/compiled-documents/${documentId}`,
-                    `/api/documents/${documentId}`,
-                    `/api/document/${documentId}`
+                    `/api/documents/${documentId}?include_children=true&include_authors=true&include_topics=true`,
+                    `/api/documents/${documentId}`
                 ];
             } else {
                 // For regular documents, try standard endpoints
@@ -838,77 +1108,22 @@ window.documentEdit = {
             
             // Try each endpoint in sequence
             this.tryEndpoints(endpoints)
-                .then(data => {
-                    console.log('Document data fetched successfully:', data);
-                    
-                    // Ensure we have at least a bare minimum document structure
-                    if (!data || typeof data !== 'object') {
-                        console.warn('Document data is not an object, creating default structure');
-                        data = {
-                            id: documentId,
-                            title: 'Unknown Document',
-                            document_type: '',
-                            date_published: null,
-                            authors: [],
-                            research_agenda: []
-                        };
-                    }
-                    
-                    // Ensure document ID is set
-                    if (!data.id) {
-                        data.id = documentId;
-                    }
-                    
-                    // Make sure other essential fields exist
-                    if (!data.title) data.title = 'Untitled Document';
-                    if (!data.document_type) data.document_type = '';
-                    
-                    // Normalize field names - some APIs might use different names
-                    if (!data.date_published && data.publication_date) {
-                        data.date_published = data.publication_date;
-                    }
-                    
-                    // For API compatibility, make sure all expected fields exist
-                    if (!data.authors) data.authors = [];
-                    if (!data.research_agenda && data.topics) {
-                        data.research_agenda = data.topics;
-                    } else if (!data.research_agenda) {
-                        data.research_agenda = [];
-                    }
-                    
-                    resolve(data);
-                })
+                .then(data => resolve(data))
                 .catch(error => {
                     console.error('Error fetching document data:', error);
-                    
-                    // Create fallback document object in case of failure
-                    const fallbackData = {
-                        id: documentId,
-                        title: 'Error Loading Document',
-                        document_type: '',
-                        date_published: null,
-                        authors: [],
-                        research_agenda: []
-                    };
-                    
-                    // Attempt to fetch the most critical data separately
-                    this.fetchMinimalDocumentData(documentId)
-                        .then(minimalData => {
-                            // Combine fallback with any data we were able to get
-                            const combinedData = { ...fallbackData, ...minimalData };
-                            resolve(combinedData);
-                        })
-                        .catch(minimalError => {
-                            console.error('Even minimal data fetch failed:', minimalError);
-                            // Use complete fallback
-                            resolve(fallbackData);
-                        });
+                    reject(error);
                 });
         });
     },
     
+    // Helper function for compatibility - uses loadChildDocuments
+    populateChildDocumentsList: function(children) {
+        console.log('Wrapper function for backward compatibility');
+        this.loadChildDocuments(null, children);
+    },
+    
     // Helper function to fetch minimal document data when main endpoints fail
-    fetchMinimalDocumentData: function(documentId) {
+    fetchMinimalDocumentData: function(documentId, isCompiled) {
         return new Promise(async (resolve, reject) => {
             try {
                 const minimalData = { id: documentId };
@@ -940,6 +1155,20 @@ window.documentEdit = {
                     console.warn('Failed to fetch document research agenda:', agendaError);
                 }
                 
+                // For compiled documents, also try to get child documents
+                if (isCompiled) {
+                    try {
+                        const childResponse = await fetch(`/api/compiled-documents/${documentId}/children`);
+                        if (childResponse.ok) {
+                            const childData = await childResponse.json();
+                            minimalData.children = childData.children || [];
+                        }
+                    } catch (childError) {
+                        console.warn('Failed to fetch child documents:', childError);
+                        minimalData.children = [];
+                    }
+                }
+                
                 resolve(minimalData);
             } catch (error) {
                 reject(error);
@@ -951,6 +1180,33 @@ window.documentEdit = {
     tryEndpoints: function(endpoints) {
         return new Promise(async (resolve, reject) => {
             let lastError = null;
+            let partialData = null;
+            
+            // Extract ID from the first endpoint URL to use as fallback
+            const idMatch = endpoints[0].match(/\/(\d+)(?:\?|$)/);
+            const docId = idMatch ? idMatch[1] : 'unknown';
+            
+            // Check if this might be a compiled document based on endpoints
+            const isLikelyCompiled = endpoints.some(ep => ep.includes('compiled'));
+            
+            // If compiled document, make sure we include compiled-specific endpoints
+            if (isLikelyCompiled) {
+                // Make sure we have compiled document endpoints
+                const compiledEndpoints = [
+                    `/api/compiled-documents/${docId}?include_children=true&include_authors=true&include_topics=true`,
+                    `/api/compiled-documents/${docId}`
+                ];
+                
+                // Add compiledEndpoints to the beginning of the endpoints array if they're not already there
+                compiledEndpoints.forEach(ep => {
+                    if (!endpoints.includes(ep)) {
+                        endpoints.unshift(ep);
+                    }
+                });
+                
+                console.log('Document appears to be compiled, prioritizing compiled endpoints:', 
+                            endpoints.slice(0, 2));
+            }
             
             for (const endpoint of endpoints) {
                 try {
@@ -960,54 +1216,34 @@ window.documentEdit = {
                     if (response.ok) {
                         const data = await response.json();
                         
-                        // If the response is empty or doesn't have the expected structure,
-                        // create a default object with the document ID
-                        if (!data || Object.keys(data).length === 0) {
-                            // Extract ID from endpoint URL
-                            const idMatch = endpoint.match(/\/(\d+)$/);
-                            const docId = idMatch ? idMatch[1] : 'unknown';
+                        // If we get some data, save it even if incomplete
+                        if (data && Object.keys(data).length > 0) {
+                            console.log(`Got data from endpoint: ${endpoint}`, data);
                             
-                            console.warn(`Empty data returned for document ${docId}, using defaults`);
-                            return resolve({
-                                id: docId,
-                                title: 'Untitled Document',
-                                document_type: '',
-                                date_published: new Date().toISOString(),
-                                abstract: '',
-                                authors: [],
-                                research_agenda: []
-                            });
+                            // Normalize date fields - if publication_date exists but date_published doesn't
+                            if (data.publication_date && !data.date_published) {
+                                data.date_published = data.publication_date;
+                                console.log('Mapped publication_date to date_published:', data.publication_date);
+                            }
+                            
+                            // Mark as compiled if it came from a compiled endpoint
+                            if (endpoint.includes('compiled') && !data.is_compiled) {
+                                data.is_compiled = true;
+                            }
+                            
+                            // Save any data we get, even if it's partial
+                            if (partialData) {
+                                // Merge with previous partial data, preferring newer values
+                                partialData = { ...partialData, ...data };
+                            } else {
+                                partialData = data;
+                            }
+                            
+                            // If this looks like complete data, break out of the loop
+                            if (data.title && (data.document_type || data.category)) {
+                                break;
+                            }
                         }
-                        
-                        // Ensure document ID is available
-                        const docId = data.id;
-                        if (!docId) {
-                            console.warn('Document data missing ID, extracting from endpoint');
-                            // Try to extract ID from the endpoint URL
-                            const idMatch = endpoint.match(/\/(\d+)$/);
-                            data.id = idMatch ? idMatch[1] : 'unknown';
-                        }
-                        
-                        // Fetch authors information separately if not included
-                        const fetchAuthorsPromise = (!data.authors || !Array.isArray(data.authors) || data.authors.length === 0) 
-                            ? this.fetchAuthorsForDocument(data.id)
-                            : Promise.resolve(data.authors);
-                        
-                        // Fetch research agenda separately if not included
-                        const fetchResearchAgendaPromise = (!data.research_agenda || !Array.isArray(data.research_agenda)) 
-                            ? this.fetchResearchAgendaForDocument(data.id)
-                            : Promise.resolve(data.research_agenda);
-                        
-                        // Wait for both promises to resolve
-                        return Promise.all([fetchAuthorsPromise, fetchResearchAgendaPromise])
-                            .then(([authors, researchAgenda]) => {
-                                // Merge the data
-                                resolve({
-                                    ...data,
-                                    authors: authors || [],
-                                    research_agenda: researchAgenda || []
-                                });
-                            });
                     } else {
                         console.log(`Endpoint ${endpoint} failed with status ${response.status}`);
                         lastError = new Error(`Failed to fetch document: ${response.status}`);
@@ -1018,9 +1254,84 @@ window.documentEdit = {
                 }
             }
             
-            // If we got here, all endpoints failed
-            console.error('All endpoints failed for document fetch');
-            reject(lastError || new Error('Failed to fetch document data from any endpoint'));
+            // If we didn't get any data at all, create fallback data
+            if (!partialData || Object.keys(partialData).length === 0) {
+                console.warn(`No data found for document ${docId}, using fallback defaults`);
+                partialData = {
+                                id: docId,
+                                title: 'Untitled Document',
+                                document_type: '',
+                                date_published: new Date().toISOString(),
+                                abstract: '',
+                                authors: [],
+                    research_agenda: [],
+                    children: [],
+                    is_compiled: isLikelyCompiled
+                };
+                        }
+                        
+                        // Ensure document ID is available
+            if (!partialData.id) {
+                partialData.id = docId;
+            }
+            
+            // Ensure critical fields exist with defaults if missing
+            if (!partialData.title) partialData.title = 'Untitled Document';
+            if (!partialData.document_type && !partialData.category) partialData.document_type = '';
+            if (!partialData.authors) partialData.authors = [];
+            if (!partialData.research_agenda) partialData.research_agenda = [];
+            if (!partialData.children) partialData.children = [];
+            
+            // Also ensure the date field exists
+            if (!partialData.date_published && partialData.publication_date) {
+                partialData.date_published = partialData.publication_date;
+            } else if (!partialData.date_published) {
+                partialData.date_published = new Date().toISOString();
+            }
+            
+            // If we know it's compiled, mark it accordingly
+            if (isLikelyCompiled && !partialData.is_compiled) {
+                partialData.is_compiled = true;
+            }
+            
+            try {
+                // Only fetch additional author/topic data if endpoints didn't already include them
+                // and avoid making extra API calls if we're dealing with a compiled document
+                // which often has specific endpoints for these
+                const shouldFetchAdditional = !endpoints.some(ep => 
+                    ep.includes('include_authors') || ep.includes('include_topics'));
+                
+                if (shouldFetchAdditional) {
+                    // Try to fetch additional data separately
+                    const [authors, researchAgenda] = await Promise.all([
+                        // Only fetch authors if we don't already have them
+                        (!partialData.authors || partialData.authors.length === 0) 
+                            ? this.fetchAuthorsForDocument(partialData.id).catch(() => [])
+                            : Promise.resolve(partialData.authors),
+                        
+                        // Only fetch research agenda if we don't already have it
+                        (!partialData.research_agenda || partialData.research_agenda.length === 0) 
+                            ? this.fetchResearchAgendaForDocument(partialData.id).catch(() => [])
+                            : Promise.resolve(partialData.research_agenda)
+                    ]);
+                    
+                    // Merge the data - don't override if we already have values
+                    if (authors && authors.length > 0) {
+                        partialData.authors = authors;
+                    }
+                    
+                    if (researchAgenda && researchAgenda.length > 0) {
+                        partialData.research_agenda = researchAgenda;
+                    }
+                }
+                
+                // Always resolve with whatever data we have - never reject
+                resolve(partialData);
+            } catch (error) {
+                console.error('Error fetching additional data:', error);
+                // Still resolve with partial data even if additional fetches fail
+                resolve(partialData);
+            }
         });
     },
     
@@ -1028,11 +1339,13 @@ window.documentEdit = {
     fetchAuthorsForDocument: function(documentId) {
         console.log(`Fetching authors for document ${documentId}`);
         
-        // Try multiple potential endpoints
+        // Try multiple potential endpoints, adding compiled-specific endpoints
         const endpoints = [
             `/api/document-authors/${documentId}`,
             `/api/documents/${documentId}/authors`,
-            `/document-authors/${documentId}`
+            `/document-authors/${documentId}`,
+            `/api/compiled-documents/${documentId}/authors`,
+            `/compiled-documents/${documentId}/authors`
         ];
         
         return new Promise(async (resolve, reject) => {
@@ -1077,172 +1390,140 @@ window.documentEdit = {
                     }
                 }
                 
-                // If no authors found, try one more strategy - get document and extract authors
-                if (!succeeded && authors.length === 0) {
+                // Skip the document extraction fallback for compiled documents
+                // since this often fails with 404 errors
+                const isCompiled = documentId && String(documentId).startsWith('C');
+                
+                // If no authors found and not a compiled doc, try one more strategy - get document and extract authors
+                if (!succeeded && authors.length === 0 && !isCompiled) {
                     try {
                         console.log('Trying to extract authors from document data');
-                        const docResponse = await fetch(`/api/documents/${documentId}`);
+                        // Try both regular and compiled document endpoints
+                        let docData = null;
                         
-                        if (docResponse.ok) {
-                            const docData = await docResponse.json();
-                            
-                            if (docData.authors && Array.isArray(docData.authors)) {
-                                authors = docData.authors;
-                                console.log(`Extracted ${authors.length} authors from document data`);
+                        try {
+                            const regDocResponse = await fetch(`/api/documents/${documentId}`);
+                            if (regDocResponse.ok) {
+                                docData = await regDocResponse.json();
+                            } else {
+                                console.warn(`Regular document endpoint failed: ${regDocResponse.status}`);
+                            }
+                        } catch (regError) {
+                            console.warn('Error fetching from regular document endpoint:', regError);
+                        }
+                        
+                        // If regular endpoint failed, try compiled endpoint
+                        if (!docData) {
+                            try {
+                                const compDocResponse = await fetch(`/api/compiled-documents/${documentId}`);
+                                if (compDocResponse.ok) {
+                                    docData = await compDocResponse.json();
+                                } else {
+                                    console.warn(`Compiled document endpoint failed: ${compDocResponse.status}`);
+                                }
+                            } catch (compError) {
+                                console.warn('Error fetching from compiled document endpoint:', compError);
                             }
                         }
+                        
+                        // If we have data, extract authors
+                        if (docData && docData.authors && Array.isArray(docData.authors)) {
+                            authors = docData.authors;
+                            console.log(`Extracted ${authors.length} authors from document data`);
+                        }
                     } catch (docError) {
-                        console.warn('Error extracting authors from document:', docError);
+                        console.warn('No authors found for this document');
                     }
                 }
                 
-                // Process authors to ensure consistent format
-                const formattedAuthors = authors.map(author => {
-                    // Handle string-only authors
-                    if (typeof author === 'string') {
-                        return { id: 'unknown', full_name: author };
-                    }
-                    
-                    // Handle object authors with different property names
-                    let authorObj = { ...author };
-                    
-                    // Ensure id exists
-                    if (!authorObj.id && authorObj.author_id) {
-                        authorObj.id = authorObj.author_id;
-                    } else if (!authorObj.id) {
-                        authorObj.id = 'unknown';
-                    }
-                    
-                    // Ensure full_name exists
-                    if (!authorObj.full_name && authorObj.name) {
-                        authorObj.full_name = authorObj.name;
-                    } else if (!authorObj.full_name) {
-                        authorObj.full_name = 'Unknown Author';
-                    }
-                    
-                    return authorObj;
-                });
-                
-                console.log(`Returning ${formattedAuthors.length} formatted authors`);
-                resolve(formattedAuthors);
+                resolve(authors);
             } catch (error) {
-                console.error(`Error in fetchAuthorsForDocument:`, error);
-                resolve([]); // Resolve with empty array instead of rejecting
+                console.error('Error fetching authors:', error);
+                resolve([]); // Resolve with empty array in case of error
             }
         });
     },
     
-    // Fetch keywords for a document separately
+    // Fetch research agenda for a document separately
     fetchResearchAgendaForDocument: function(documentId) {
-        console.log(`[KEYWORDS] Fetching keywords for document ${documentId}`);
+        console.log(`Fetching research agenda for document ${documentId}`);
         
         // Try multiple potential endpoints
         const endpoints = [
-            `/document-research-agenda/${documentId}`,
             `/api/document-research-agenda/${documentId}`,
             `/api/documents/${documentId}/topics`,
+            `/document-research-agenda/${documentId}`,
+            `/api/compiled-documents/${documentId}/topics`,
             `/api/documents/${documentId}/research-agenda`
         ];
         
         return new Promise(async (resolve, reject) => {
             try {
-                let agendaItems = [];
+                let topics = [];
                 let succeeded = false;
                 
                 // Try each endpoint sequentially
                 for (const endpoint of endpoints) {
                     try {
-                        console.log(`[KEYWORDS] Trying endpoint: ${endpoint}`);
+                        console.log(`Trying to fetch research agenda from: ${endpoint}`);
                         const response = await fetch(endpoint);
                         
                         if (response.ok) {
                             const data = await response.json();
-                            console.log(`[KEYWORDS] Response from ${endpoint}:`, data);
+                            console.log(`Research agenda data from ${endpoint}:`, data);
                             
-                            // Handle different response formats
-                            if (Array.isArray(data)) {
-                                agendaItems = data;
+                            // Handle different API response formats
+                            if (data.topics && Array.isArray(data.topics)) {
+                                topics = data.topics;
                                 succeeded = true;
-                                break;
-                            } else if (data.items && Array.isArray(data.items)) {
-                                agendaItems = data.items;
-                                succeeded = true;
-                                break;
-                            } else if (data.agenda_items && Array.isArray(data.agenda_items)) {
-                                agendaItems = data.agenda_items;
-                                succeeded = true;
-                                break;
-                            } else if (data.topics && Array.isArray(data.topics)) {
-                                agendaItems = data.topics;
-                                succeeded = true;
+                                console.log(`Found ${topics.length} topics at ${endpoint}`);
                                 break;
                             } else if (data.research_agenda && Array.isArray(data.research_agenda)) {
-                                agendaItems = data.research_agenda;
+                                topics = data.research_agenda;
                                 succeeded = true;
+                                console.log(`Found ${topics.length} topics at ${endpoint} (research_agenda format)`);
                                 break;
+                            } else if (Array.isArray(data)) {
+                                topics = data;
+                                succeeded = true;
+                                console.log(`Found ${topics.length} topics at ${endpoint} (array format)`);
+                                break;
+                            } else {
+                                console.warn(`Response from ${endpoint} doesn't contain topics in expected format:`, data);
                             }
+                        } else {
+                            console.warn(`Failed to fetch research agenda from ${endpoint}: ${response.status}`);
                         }
                     } catch (endpointError) {
-                        console.warn(`[KEYWORDS] Error fetching from ${endpoint}:`, endpointError);
+                        console.warn(`Error fetching research agenda from ${endpoint}:`, endpointError);
                     }
                 }
                 
-                // If no items found, try direct document query as a last resort
-                if (!succeeded || agendaItems.length === 0) {
+                // If no topics found, try one more strategy - get document and extract topics
+                if (!succeeded && topics.length === 0) {
                     try {
-                        console.log('[KEYWORDS] Trying to extract from document data');
+                        console.log('Trying to extract topics from document data');
                         const docResponse = await fetch(`/api/documents/${documentId}`);
-                        
                         if (docResponse.ok) {
                             const docData = await docResponse.json();
                             
-                            // Try different field names that might contain keywords data
                             if (docData.research_agenda && Array.isArray(docData.research_agenda)) {
-                                agendaItems = docData.research_agenda;
+                                topics = docData.research_agenda;
+                                console.log(`Extracted ${topics.length} topics from document data (research_agenda)`);
                             } else if (docData.topics && Array.isArray(docData.topics)) {
-                                agendaItems = docData.topics;
-                            } else if (docData.subject_areas && Array.isArray(docData.subject_areas)) {
-                                agendaItems = docData.subject_areas;
+                                topics = docData.topics;
+                                console.log(`Extracted ${topics.length} topics from document data (topics)`);
                             }
                         }
                     } catch (docError) {
-                        console.warn('[KEYWORDS] Error extracting from document:', docError);
+                        console.warn('No research agenda found for this document');
                     }
                 }
                 
-                // Format the items
-                const formattedItems = agendaItems.map(item => {
-                    // Handle string-only items
-                    if (typeof item === 'string') {
-                        return {
-                            id: 'unknown',
-                            name: item
-                        };
-                    }
-                    
-                    // Handle object items
-                    const itemObj = { ...item };
-                    
-                    // Ensure name exists
-                    if (!itemObj.name && itemObj.title) {
-                        itemObj.name = itemObj.title;
-                    } else if (!itemObj.name && itemObj.agenda_name) {
-                        itemObj.name = itemObj.agenda_name;
-                    } else if (!itemObj.name && itemObj.topic) {
-                        itemObj.name = itemObj.topic;
-                    } else if (!itemObj.name) {
-                        console.warn('[KEYWORDS] Item has no name:', itemObj);
-                        itemObj.name = 'Unknown Item';
-                    }
-                    
-                    return itemObj;
-                }).filter(item => item !== null);
-                
-                console.log(`[KEYWORDS] Final formatted items (${formattedItems.length}):`, formattedItems);
-                resolve(formattedItems);
+                resolve(topics);
             } catch (error) {
-                console.error(`[KEYWORDS] Error in fetchResearchAgendaForDocument:`, error);
-                reject(error);
+                console.error('Error fetching research agenda:', error);
+                resolve([]); // Resolve with empty array in case of error
             }
         });
     },
@@ -1251,119 +1532,75 @@ window.documentEdit = {
     populateEditForm: function(data) {
         console.log('Populating edit form with data:', data);
         
-        // Set form fields
+        // Set ID field
+        document.getElementById('edit-single-document-id').value = data.id;
+        
+        // Set basic fields
         document.getElementById('edit-single-document-title').value = data.title || '';
-        document.getElementById('edit-single-document-type').value = data.document_type || '';
         
-        // Format date for input field (YYYY-MM-DD)
-        if (data.date_published) {
-            const date = new Date(data.date_published);
-            const formattedDate = date.toISOString().split('T')[0];
-            document.getElementById('edit-single-document-date').value = formattedDate;
-        } else {
-            document.getElementById('edit-single-document-date').value = '';
-        }
-        
-        // Ensure data.authors is an array
-        if (!data.authors || !Array.isArray(data.authors)) {
-            console.warn('Document has no authors or authors is not an array, fetching authors separately');
-            // Try to fetch authors
-            this.fetchAuthorsForDocument(data.id)
-                .then(authors => {
-                    data.authors = authors;
-                    this.populateAuthorsContainer(data.authors);
-                })
-                .catch(error => {
-                    console.error('Error fetching authors:', error);
-                    data.authors = [];
-                });
-        } else {
-            this.populateAuthorsContainer(data.authors);
-        }
-        
-        // Ensure data.research_agenda is an array
-        if (!data.research_agenda || !Array.isArray(data.research_agenda)) {
-            console.warn('Document has no research agenda or research_agenda is not an array, fetching research agenda separately');
-            // Try to fetch research agenda
-            this.fetchResearchAgendaForDocument(data.id)
-                .then(researchAgenda => {
-                    data.research_agenda = researchAgenda;
-                    this.populateResearchAgendaContainer(data.research_agenda);
-                })
-                .catch(error => {
-                    console.error('Error fetching research agenda:', error);
-                    data.research_agenda = [];
-                });
-        } else {
-            this.populateResearchAgendaContainer(data.research_agenda);
-        }
-        
-        // Populate abstract
-        const abstractElement = document.getElementById('edit-single-document-abstract');
-        if (abstractElement) {
-            abstractElement.value = data.abstract || '';
-        }
-        
-        // Populate preview section
-        document.getElementById('edit-single-document-preview-title').textContent = data.title || 'Document Title';
-        document.getElementById('edit-single-document-preview-type').textContent = data.document_type || '-';
-        document.getElementById('edit-single-document-preview-date').textContent = data.date_published ? new Date(data.date_published).toLocaleDateString() : '-';
-        
-        // The abstract element in the preview might not exist since we reorganized the UI
-        const previewAbstractElement = document.getElementById('edit-single-document-preview-abstract');
-        if (previewAbstractElement) {
-            previewAbstractElement.textContent = data.abstract || 'No abstract available.';
-        }
-        
-        // Initialize search inputs after a short delay to allow containers to be populated
-        setTimeout(() => {
-            // Initialize author search
-            const authorSearchInput = document.getElementById('edit-single-document-author-search');
-            const selectedAuthorsContainerId = 'edit-single-document-selected-authors';
+        // Set document type dropdown
+        const typeSelect = document.getElementById('edit-single-document-type');
+        if (typeSelect) {
+            // Try to find matching option
+            const documentType = data.document_type || data.type || data.category || '';
             
-            if (authorSearchInput) {
-                // Try to initialize with our new enhanced version
-                try {
-                    this.initializeAuthorSearch(authorSearchInput, selectedAuthorsContainerId);
-                    console.log('Author search initialized successfully');
-                } catch (error) {
-                    console.error('Error initializing author search:', error);
-                    this.dummyAuthorSearchInit(authorSearchInput); // Fallback
+            for (let i = 0; i < typeSelect.options.length; i++) {
+                if (typeSelect.options[i].value.toUpperCase() === documentType.toUpperCase()) {
+                    typeSelect.selectedIndex = i;
+                    break;
                 }
             }
-            
-            // Initialize research agenda search
-            const topicSearchInput = document.getElementById('edit-single-document-topic-search');
-            const selectedTopicsContainerId = 'edit-single-document-selected-topics';
-            
-            if (topicSearchInput) {
-                // Try to initialize with our enhanced version
+        }
+        
+        // Set date field - handle both date_published and publication_date formats
+        const dateField = document.getElementById('edit-single-document-date');
+        if (dateField) {
+            const dateValue = data.date_published || data.publication_date;
+            if (dateValue) {
                 try {
-                    this.initializeResearchAgendaSearch(topicSearchInput, selectedTopicsContainerId);
-                    console.log('Research agenda search initialized successfully');
+                    // Format date as YYYY-MM-DD for input[type=date]
+                    const date = new Date(dateValue);
+                    const formattedDate = date.toISOString().split('T')[0];
+                    dateField.value = formattedDate;
                 } catch (error) {
-                    console.error('Error initializing research agenda search:', error);
-                    // No fallback needed, basic functionality will work without it
+                    console.error('Error formatting date:', error);
                 }
             }
-        }, 100);
-        
-        // Set document type icon
-        const typeIcon = document.getElementById('edit-single-document-type-icon');
-        if (typeIcon) {
-            const iconPath = this.getDocumentTypeIcon(data.document_type);
-            typeIcon.src = iconPath;
         }
         
-        // Set up "View Document" button
-        const viewDocBtn = document.getElementById('edit-single-document-view-btn');
-        if (viewDocBtn && data.id) {
-            viewDocBtn.href = `/open-doc.html?id=${data.id}`;
-            viewDocBtn.classList.remove('disabled');
+        // Set abstract field
+        const abstractField = document.getElementById('edit-single-document-abstract');
+        if (abstractField && data.abstract) {
+            abstractField.value = data.abstract;
         }
+        
+        // Handle file path if available
+        if (data.file_path) {
+            const fileIndicator = document.getElementById('edit-single-document-file-indicator');
+            if (fileIndicator) {
+                const fileName = data.file_path.split('/').pop();
+                fileIndicator.textContent = `Current file: ${fileName}`;
+                fileIndicator.classList.add('has-file');
+                
+                // Add a note about replacement
+                const fileNoteContainer = document.getElementById('edit-single-document-file-note');
+                if (fileNoteContainer) {
+                    fileNoteContainer.innerHTML = '<div class="file-replace-note">Select a new file to replace the current document</div>';
+                }
+            }
+        }
+        
+        // Populate authors
+        this.populateAuthorsContainer(data.authors || []);
+        
+        // Populate research agenda/topics
+        this.populateResearchAgendaContainer(data.research_agenda || data.topics || []);
+        
+        // Update the preview section
+        this.updateDocumentPreview(data);
     },
     
-    // Helper function to populate authors container
+    // Populate authors container
     populateAuthorsContainer: function(authors) {
         const selectedAuthorsContainer = document.getElementById('edit-single-document-selected-authors');
         if (!selectedAuthorsContainer) {
@@ -1374,32 +1611,124 @@ window.documentEdit = {
         // Clear existing content
         selectedAuthorsContainer.innerHTML = '';
         
-        // Populate with authors
+        // Populate with author items
         if (authors && Array.isArray(authors) && authors.length > 0) {
-            console.log(`Populating authors container with ${authors.length} authors:`, authors);
+            console.log(`Populating authors container with ${authors.length} items:`, authors);
+            
             authors.forEach(author => {
                 // Skip if author is null or undefined
                 if (!author) return;
                 
+                // Handle different formats of author items
+                let authorId = 'unknown';
+                let authorName = '';
+                
+                if (typeof author === 'string') {
+                    authorName = author;
+                } else if (author.id) {
+                    authorId = author.id;
+                    
+                    if (author.full_name) {
+                        authorName = author.full_name;
+                    } else if (author.name) {
+                        authorName = author.name;
+                    } else if (author.first_name || author.last_name) {
+                        authorName = [author.first_name, author.last_name].filter(Boolean).join(' ');
+                    }
+                }
+                
+                if (!authorName) {
+                    console.warn('Author item has no name, skipping', author);
+                    return;
+                }
+                
                 const authorElement = document.createElement('div');
                 authorElement.className = 'selected-author';
-                authorElement.dataset.id = author.id || 'unknown';
+                authorElement.dataset.id = authorId;
                 authorElement.innerHTML = `
-                    ${author.full_name || author.name || author}
-                    <span class="remove-author" data-id="${author.id || 'unknown'}">&times;</span>
+                    ${authorName}
+                    <span class="remove-author" data-id="${authorId}">&times;</span>
                 `;
+                
+                // Add to container
                 selectedAuthorsContainer.appendChild(authorElement);
-            });
-            
-            // Add event listeners to remove buttons
-            const removeButtons = selectedAuthorsContainer.querySelectorAll('.remove-author');
-            removeButtons.forEach(button => {
-                button.addEventListener('click', (e) => {
-                    e.target.parentElement.remove();
-                });
+                
+                // Add click handler to remove button
+                const removeBtn = authorElement.querySelector('.remove-author');
+                if (removeBtn) {
+                    removeBtn.addEventListener('click', () => {
+                        authorElement.remove();
+                    });
+                }
             });
         } else {
-            console.warn('No authors found for this document');
+            console.warn('No author items found for this document');
+        }
+    },
+    
+    // Update document preview
+    updateDocumentPreview: function(data) {
+        console.log('Updating document preview with data:', data);
+        
+        // Update title
+        const titleElement = document.getElementById('edit-single-document-preview-title');
+        if (titleElement) {
+            titleElement.textContent = data.title || 'Untitled Document';
+        }
+        
+        // Update type
+        const typeElement = document.getElementById('edit-single-document-preview-type');
+        if (typeElement) {
+            typeElement.textContent = data.document_type || data.type || data.category || 'Unknown Type';
+        }
+        
+        // Update date
+        const dateElement = document.getElementById('edit-single-document-preview-date');
+        if (dateElement) {
+            const dateValue = data.date_published || data.publication_date;
+            const formattedDate = dateValue ? new Date(dateValue).toLocaleDateString() : '-';
+            dateElement.textContent = formattedDate;
+        }
+        
+        // Update authors
+        const authorsElement = document.getElementById('edit-single-document-preview-authors');
+        if (authorsElement) {
+            const authors = data.authors || [];
+            
+            if (authors.length > 0) {
+                const authorNames = authors.map(author => {
+                    if (typeof author === 'string') return author;
+                    return author.full_name || author.name || [author.first_name, author.last_name].filter(Boolean).join(' ') || 'Unknown Author';
+                });
+                
+                authorsElement.textContent = authorNames.join(', ');
+            } else {
+                authorsElement.textContent = 'No authors';
+            }
+        }
+        
+        // Update abstract
+        const abstractElement = document.getElementById('edit-single-document-preview-abstract');
+        if (abstractElement) {
+            abstractElement.textContent = data.abstract || 'No abstract available';
+        }
+        
+        // Set document type icon if available
+        const typeIcon = document.getElementById('edit-single-document-type-icon');
+        if (typeIcon) {
+            const iconPath = this.getDocumentTypeIcon(data.document_type || data.category);
+            if (iconPath && !iconPath.includes('undefined')) {
+                typeIcon.src = iconPath;
+            } else {
+                // Use a default icon path if the document type doesn't have a specific icon
+                typeIcon.src = '/admin/Components/icons/Category-icons/default_category_icon.png';
+            }
+            
+            // Add background color to the icon container
+            const iconContainer = document.getElementById('edit-single-document-preview-icon');
+            if (iconContainer) {
+                iconContainer.style.backgroundColor = '#10B981'; // Green color from css
+            }
         }
     },
     
@@ -1407,21 +1736,21 @@ window.documentEdit = {
     populateResearchAgendaContainer: function(researchAgenda) {
         const selectedTopicsContainer = document.getElementById('edit-single-document-selected-topics');
         if (!selectedTopicsContainer) {
-            console.error('Keywords container not found');
+            console.error('Research agenda container not found');
             return;
         }
         
         // Clear existing content
         selectedTopicsContainer.innerHTML = '';
         
-        // Populate with keywords items
+        // Populate with research agenda items
         if (researchAgenda && Array.isArray(researchAgenda) && researchAgenda.length > 0) {
-            console.log(`Populating keywords container with ${researchAgenda.length} items:`, researchAgenda);
+            console.log(`Populating research agenda container with ${researchAgenda.length} items:`, researchAgenda);
             researchAgenda.forEach(item => {
                 // Skip if item is null or undefined
                 if (!item) return;
                 
-                // Handle different formats of keywords items
+                // Handle different formats of research agenda items
                 let itemId = 'unknown';
                 let itemName = '';
                 
@@ -1442,7 +1771,7 @@ window.documentEdit = {
                 }
                 
                 if (!itemName) {
-                    console.warn('Keywords item has no name, skipping', item);
+                    console.warn('Research agenda item has no name, skipping', item);
                     return;
                 }
                 
@@ -1466,841 +1795,93 @@ window.documentEdit = {
                 }
             });
         } else {
-            console.warn('No keywords items found for this document');
+            console.warn('No research agenda items found for this document');
         }
     },
     
     // Populate the compiled document edit form
     populateCompiledEditForm: function(data) {
-        // Set form values
-        document.getElementById('edit-compiled-document-title').value = data.title || '';
-        document.getElementById('edit-compiled-document-type').value = data.document_type || '';
-        
-        // Format date for input field (YYYY-MM-DD)
-        if (data.date_published) {
-            const date = new Date(data.date_published);
-            const formattedDate = date.toISOString().split('T')[0];
-            document.getElementById('edit-compiled-document-date').value = formattedDate;
-        } else {
-            document.getElementById('edit-compiled-document-date').value = '';
-        }
-        
-        // Populate authors
-        const selectedAuthorsContainer = document.getElementById('edit-compiled-document-selected-authors');
-        if (selectedAuthorsContainer && data.authors && Array.isArray(data.authors)) {
-            selectedAuthorsContainer.innerHTML = '';
-            data.authors.forEach(author => {
-                const authorElement = document.createElement('div');
-                authorElement.className = 'selected-author';
-                authorElement.dataset.id = author.id || 'unknown';
-                authorElement.innerHTML = `
-                    ${author.full_name || author.name || author}
-                    <span class="remove-author" data-id="${author.id || 'unknown'}">&times;</span>
-                `;
-                selectedAuthorsContainer.appendChild(authorElement);
-            });
-            
-            // Add event listeners to remove buttons
-            const removeButtons = selectedAuthorsContainer.querySelectorAll('.remove-author');
-            removeButtons.forEach(button => {
-                button.addEventListener('click', (e) => {
-                    e.target.parentElement.remove();
-                });
-            });
-        }
-        
-        // Populate research agenda (renamed from topics)
-        const selectedTopicsContainer = document.getElementById('edit-compiled-document-selected-topics');
-        if (selectedTopicsContainer && data.research_agenda && Array.isArray(data.research_agenda)) {
-            selectedTopicsContainer.innerHTML = '';
-            data.research_agenda.forEach(item => {
-                const topicElement = document.createElement('div');
-                topicElement.className = 'selected-topic';
-                topicElement.dataset.id = item.id || 'unknown';
-                topicElement.innerHTML = `
-                    ${item.name || item}
-                    <span class="remove-topic" data-id="${item.id || 'unknown'}">&times;</span>
-                `;
-                selectedTopicsContainer.appendChild(topicElement);
-            });
-            
-            // Add event listeners to remove buttons
-            const removeButtons = selectedTopicsContainer.querySelectorAll('.remove-topic');
-            removeButtons.forEach(button => {
-                button.addEventListener('click', (e) => {
-                    e.target.parentElement.remove();
-                });
-            });
-        }
-        
-        // Load child documents
-        this.loadChildDocuments(data.id, data.children || []);
-        
-        // Populate preview section
-        document.getElementById('edit-compiled-document-preview-title').textContent = data.title || 'Compilation Title';
-        document.getElementById('edit-compiled-document-preview-type').textContent = data.document_type || '-';
-        document.getElementById('edit-compiled-document-preview-date').textContent = data.date_published ? new Date(data.date_published).toLocaleDateString() : '-';
-        
-        // The abstract element in the preview might not exist since we reorganized the UI
-        const abstractElement = document.getElementById('edit-compiled-document-preview-abstract');
-        if (abstractElement) {
-            abstractElement.textContent = data.abstract || 'No abstract available.';
-        }
-        
-        document.getElementById('edit-compiled-document-preview-count').textContent = data.child_count || 0;
-        
-        // Set author text
-        if (data.authors && Array.isArray(data.authors) && data.authors.length > 0) {
-            const authorNames = data.authors.map(a => a.full_name || a.name || a).join(', ');
-            document.getElementById('edit-compiled-document-preview-author').innerHTML = `<i class="fas fa-user"></i> ${authorNames}`;
-        } else {
-            document.getElementById('edit-compiled-document-preview-author').innerHTML = `<i class="fas fa-user"></i> Multiple Authors`;
-        }
-        
-        // Set research agenda text (renamed from topics)
-        if (data.research_agenda && Array.isArray(data.research_agenda) && data.research_agenda.length > 0) {
-            const agendaNames = data.research_agenda.map(t => t.name || t).join(', ');
-            document.getElementById('edit-compiled-document-preview-topics').textContent = agendaNames;
-        } else {
-            document.getElementById('edit-compiled-document-preview-topics').textContent = '-';
-        }
-        
-        // Set document type icon
-        const typeIcon = document.getElementById('edit-compiled-document-type-icon');
-        if (typeIcon) {
-            const iconPath = this.getDocumentTypeIcon(data.document_type);
-            typeIcon.src = iconPath;
-        }
-        
-        // Load preview of child documents
-        this.updateChildDocumentsPreview(data.children || []);
+        // ... existing code ...
     },
     
     // Load and display child documents in the compiled document edit form
-    loadChildDocuments: function(parentId, children = []) {
-        const container = document.getElementById('edit-compiled-document-children');
-        if (!container) return;
-        
-        if (!children.length) {
-            container.innerHTML = '<div class="no-children-message">No child documents added yet.</div>';
-            return;
-        }
-        
-        container.innerHTML = '';
-        
-        children.forEach(child => {
-            const childElement = document.createElement('div');
-            childElement.className = 'compilation-study-item';
-            childElement.dataset.id = child.id;
-            
-            childElement.innerHTML = `
-                <div class="study-info">
-                    <div class="study-title">${child.title || 'Untitled Document'}</div>
-                    <div class="study-author">${child.author_names || 'Unknown Author'}</div>
-                </div>
-                <div class="study-actions">
-                    <button class="remove-child-btn" data-id="${child.id}" title="Remove from compilation">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            `;
-            
-            container.appendChild(childElement);
-        });
-        
-        // Add event listeners to remove buttons
-        const removeButtons = container.querySelectorAll('.remove-child-btn');
-        removeButtons.forEach(button => {
-            button.addEventListener('click', (e) => {
-                const childId = e.target.closest('button').dataset.id;
-                this.removeChildDocument(childId);
-            });
-        });
+    loadChildDocuments: function(parentId, children = [], container = null) {
+        // ... existing code ...
     },
     
     // Update the child documents preview in the right panel
-    updateChildDocumentsPreview: function(children = []) {
-        const container = document.getElementById('edit-compiled-document-preview-children');
-        if (!container) return;
-        
-        if (!children.length) {
-            container.innerHTML = '<div class="no-children-message">No child documents added.</div>';
-            return;
-        }
-        
-        container.innerHTML = '';
-        
-        children.forEach(child => {
-            const childElement = document.createElement('div');
-            childElement.className = 'preview-child-item';
-            
-            childElement.innerHTML = `
-                <div class="preview-child-title">${child.title || 'Untitled Document'}</div>
-                <div class="preview-child-author">${child.author_names || 'Unknown Author'}</div>
-            `;
-            
-            container.appendChild(childElement);
-        });
+    updateChildDocumentsPreview: function(children = [], container = null) {
+        // ... existing code ...
+    },
+    
+    // Update the compiled document edit preview section
+    updateCompiledEditPreview: function(data) {
+        // ... existing code ...
     },
     
     // Remove a child document from the compilation
     removeChildDocument: function(childId) {
-        // Get parent document ID
-        const parentId = document.getElementById('edit-compiled-document-id').value;
-        
-        // Find and remove the child element from the list
-        const childElement = document.querySelector(`.compilation-study-item[data-id="${childId}"]`);
-        if (childElement) {
-            childElement.remove();
-        }
-        
-        // Update the preview
-        this.fetchDocumentData(parentId, true).then(data => {
-            // Filter out the removed child
-            const updatedChildren = (data.children || []).filter(child => child.id != childId);
-            this.updateChildDocumentsPreview(updatedChildren);
-            
-            // Update child count
-            document.getElementById('edit-compiled-document-preview-count').textContent = updatedChildren.length;
-        });
-        
-        // Notify success
-        showToast('Child document removed from compilation', 'success');
+        // ... existing code ...
     },
     
     // Show the child document selection modal
     showChildDocumentSelector: function() {
-        const modal = document.getElementById('select-child-document-modal');
-        if (!modal) return;
-        
-        // Display the modal
-        modal.style.display = 'flex';
-        
-        // Load available documents
-        this.loadAvailableDocuments();
+        // ... existing code ...
     },
     
     // Load available documents for selection
     loadAvailableDocuments: function() {
-        const container = document.getElementById('available-documents-container');
-        if (!container) return;
-        
-        container.innerHTML = '<div class="loading-documents"><i class="fas fa-spinner fa-spin"></i> Loading documents...</div>';
-        
-        // Fetch non-compiled documents that can be added as children
-        fetch('/api/documents?type=regular&limit=50')
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch documents: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                this.renderAvailableDocuments(data.documents || []);
-            })
-            .catch(error => {
-                console.error('Error loading available documents:', error);
-                container.innerHTML = `<div class="error-message">Error loading documents: ${error.message}</div>`;
-            });
+        // ... existing code ...
     },
     
     // Render available documents for selection
     renderAvailableDocuments: function(documents) {
-        const container = document.getElementById('available-documents-container');
-        if (!container) return;
-        
-        if (!documents.length) {
-            container.innerHTML = '<div class="no-documents-message">No documents available to add.</div>';
-            return;
-        }
-        
-        container.innerHTML = '';
-        
-        documents.forEach(doc => {
-            const docElement = document.createElement('div');
-            docElement.className = 'available-document-item';
-            docElement.dataset.id = doc.id;
-            
-            const formattedDate = doc.date_published ? new Date(doc.date_published).toLocaleDateString() : 'Unknown date';
-            
-            docElement.innerHTML = `
-                <div class="available-document-info">
-                    <div class="available-document-title">${doc.title || 'Untitled Document'}</div>
-                    <div class="available-document-meta">
-                        ${doc.author_names || 'Unknown Author'} | ${formattedDate} | ${doc.document_type || 'Unknown Type'}
-                    </div>
-                </div>
-                <button class="select-document-btn" data-id="${doc.id}">Add</button>
-            `;
-            
-            container.appendChild(docElement);
-        });
-        
-        // Add event listeners to select buttons
-        const selectButtons = container.querySelectorAll('.select-document-btn');
-        selectButtons.forEach(button => {
-            button.addEventListener('click', (e) => {
-                const docId = e.target.dataset.id;
-                this.addChildDocument(docId);
-            });
-        });
+        // ... existing code ...
     },
     
     // Search available documents
     searchAvailableDocuments: function(query) {
-        const items = document.querySelectorAll('.available-document-item');
-        
-        items.forEach(item => {
-            const title = item.querySelector('.available-document-title').textContent.toLowerCase();
-            const meta = item.querySelector('.available-document-meta').textContent.toLowerCase();
-            
-            if (title.includes(query.toLowerCase()) || meta.includes(query.toLowerCase())) {
-                item.style.display = '';
-            } else {
-                item.style.display = 'none';
-            }
-        });
+        // ... existing code ...
     },
     
     // Add a child document to the compilation
     addChildDocument: function(childId) {
-        const parentId = document.getElementById('edit-compiled-document-id').value;
-        
-        // Fetch child document data
-        fetch(`/api/documents/${childId}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch child document: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(childData => {
-                // Add to the child documents list
-                const container = document.getElementById('edit-compiled-document-children');
-                
-                // Remove "no children" message if present
-                const noChildrenMsg = container.querySelector('.no-children-message');
-                if (noChildrenMsg) {
-                    container.innerHTML = '';
-                }
-                
-                const childElement = document.createElement('div');
-                childElement.className = 'compilation-study-item';
-                childElement.dataset.id = childData.id;
-                
-                childElement.innerHTML = `
-                    <div class="study-info">
-                        <div class="study-title">${childData.title || 'Untitled Document'}</div>
-                        <div class="study-author">${childData.author_names || 'Unknown Author'}</div>
-                    </div>
-                    <div class="study-actions">
-                        <button class="remove-child-btn" data-id="${childData.id}" title="Remove from compilation">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                `;
-                
-                container.appendChild(childElement);
-                
-                // Add event listener to remove button
-                childElement.querySelector('.remove-child-btn').addEventListener('click', (e) => {
-                    this.removeChildDocument(childData.id);
-                });
-                
-                // Update the preview
-                this.updateChildDocumentsPreview([...this.getSelectedChildDocuments(), childData]);
-                
-                // Update child count
-                const countElement = document.getElementById('edit-compiled-document-preview-count');
-                countElement.textContent = parseInt(countElement.textContent || '0') + 1;
-                
-                // Close the selection modal
-                document.getElementById('select-child-document-modal').style.display = 'none';
-                
-                // Notify success
-                showToast('Child document added to compilation', 'success');
-            })
-            .catch(error => {
-                console.error('Error adding child document:', error);
-                showToast('Error adding child document. Please try again.', 'error');
-            });
+        // ... existing code ...
     },
     
     // Get the currently selected child documents
     getSelectedChildDocuments: function() {
-        const children = [];
-        const childElements = document.querySelectorAll('.compilation-study-item');
-        
-        childElements.forEach(element => {
-            children.push({
-                id: element.dataset.id,
-                title: element.querySelector('.study-title').textContent,
-                author_names: element.querySelector('.study-author').textContent
-            });
-        });
-        
-        return children;
+        // ... existing code ...
     },
     
     // Show PDF viewer
     showPdfViewer: function(documentId) {
-        console.log(`Opening document ID: ${documentId} in new tab`);
-        
-        // Fetch the document to get the file path
-        fetch(`/api/documents/${documentId}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Error fetching document: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(document => {
-                if (document && document.file_path) {
-                    // Ensure we have a fully qualified URL by adding protocol and host if missing
-                    let pdfPath = document.file_path;
-                    
-                    // If the path doesn't start with http or /, add the leading /
-                    if (!pdfPath.startsWith('http') && !pdfPath.startsWith('/')) {
-                        pdfPath = '/' + pdfPath;
-                    }
-                    
-                    // If the path is relative (starts with /), prepend the current origin
-                    if (pdfPath.startsWith('/')) {
-                        pdfPath = window.location.origin + pdfPath;
-                    }
-                    
-                    console.log(`Opening document with path: ${pdfPath}`);
-                    // Open in new tab
-                    window.open(pdfPath, '_blank');
-                } else {
-                    console.error('No file path found for document:', document);
-                    alert('Error: The document file could not be found.');
-                }
-            })
-            .catch(error => {
-                console.error('Error opening document:', error);
-                alert(`Error: ${error.message}`);
-            });
+        // ... existing code ...
     },
     
     // Show success message
     showSaveSuccess: function() {
-        // Create success popup
-        const popup = document.createElement('div');
-        popup.className = 'success-popup-overlay';
-        popup.innerHTML = `
-            <div class="success-popup">
-                <div class="success-popup-icon">✓</div>
-                <div class="success-popup-title">Changes Saved</div>
-                <div class="success-popup-message">Your changes have been saved successfully.</div>
-                <button class="success-popup-button">OK</button>
-            </div>
-        `;
-        
-        // Add to document
-        document.body.appendChild(popup);
-        
-        // Add button click handler to close
-        const button = popup.querySelector('.success-popup-button');
-        if (button) {
-            button.addEventListener('click', () => {
-                document.body.removeChild(popup);
-            });
-        }
-        
-        // Auto-close after 3 seconds
-        setTimeout(() => {
-            if (document.body.contains(popup)) {
-                document.body.removeChild(popup);
-            }
-        }, 3000);
+        // ... existing code ...
     },
     
     // Show error message
     showSaveError: function(error) {
-        // Create small toast notification
-        const toast = document.createElement('div');
-        toast.className = 'toast toast-error';
-        toast.textContent = error instanceof Error ? error.message : error;
-        
-        // Add to document
-        document.body.appendChild(toast);
-        
-        // Auto-close after 5 seconds
-        setTimeout(() => {
-            if (document.body.contains(toast)) {
-                document.body.removeChild(toast);
-            }
-        }, 5000);
+        // ... existing code ...
     },
     
     // Hide modal by ID
     hideModal: function(modalId) {
-        const modal = document.getElementById(modalId);
-        if (modal) {
-            modal.style.display = 'none';
-        } else {
-            console.warn(`Modal with ID ${modalId} not found`);
-        }
+        // ... existing code ...
     },
     
     // Save changes to a document
     saveDocument: function(formData) {
-        console.log('Saving document changes...');
-        
-        const documentId = formData.get('document_id');
-        if (!documentId) {
-            console.error('No document ID provided for save operation');
-            this.showSaveError('Invalid document ID');
-            return;
-        }
-        
-        // Create data object from form data
-        const data = {
-            id: documentId,
-            title: formData.get('title'),
-            document_type: formData.get('document_type'),
-            date_published: formData.get('date_published')
-        };
-        
-        console.log('Document data to save:', data);
-        
-        // Gather selected authors
-        const selectedAuthors = [];
-        document.querySelectorAll('#edit-single-document-selected-authors .selected-author').forEach(element => {
-            selectedAuthors.push({
-                id: element.dataset.id,
-                name: element.textContent.trim().replace('×', '')
-            });
-        });
-        
-        console.log('Selected authors:', selectedAuthors);
-        
-        // Gather selected research agenda items
-        const selectedTopics = [];
-        document.querySelectorAll('#edit-single-document-selected-topics .selected-topic').forEach(element => {
-            selectedTopics.push({
-                id: element.dataset.id,
-                name: element.textContent.trim().replace('×', '')
-            });
-        });
-        
-        console.log('Selected research agenda items:', selectedTopics);
-        
-        // First, update basic document data
-        fetch(`/api/documents/${documentId}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                ...data,
-                authors: selectedAuthors.map(author => author.id)
-            })
-        })
-        .then(response => {
-            if (!response.ok) {
-                console.error('Error updating document:', response.status);
-                return response.json().then(data => Promise.reject(data.error || 'Failed to update document'));
-            }
-            return response.json();
-        })
-        .then(result => {
-            console.log('Document updated successfully:', result);
-            
-            // Now save research agenda items to both endpoints
-            const agendaItemNames = selectedTopics.map(item => item.name);
-            
-                // First try the old endpoint for backward compatibility
-            return fetch(`/api/documents/${documentId}/topics`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                body: JSON.stringify({ topics: agendaItemNames })
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        console.warn('Warning: Research agenda items may not have been saved correctly to old endpoint');
-                    }
-                return result; // Continue with the original result
-                })
-                .catch(error => {
-                    console.error('Error saving research agenda items to old endpoint:', error);
-                return result; // Continue with the original result
-            });
-        })
-        .then(result => {
-            // Now save to the new research agenda endpoint
-            const agendaItemIds = selectedTopics
-                .filter(item => item.id !== 'new')
-                .map(item => item.id);
-                
-            const agendaItemNames = selectedTopics
-                .filter(item => item.id === 'new')
-                .map(item => item.name);
-                
-            return fetch(`/document-research-agenda`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        document_id: documentId,
-                        agenda_ids: agendaItemIds,
-                        agenda_names: agendaItemNames,
-                        agenda_items: selectedTopics.map(item => item.name) // For backward compatibility
-                    })
-                })
-                .then(response => {
-                    if (!response.ok) {
-                    console.warn('Warning: Failed to link research agenda items using main endpoint, trying fallback');
-                    // Try fallback endpoint
-                    return fetch(`/api/document-research-agenda/link`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ 
-                            document_id: documentId,
-                            agenda_items: selectedTopics.map(item => item.name)
-                        })
-                    })
-                    .then(fallbackResponse => {
-                        if (!fallbackResponse.ok) {
-                            console.warn('Warning: Failed to link research agenda items in fallback endpoint');
-                            return fallbackResponse.json().then(data => Promise.reject(data.error || 'Failed to link research agenda items'));
-                        }
-                        return fallbackResponse.json();
-                    });
-                }
-                
-                    return response.json();
-                })
-                .then(result => {
-                    console.log('Research agenda linking result:', result);
-                return result;
-                })
-                .catch(error => {
-                    console.error('Error linking research agenda items:', error);
-                return result; // Continue with the original result
-            });
-        })
-        .then(result => {
-            // Handle file upload if provided
-            const fileInput = document.getElementById('edit-single-document-file');
-            if (fileInput && fileInput.files.length > 0) {
-                const fileFormData = new FormData();
-                fileFormData.append('file', fileInput.files[0]);
-                
-                return fetch(`/api/documents/${documentId}/file`, {
-                    method: 'POST',
-                    body: fileFormData
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        return response.json().then(data => Promise.reject(data.error || 'Failed to upload file'));
-                    }
-                    return response.json();
-                });
-            }
-            
-            return result;
-        })
-        .then(result => {
-            // Show success message and close modal
-            this.showSaveSuccess();
-            document.getElementById('edit-single-document-modal').style.display = 'none';
-            
-            // Refresh document list if available
-            if (window.documentList && typeof window.documentList.reloadDocuments === 'function') {
-                window.documentList.reloadDocuments();
-            }
-        })
-        .catch(error => {
-            console.error('Error saving document:', error);
-            this.showSaveError(error);
-        });
+        // ... existing code ...
     },
     
     // Save changes to a compiled document
     saveCompiledDocument: function(formData) {
-        console.log('Saving compiled document changes...');
-        
-        const documentId = formData.get('document_id');
-        if (!documentId) {
-            console.error('No document ID provided for save operation');
-            this.showSaveError('Invalid document ID');
-            return;
-        }
-        
-        // Create data object from form data
-        const data = {
-            id: documentId,
-            title: formData.get('title'),
-            document_type: formData.get('document_type'),
-            date_published: formData.get('date_published'),
-            is_compiled: true
-        };
-        
-        console.log('Compiled document data to save:', data);
-        
-        // Gather selected authors
-        const selectedAuthors = [];
-        document.querySelectorAll('#edit-compiled-document-selected-authors .selected-author').forEach(element => {
-            selectedAuthors.push({
-                id: element.dataset.id,
-                name: element.textContent.trim().replace('×', '')
-            });
-        });
-        
-        console.log('Selected authors:', selectedAuthors);
-        
-        // Gather selected research agenda items
-        const selectedTopics = [];
-        document.querySelectorAll('#edit-compiled-document-selected-topics .selected-topic').forEach(element => {
-            selectedTopics.push({
-                id: element.dataset.id,
-                name: element.textContent.trim().replace('×', '')
-            });
-        });
-        
-        console.log('Selected research agenda items:', selectedTopics);
-        
-        // First, update basic document data
-        fetch(`/api/documents/${documentId}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                ...data,
-                authors: selectedAuthors.map(author => author.id)
-            })
-        })
-        .then(response => {
-            if (!response.ok) {
-                console.error('Error updating compiled document:', response.status);
-                return response.json().then(data => Promise.reject(data.error || 'Failed to update compiled document'));
-            }
-            return response.json();
-        })
-        .then(result => {
-            console.log('Compiled document updated successfully:', result);
-            
-            // Now save research agenda items to both endpoints
-            const agendaItemNames = selectedTopics.map(item => item.name);
-            
-                // First try the old endpoint for backward compatibility
-            return fetch(`/api/documents/${documentId}/topics`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                body: JSON.stringify({ topics: agendaItemNames })
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        console.warn('Warning: Research agenda items may not have been saved correctly to old endpoint');
-                    }
-                return result; // Continue with the original result
-                })
-                .catch(error => {
-                    console.error('Error saving research agenda items to old endpoint:', error);
-                return result; // Continue with the original result
-            });
-        })
-        .then(result => {
-            // Now save to the new research agenda endpoint
-            const agendaItemIds = selectedTopics
-                .filter(item => item.id !== 'new')
-                .map(item => item.id);
-                
-            const agendaItemNames = selectedTopics
-                .filter(item => item.id === 'new')
-                .map(item => item.name);
-                
-            return fetch(`/document-research-agenda`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        document_id: documentId,
-                        agenda_ids: agendaItemIds,
-                        agenda_names: agendaItemNames,
-                        agenda_items: selectedTopics.map(item => item.name) // For backward compatibility
-                    })
-                })
-                .then(response => {
-                    if (!response.ok) {
-                    console.warn('Warning: Failed to link research agenda items using main endpoint, trying fallback');
-                    // Try fallback endpoint
-                    return fetch(`/api/document-research-agenda/link`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ 
-                            document_id: documentId,
-                            agenda_items: selectedTopics.map(item => item.name)
-                        })
-                    })
-                    .then(fallbackResponse => {
-                        if (!fallbackResponse.ok) {
-                            console.warn('Warning: Failed to link research agenda items in fallback endpoint');
-                            return fallbackResponse.json().then(data => Promise.reject(data.error || 'Failed to link research agenda items'));
-                        }
-                        return fallbackResponse.json();
-                    });
-                }
-                
-                    return response.json();
-                })
-                .then(result => {
-                    console.log('Research agenda linking result:', result);
-                return result;
-                })
-                .catch(error => {
-                    console.error('Error linking research agenda items:', error);
-                return result; // Continue with the original result
-            });
-        })
-        .then(result => {
-            // Handle file upload if provided
-            const fileInput = document.getElementById('edit-compiled-document-file');
-            if (fileInput && fileInput.files.length > 0) {
-                const fileFormData = new FormData();
-                fileFormData.append('file', fileInput.files[0]);
-                
-                return fetch(`/api/documents/${documentId}/file`, {
-                    method: 'POST',
-                    body: fileFormData
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        return response.json().then(data => Promise.reject(data.error || 'Failed to upload file'));
-                    }
-                    return response.json();
-                });
-            }
-            
-            return result;
-        })
-        .then(result => {
-            // Show success message and close modal
-            this.showSaveSuccess();
-            document.getElementById('edit-compiled-document-modal').style.display = 'none';
-            
-            // Refresh document list if available
-            if (window.documentList && typeof window.documentList.reloadDocuments === 'function') {
-                window.documentList.reloadDocuments();
-            }
-        })
-        .catch(error => {
-            console.error('Error saving compiled document:', error);
-            this.showSaveError(error);
-        });
+        // ... existing code ...
     },
     
     // Get document type icon URL
@@ -2314,10 +1895,17 @@ window.documentEdit = {
         };
         
         // Get the normalized document type
-        const normType = documentType?.toUpperCase() || '';
+        const normType = documentType ? documentType.toUpperCase() : '';
         
-        // Return the mapped icon path or default
-        return iconMap[normType] || '/admin/Components/icons/Category-icons/default_category_icon.png';
+        // Check for all possible case variations
+        for (const [key, path] of Object.entries(iconMap)) {
+            if (normType === key || normType === key.toLowerCase()) {
+                return path;
+            }
+        }
+        
+        // Return the default icon path
+        return '/admin/Components/icons/Category-icons/default_category_icon.png';
     },
     
     // Initialize Author Search
@@ -2412,7 +2000,7 @@ window.documentEdit = {
                         
                         if (response.ok) {
                             authorsData = await response.json();
-                            console.log(`Found working author endpoint: ${endpoint}`);
+                            console.log(`Found working author endpoint: ${endpoint}`, authorsData);
                             
                             // Format the data based on response structure
                             if (authorsData.authors) {
@@ -2448,10 +2036,14 @@ window.documentEdit = {
                                 const lowerQuery = query.toLowerCase();
                                 authors = allAuthorsData.authors.filter(author => {
                                     const fullName = (author.full_name || '').toLowerCase();
+                                    const firstName = (author.first_name || '').toLowerCase();
+                                    const lastName = (author.last_name || '').toLowerCase();
                                     const affiliation = (author.affiliation || '').toLowerCase();
                                     const spudId = (author.spud_id || '').toLowerCase();
                                     
                                     return fullName.includes(lowerQuery) || 
+                                           firstName.includes(lowerQuery) ||
+                                           lastName.includes(lowerQuery) ||
                                            affiliation.includes(lowerQuery) ||
                                            spudId.includes(lowerQuery);
                                 });
@@ -2477,8 +2069,24 @@ window.documentEdit = {
                         createItem.innerHTML = `<div class="item-name"><i class="fas fa-plus"></i> Create "${query}"</div>`;
                         
                         // Add click handler to create and select new author
-                        createItem.addEventListener('click', () => {
+                        createItem.addEventListener('click', async () => {
+                            // Try to create a new author if possible
+                            try {
+                                // First check if we should try to create via API or just select as new
+                                const newAuthor = await this.createNewAuthor(query);
+                                if (newAuthor && newAuthor.id) {
+                                    // Successfully created via API
+                                    this.selectAuthor(newAuthor.id, newAuthor.full_name || newAuthor.name || query, selectedContainerId);
+                                } else {
+                                    // Fallback to just marking as new
                             this.selectAuthor('new', query, selectedContainerId);
+                                }
+                            } catch (error) {
+                                console.error('Error creating new author:', error);
+                                // Fallback to just marking as new
+                                this.selectAuthor('new', query, selectedContainerId);
+                            }
+                            
                             dropdown.style.display = 'none';
                             inputElement.value = '';
                         });
@@ -2486,6 +2094,12 @@ window.documentEdit = {
                         dropdown.appendChild(createItem);
                     }
                 } else {
+                    // Check if there's an exact match
+                    const exactMatch = authors.some(author => 
+                        (author.full_name || author.name || '').toLowerCase() === query.toLowerCase()
+                    );
+                    
+                    // Add authors to dropdown
                     authors.forEach(author => {
                         const item = document.createElement('div');
                         item.className = 'dropdown-item';
@@ -2512,6 +2126,38 @@ window.documentEdit = {
                         
                         dropdown.appendChild(item);
                     });
+                    
+                    // Add option to create new if no exact match
+                    if (!exactMatch && query.length >= 3) {
+                        const createItem = document.createElement('div');
+                        createItem.className = 'dropdown-item create-new';
+                        createItem.innerHTML = `<div class="item-name"><i class="fas fa-plus"></i> Create "${query}"</div>`;
+                        
+                        // Add click handler to create and select new author
+                        createItem.addEventListener('click', async () => {
+                            // Try to create a new author if possible
+                            try {
+                                // First check if we should try to create via API or just select as new
+                                const newAuthor = await this.createNewAuthor(query);
+                                if (newAuthor && newAuthor.id) {
+                                    // Successfully created via API
+                                    this.selectAuthor(newAuthor.id, newAuthor.full_name || newAuthor.name || query, selectedContainerId);
+                                } else {
+                                    // Fallback to just marking as new
+                                    this.selectAuthor('new', query, selectedContainerId);
+                                }
+                            } catch (error) {
+                                console.error('Error creating new author:', error);
+                                // Fallback to just marking as new
+                                this.selectAuthor('new', query, selectedContainerId);
+                            }
+                            
+                            dropdown.style.display = 'none';
+                            inputElement.value = '';
+                        });
+                        
+                        dropdown.appendChild(createItem);
+                    }
                 }
                 
                 // Position dropdown directly under the input field
@@ -2540,6 +2186,80 @@ window.documentEdit = {
                 dropdown.style.display = 'none';
             }
         });
+    },
+    
+    // Helper function to try creating a new author via API
+    createNewAuthor: async function(name) {
+        console.log(`Attempting to create new author: "${name}"`);
+        
+        // Try different endpoints for creating authors
+        const endpoints = [
+            '/api/authors',
+            '/authors'
+        ];
+        
+        // Parse name into components (simple logic)
+        let firstName = '';
+        let lastName = '';
+        
+        const nameParts = name.trim().split(' ');
+        if (nameParts.length > 1) {
+            lastName = nameParts.pop();
+            firstName = nameParts.join(' ');
+        } else {
+            // If only one word, assume it's the last name
+            lastName = name.trim();
+        }
+        
+        // Prepare author data
+        const authorData = {
+            name: name,
+            full_name: name,
+            first_name: firstName,
+            last_name: lastName
+        };
+        
+        // Try each endpoint
+        for (const endpoint of endpoints) {
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(authorData)
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log(`Successfully created author via ${endpoint}:`, result);
+                    
+                    // Handle different API response formats
+                    if (result.id || result.author_id) {
+                        return {
+                            id: result.id || result.author_id,
+                            full_name: name,
+                            name: name
+                        };
+                    } else if (result.author && result.author.id) {
+                        return result.author;
+                    }
+                    
+                    return result;
+                } else {
+                    console.warn(`Failed to create author via ${endpoint}: ${response.status}`);
+                }
+            } catch (error) {
+                console.error(`Error creating author via ${endpoint}:`, error);
+            }
+        }
+        
+        // If we didn't create via API, return a basic object
+        return {
+            id: 'new',
+            name: name,
+            full_name: name
+        };
     },
     
     // A dummy function for the fallback implementation
@@ -2643,7 +2363,8 @@ window.documentEdit = {
                 let endpoints = [
                     `/research-agenda-items/search?q=${encodeURIComponent(query)}`,
                     `/api/research-agenda-items/search?q=${encodeURIComponent(query)}`,
-                    `/document-research-agenda/search?q=${encodeURIComponent(query)}`
+                    `/document-research-agenda/search?q=${encodeURIComponent(query)}`,
+                    `/api/topics/search?q=${encodeURIComponent(query)}`
                 ];
                 
                 // Try each endpoint until one works
@@ -2663,6 +2384,8 @@ window.documentEdit = {
                                 items = data;
                             } else if (data.agendaItems) {
                                 items = data.agendaItems;
+                            } else if (data.topics) {
+                                items = data.topics;
                             }
                             
                             if (items.length > 0) {
@@ -2682,33 +2405,52 @@ window.documentEdit = {
                 if (items.length === 0) {
                     console.log('No items found via search endpoints, trying to fetch all research agenda items');
                     try {
-                        // Try the all research agenda items endpoint
-                        const allItemsResponse = await fetch('/research-agenda-items/search?q=');
+                        // Try the all research agenda items endpoint with multiple paths
+                        const allEndpoints = [
+                            '/research-agenda-items/all',
+                            '/research-agenda-items',
+                            '/api/research-agenda-items',
+                            '/api/topics'
+                        ];
+                        
+                        for (const allEndpoint of allEndpoints) {
+                            try {
+                                const allItemsResponse = await fetch(allEndpoint);
                         
                         if (allItemsResponse.ok) {
                             const allItemsData = await allItemsResponse.json();
-                            console.log('All research agenda items:', allItemsData);
+                                    console.log(`All research agenda items from ${allEndpoint}:`, allItemsData);
                             
-                            // Filter items by the search query manually
+                                    // Handle different response structures
+                                    let allItems = [];
                             if (allItemsData.items && Array.isArray(allItemsData.items)) {
-                                const lowerQuery = query.toLowerCase();
-                                items = allItemsData.items.filter(item => {
-                                    const name = (item.name || '').toLowerCase();
-                                    const description = (item.description || '').toLowerCase();
-                                    
-                                    return name.includes(lowerQuery) || description.includes(lowerQuery);
-                                });
+                                        allItems = allItemsData.items;
                             } else if (Array.isArray(allItemsData)) {
+                                        allItems = allItemsData;
+                                    } else if (allItemsData.topics && Array.isArray(allItemsData.topics)) {
+                                        allItems = allItemsData.topics;
+                                    }
+                                    
+                                    if (allItems.length > 0) {
+                                        // Filter items by the search query manually
                                 const lowerQuery = query.toLowerCase();
-                                items = allItemsData.filter(item => {
+                                        items = allItems.filter(item => {
                                     const name = (item.name || '').toLowerCase();
+                                            const title = (item.title || '').toLowerCase();
                                     const description = (item.description || '').toLowerCase();
                                     
-                                    return name.includes(lowerQuery) || description.includes(lowerQuery);
+                                            return name.includes(lowerQuery) || 
+                                                   title.includes(lowerQuery) || 
+                                                   description.includes(lowerQuery);
                                 });
-                            }
                             
                             console.log(`Found ${items.length} research agenda items by filtering all items`);
+                                        if (items.length > 0) break;
+                                    }
+                                }
+                            } catch (err) {
+                                console.warn(`Error fetching all research agenda items from ${allEndpoint}:`, err);
+                            }
                         }
                     } catch (err) {
                         console.warn('Error fetching all research agenda items:', err);
@@ -2720,18 +2462,23 @@ window.documentEdit = {
                 
                 // Always add option to create a new item
                 const exactMatchFound = items.some(item => 
-                    (item.name || '').toLowerCase() === query.toLowerCase()
+                    (item.name || item.title || '').toLowerCase() === query.toLowerCase()
                 );
                 
                 if (items.length > 0) {
                     items.forEach(item => {
                         const dropdownItem = document.createElement('div');
                         dropdownItem.className = 'dropdown-item';
-                        dropdownItem.dataset.id = item.id;
-                        dropdownItem.dataset.name = item.name;
+                        
+                        // Handle different item structures
+                        const itemId = item.id || 'unknown';
+                        const itemName = item.name || item.title || '';
+                        
+                        dropdownItem.dataset.id = itemId;
+                        dropdownItem.dataset.name = itemName;
                         
                         // Add item details including description if available
-                        let itemDisplay = `<div class="item-name">${item.name}</div>`;
+                        let itemDisplay = `<div class="item-name">${itemName}</div>`;
                         if (item.description) {
                             itemDisplay += `<div class="item-detail">${item.description}</div>`;
                         }
@@ -2740,7 +2487,7 @@ window.documentEdit = {
                         
                         // Add click handler to select the item
                         dropdownItem.addEventListener('click', () => {
-                            this.selectResearchAgendaItem(item.id, item.name, selectedContainerId);
+                            this.selectResearchAgendaItem(itemId, itemName, selectedContainerId);
                             dropdown.style.display = 'none';
                             inputElement.value = '';
                         });
@@ -2758,8 +2505,20 @@ window.documentEdit = {
                     createItem.innerHTML = `<div class="item-name"><i class="fas fa-plus"></i> Create "${query}"</div>`;
                     
                     // Add click handler to create and select new item
-                    createItem.addEventListener('click', () => {
+                    createItem.addEventListener('click', async () => {
+                        try {
+                            // Attempt to create the new item via API
+                            const newItem = await this.createNewResearchAgendaItem(query);
+                            if (newItem && newItem.id) {
+                                this.selectResearchAgendaItem(newItem.id, newItem.name || newItem.title || query, selectedContainerId);
+                            } else {
                         this.selectResearchAgendaItem('new', query, selectedContainerId);
+                            }
+                        } catch (error) {
+                            console.error('Error creating new research agenda item:', error);
+                            this.selectResearchAgendaItem('new', query, selectedContainerId);
+                        }
+                        
                         dropdown.style.display = 'none';
                         inputElement.value = '';
                     });
@@ -2795,36 +2554,67 @@ window.documentEdit = {
         });
     },
     
-    // Create and select a new research agenda item
-    createAndSelectResearchAgenda: async function(name, containerId) {
-        if (!name.trim()) return;
+    // Helper function to create a new research agenda item
+    createNewResearchAgendaItem: async function(name) {
+        console.log(`Attempting to create new research agenda item: "${name}"`);
         
-        try {
-            // Create the new research agenda item - FIX: Use correct endpoint path
-            const response = await fetch('/research-agenda-items', {
+        // Try different endpoints for creating items
+        const endpoints = [
+            '/api/research-agenda-items',
+            '/research-agenda-items',
+            '/api/topics'
+        ];
+        
+        const itemData = {
+            name: name,
+            title: name,
+            description: ''
+        };
+        
+        // Try each endpoint
+        for (const endpoint of endpoints) {
+            try {
+                const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ name: name.trim() })
+                    body: JSON.stringify(itemData)
             });
             
-            if (!response.ok) {
-                throw new Error(`Failed to create research agenda item: ${response.status}`);
-            }
-            
+                if (response.ok) {
             const result = await response.json();
-            console.log('Created new research agenda item:', result);
-            
-            // Select the newly created item
-            this.selectResearchAgenda(result.id || 'new', name.trim(), containerId);
-        } catch (error) {
-            console.error('Error creating research agenda item:', error);
-            alert('Error creating research agenda item. Please try again.');
-            
-            // Still select it with a temporary ID
-            this.selectResearchAgenda('new', name.trim(), containerId);
+                    console.log(`Successfully created research agenda item via ${endpoint}:`, result);
+                    
+                    // Handle different API response formats
+                    if (result.id) {
+                        return {
+                            id: result.id,
+                            name: name
+                        };
+                    } else if (result.item && result.item.id) {
+                        return result.item;
+                    } else if (result.topic && result.topic.id) {
+                        return {
+                            id: result.topic.id,
+                            name: result.topic.name || name
+                        };
+                    }
+                    
+                    return result;
+                } else {
+                    console.warn(`Failed to create research agenda item via ${endpoint}: ${response.status}`);
+                }
+            } catch (error) {
+                console.error(`Error creating research agenda item via ${endpoint}:`, error);
+            }
         }
+        
+        // If we didn't create via API, return a basic object
+        return {
+            id: 'new',
+            name: name
+        };
     },
     
     // Select a research agenda item and add to the selected list
@@ -2856,6 +2646,26 @@ window.documentEdit = {
             });
         }
     },
+    
+    // Helper function to fetch child documents by IDs
+    fetchChildDocuments: function(childIds) {
+        // ... existing code ...
+    },
+    
+    // Update compiled document preview - for references in other parts of the code
+    updateCompiledDocumentPreview: function() {
+        // ... existing code ...
+    },
+    
+    // Function to upload a file with multiple endpoint attempts
+    uploadFileWithFallback: function(documentId, fileInput) {
+        // ... existing code ...
+    },
+    
+    // Helper function to try multiple file upload endpoints
+    tryFileUploadEndpoints: function(endpoints, formData) {
+        // ... existing code ...
+    }
 };
 
 // Initialize document edit components when the DOM is loaded

@@ -814,6 +814,63 @@ async function handleCompiledDocumentSubmit(e) {
         // Create storage path for compiled document
         const compiledStoragePath = `storage/compiled/${category.toLowerCase()}/`;
         
+        // Process the foreword file if it exists
+        const forewordFileInput = document.getElementById('foreword-file-upload');
+        let forewordFilePath = null;
+        
+        if (forewordFileInput && forewordFileInput.files && forewordFileInput.files.length > 0) {
+            console.log('Found foreword file:', forewordFileInput.files[0].name);
+            
+            // Create foreword path based on category
+            const forewordPath = `storage/foreword/${category.toLowerCase()}/`;
+            console.log(`Creating foreword storage path for ${category}: ${forewordPath}`);
+            
+            // Create foreword-specific form data
+            const forewordFormData = new FormData();
+            forewordFormData.append('file', forewordFileInput.files[0]);
+            forewordFormData.append('storagePath', forewordPath);
+            
+            // Create the foreword directory
+            await ensureDirectoriesExist(forewordPath);
+            console.log(`Foreword directory ensured: ${forewordPath}`);
+            
+            // Upload the foreword file
+            const forewordFileResponse = await fetch('/api/upload', {
+                method: 'POST',
+                body: forewordFormData
+            });
+            
+            if (!forewordFileResponse.ok) {
+                const errorData = await forewordFileResponse.json();
+                console.error('Failed to upload foreword file:', errorData.error || 'Unknown error');
+                
+                // Show a warning but continue with the submission process
+                await Swal.fire({
+                    title: 'Foreword Upload Warning',
+                    text: 'The foreword file could not be uploaded. The document will be created without a foreword.',
+                    icon: 'warning',
+                    confirmButtonText: 'Continue Anyway',
+                    confirmButtonColor: '#10B981',
+                    showCancelButton: true,
+                    cancelButtonText: 'Cancel Submission'
+                }).then((result) => {
+                    if (!result.isConfirmed) {
+                        hideLoading();
+                        throw new Error('Document submission cancelled by user.');
+                    }
+                });
+                
+                // Set forewordFilePath to null so it's properly recorded in the database
+                forewordFilePath = null;
+            } else {
+                const forewordResult = await forewordFileResponse.json();
+                forewordFilePath = forewordResult.filePath;
+                console.log('Uploaded foreword file to:', forewordFilePath);
+            }
+        } else {
+            console.log('No foreword file found');
+        }
+        
         // Ensure the directory exists
         await ensureDirectoriesExist(compiledStoragePath);
         await ensureDirectoriesExist(compiledStoragePath + 'studies/');
@@ -841,7 +898,8 @@ async function handleCompiledDocumentSubmit(e) {
             volume: formData.get('volume') ? parseInt(formData.get('volume')) : null,
             issue_number: documentType === 'SYNERGY' ? null : (formData.get('issued-no') ? parseInt(formData.get('issued-no')) : null),
             department: departmentId ? getSelectedDepartmentText() : null,
-            category: category.toUpperCase() // Ensure category is uppercase to match enum values
+            category: category.toUpperCase(), // Ensure category is uppercase to match enum values
+            foreword: forewordFilePath // Add the foreword file path
         };
         
         // Call API to create the compiled document entry
@@ -1147,6 +1205,7 @@ async function handleCompiledDocumentSubmit(e) {
         console.log(`📚 Years: ${formData.get('pub-year-start') || 'N/A'} - ${formData.get('pub-year-end') || 'N/A'}`);
         console.log(`📚 Child Studies: ${studyDocumentIds.length} (found ${researchSections.length} research sections, ${sectionsWithFiles} with files)`);
         console.log(`📁 Storage Path: ${compiledStoragePath}`);
+        console.log(`📄 Foreword Path: ${forewordFilePath || 'No foreword attached'}`);
         console.log("-------------------------------------------");
         
         hideLoading();

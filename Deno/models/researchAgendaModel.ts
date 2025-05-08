@@ -28,20 +28,47 @@ export class ResearchAgendaModel {
    */
   static async addItems(documentId: number, agendaItems: string[]): Promise<boolean> {
     try {
-      // First delete any existing items for this document to avoid duplicates
+      // First delete any existing links for this document to avoid duplicates
       await client.queryArray(
-        "DELETE FROM research_agenda WHERE document_id = $1",
+        "DELETE FROM document_research_agenda WHERE document_id = $1",
         [documentId]
       );
       
-      // Insert all new items
+      // Process each agenda item
       for (const item of agendaItems) {
-        if (item.trim()) {
-          await client.queryArray(
-            "INSERT INTO research_agenda (document_id, agenda_item) VALUES ($1, $2)",
-            [documentId, item.trim()]
+        if (!item.trim()) continue;
+        
+        // First, check if the agenda item already exists by name
+        const existingItemResult = await client.queryObject(
+          "SELECT id FROM research_agenda WHERE name ILIKE $1",
+          [item.trim()]
+        );
+        
+        let agendaItemId: number;
+        
+        if (existingItemResult.rows.length > 0) {
+          // Use existing agenda item
+          agendaItemId = Number((existingItemResult.rows[0] as any).id);
+        } else {
+          // Create a new agenda item
+          const newItemResult = await client.queryObject(
+            "INSERT INTO research_agenda (name) VALUES ($1) RETURNING id",
+            [item.trim()]
           );
+          
+          if (newItemResult.rows.length === 0) {
+            console.error(`Failed to create research agenda item: ${item}`);
+            continue;
+          }
+          
+          agendaItemId = Number((newItemResult.rows[0] as any).id);
         }
+        
+        // Link to document in the junction table
+        await client.queryArray(
+          "INSERT INTO document_research_agenda (document_id, research_agenda_id) VALUES ($1, $2)",
+          [documentId, agendaItemId]
+          );
       }
       
       return true;

@@ -296,6 +296,8 @@
     </style>
 </head>
 <body class="p-6">
+    <!-- Navbar will be loaded here -->
+    <div id="navbarContainer"></div>
 
     <div class="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md">
 
@@ -827,6 +829,97 @@
 
         // The emailServiceLink will handle the action, no need for a separate click listener to close the modal here.
 
+    </script>
+
+    <!-- Navbar loading script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Function to check if user is logged in
+            function isUserLoggedIn() {
+                // Check for authentication token in localStorage
+                const authToken = localStorage.getItem('authToken');
+                
+                // Check for user session cookie (if your app uses cookies for auth)
+                const hasSessionCookie = document.cookie.split(';').some(item => item.trim().startsWith('user_session='));
+                
+                // Return true if either authentication method is present
+                return !!authToken || hasSessionCookie;
+            }
+            
+            // Function to load the navbar
+            function loadNavbar() {
+                // Determine which navbar to load based on login status
+                const navbarUrl = isUserLoggedIn() ? 
+                    '/Components/user-navBar.html' : 
+                    '/Components/user-navBar.html'; // Both are the same for now, but you can create a guest navbar later
+                
+                fetch(navbarUrl)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Failed to load navbar: ${response.status}`);
+                        }
+                        return response.text();
+                    })
+                    .then(html => {
+                        // Create a temporary div to parse the HTML
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = html;
+                        
+                        // Extract the navbar element
+                        const navElement = tempDiv.querySelector('nav');
+                        
+                        if (navElement) {
+                            // Insert the navbar into the container
+                            document.getElementById('navbarContainer').appendChild(navElement);
+                            
+                            // Also include any scripts from the navbar
+                            const scripts = tempDiv.querySelectorAll('script');
+                            scripts.forEach(script => {
+                                const newScript = document.createElement('script');
+                                if (script.src) {
+                                    newScript.src = script.src;
+                                } else {
+                                    newScript.textContent = script.textContent;
+                                }
+                                document.body.appendChild(newScript);
+                            });
+                            
+                            // Include any styles from the navbar
+                            const styles = tempDiv.querySelectorAll('style');
+                            styles.forEach(style => {
+                                document.head.appendChild(style.cloneNode(true));
+                            });
+                            
+                            console.log(`Navbar loaded successfully (${isUserLoggedIn() ? 'user' : 'guest'} version)`);
+                        } else {
+                            console.error('Navbar element not found in the loaded HTML');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error loading navbar:', error);
+                        // Create a basic fallback navbar if loading fails
+                        const fallbackNavbar = document.createElement('nav');
+                        fallbackNavbar.className = 'shadow-md sticky top-0 z-30';
+                        fallbackNavbar.innerHTML = `
+                            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                                <div class="flex items-center justify-between h-16">
+                                    <div class="flex items-center">
+                                        <div class="flex-shrink-0">
+                                            <a href="/index.html">
+                                                <img class="h-20 w-auto" src="/components/images/spud-logo.png" alt="SPUD Logo" onerror="this.onerror=null; this.src='https://placehold.co/100x80/F9F6EE/006A4E?text=Logo';">
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        document.getElementById('navbarContainer').appendChild(fallbackNavbar);
+                    });
+            }
+            
+            // Load the navbar
+            loadNavbar();
+        });
     </script>
 
 </body>

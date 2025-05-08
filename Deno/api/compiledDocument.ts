@@ -14,6 +14,7 @@ export async function createCompiledDocument(
     issue_number?: number;
     department?: string;
     category?: string;
+    foreword?: string;
   },
   documentIds: number[]
 ): Promise<number> {
@@ -26,7 +27,26 @@ export async function createCompiledDocument(
  * @returns The compiled document data
  */
 export async function getCompiledDocument(compiledDocId: number): Promise<any> {
-  return await getCompiledDocumentService(compiledDocId);
+  try {
+    // Get basic document data
+    const compiledDoc = await getCompiledDocumentService(compiledDocId);
+    
+    if (!compiledDoc) {
+      return null;
+    }
+    
+    // Explicitly log the foreword field for debugging
+    if (compiledDoc.foreword) {
+      console.log(`Compiled document ${compiledDocId} has foreword: ${compiledDoc.foreword}`);
+    } else {
+      console.log(`Compiled document ${compiledDocId} does not have a foreword`);
+    }
+    
+    return compiledDoc;
+  } catch (error) {
+    console.error(`Error in getCompiledDocument(${compiledDocId}):`, error);
+    throw error;
+  }
 }
 
 /**

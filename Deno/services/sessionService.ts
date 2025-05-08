@@ -72,35 +72,75 @@ export async function validateSessionToken(token: string | null): Promise<string
  * @param token - The token to delete
  * @returns True if successful, false otherwise
  */
-export async function deleteSessionToken(token: string | null): Promise<boolean> {
-  if (!token) {
+export async function deleteSessionToken(token: unknown): Promise<boolean> {
+  if (token === null || token === undefined) {
     console.log("No token provided for deletion");
     return false;
   }
   
+  let tokenString: string;
+  
+  // Handle different token types, including objects
+  if (typeof token === 'object') {
+    try {
+      console.log("Token is an object, attempting to stringify for deletion");
+      tokenString = JSON.stringify(token);
+    } catch (jsonError) {
+      console.error("Failed to stringify token object:", jsonError);
+      tokenString = String(token);
+    }
+  } else {
+    tokenString = String(token);
+  }
+  
+  // Log token type and part of the value for debugging
   try {
-    const result = await client.queryObject(
-      `DELETE FROM sessions WHERE token = $1 RETURNING *`,
-      [token]
-    );
-    
-    if (!result.rows || result.rows.length === 0) {
-      // Log safely by checking token type
-      if (typeof token === 'string') {
-        console.log(`No token found in database: ${token.substring(0, 8)}...`);
+    const tokenStart = tokenString.substring(0, 8);
+    const tokenEnd = tokenString.length > 16 ? tokenString.substring(tokenString.length - 8) : '';
+    console.log(`Attempting to delete token (type: ${typeof token}): ${tokenStart}...${tokenEnd}`);
+  } catch (logError) {
+    console.error("Error logging token:", logError);
+  }
+  
+  // Try deleting from multiple tables to ensure all session data is removed
+  let deletedFromAnyTable = false;
+  
+  try {
+    // Try to delete from sessions table
+    try {
+      const result = await client.queryObject(
+        `DELETE FROM sessions WHERE token = $1 RETURNING token`,
+        [tokenString]
+      );
+      
+      if (result.rows && result.rows.length > 0) {
+        console.log(`Deleted token from sessions table: ${tokenString.substring(0, 8)}...`);
+        deletedFromAnyTable = true;
       } else {
-        console.log(`No token found in database. Token is not a string type: ${typeof token}`);
+        console.log(`No matching token found in sessions table: ${tokenString.substring(0, 8)}...`);
       }
-      return false;
+    } catch (sessionsError) {
+      console.error("Error deleting from sessions table:", sessionsError);
     }
     
-    // Log safely by checking token type
-    if (typeof token === 'string') {
-      console.log(`Token deleted from database: ${token.substring(0, 8)}...`);
-    } else {
-      console.log(`Token deleted from database. (Non-string token type: ${typeof token})`);
+    // Also try to delete from tokens table if it exists
+    try {
+      const tokensResult = await client.queryObject(
+        `DELETE FROM tokens WHERE token = $1 RETURNING token`,
+        [tokenString]
+      );
+      
+      if (tokensResult.rows && tokensResult.rows.length > 0) {
+        console.log(`Deleted token from tokens table: ${tokenString.substring(0, 8)}...`);
+        deletedFromAnyTable = true;
+      } else {
+        console.log(`No matching token found in tokens table: ${tokenString.substring(0, 8)}...`);
+      }
+    } catch (tokensError) {
+      console.log("Note: Could not delete from tokens table (might not exist)");
     }
-    return true;
+    
+    return deletedFromAnyTable;
   } catch (error) {
     console.error("Database error when deleting token:", error);
     return false;

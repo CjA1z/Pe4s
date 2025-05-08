@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>History - List View</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --theme-gold: #FDB813;
+            --theme-gold-darker: #EAA10F;
+            --theme-gold-light-bg: rgba(253, 184, 19, 0.2);
+            --theme-gold-lighter-bg: rgba(253, 184, 19, 0.1);
+            --theme-green-dark: #006A4E;
+            --theme-green-darker-text: #00523D;
+            --theme-green-light-bg: rgba(0, 106, 78, 0.3);
+            --theme-green-lighter-bg: rgba(0, 106, 78, 0.15);
+            --theme-navbar-bg: #F9F6EE;
+            --neutral-border-color: #e5e7eb;
+            --input-border-color: #d1d5db;
+            --placeholder-text-color: #9ca3af;
+            --text-on-gold: #000000;
+            --text-on-green: #FFFFFF;
+            --primary-text-color: #1a202c;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--theme-navbar-bg);
+            color: var(--primary-text-color);
+            min-height: 100vh;
+            padding-top: 1.5rem;
+            padding-bottom: 1.5rem;
+        }
+        select.form-input-professional,
+        input[type="date"].form-input-professional {
+            border-color: var(--input-border-color);
+            border-radius: 0.375rem;
+            padding: 0.5rem 0.75rem;
+            color: var(--primary-text-color);
+            background-color: white;
+            font-size: 0.875rem;
+        }
+        select.form-input-professional:focus,
+        input[type="date"].form-input-professional:focus {
+            border-color: var(--theme-green-dark);
+            box-shadow: 0 0 0 2px var(--theme-green-light-bg);
+            outline: none;
+        }
+        select.form-input-professional {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2300523D' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+            -webkit-appearance: none; -moz-appearance: none; appearance: none;
+            padding-right: 2.5rem;
+            border-color: var(--theme-green-darker-text);
+        }
+        .select-container, .date-input-container {
+            position: relative; display: flex; align-items: center;
+            flex-grow: 1; flex-basis: 100%;
+        }
+        @media (min-width: 640px) {
+             .select-container, .date-input-container { flex-basis: auto; }
+        }
+        .select-container .select-icon {
+            position: absolute; left: 0.75rem; pointer-events: none; color: var(--theme-green-dark);
+        }
+         .select-container select.form-input-professional { padding-left: 2.5rem; width: 100%; }
+        .date-input-container label {
+            margin-right: 0.5rem; font-size: 0.875rem;
+            color: var(--theme-green-darker-text); white-space: nowrap;
+        }
+        .date-input-container input[type="date"] { flex-grow: 1; min-width: 140px; }
+        input[type="date"].form-input-professional::placeholder { color: var(--placeholder-text-color); }
+        input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.6; transition: opacity 0.2s; }
+        input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #bbb; }
+        .keywords-pill-container::-webkit-scrollbar { height: 4px; }
+        .keywords-pill-container::-webkit-scrollbar-thumb { background: transparent; border-radius: 2px; }
+        .keywords-pill-container:hover::-webkit-scrollbar-thumb { background: var(--theme-gold-lighter-bg); }
+        .keywords-pill-container { scrollbar-width: thin; scrollbar-color: var(--theme-gold-lighter-bg) transparent; }
+        .keyword-popup-glass::-webkit-scrollbar { width: 8px; }
+        .keyword-popup-glass::-webkit-scrollbar-track { background: rgba(249, 246, 238, 0.5); border-radius: 10px; margin: 5px 0; }
+        .keyword-popup-glass::-webkit-scrollbar-thumb { background: var(--theme-green-lighter-bg); border-radius: 10px; border: 2px solid rgba(249, 246, 238, 0.5); }
+        .keyword-popup-glass::-webkit-scrollbar-thumb:hover { background: var(--theme-green-light-bg); }
+        .document-item-base {
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+            border: 1px solid var(--neutral-border-color); background-color: white;
+            display: flex; flex-direction: row; align-items: center;
+            width: 100%; padding: 0.75rem 1rem; border-top: none; overflow: hidden;
+        }
+        .document-item-base:first-child { border-top: 1px solid var(--neutral-border-color); }
+        .document-item-base:hover { transform: translateY(-3px); box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1); z-index: 1; position: relative; }
+        @media (min-width: 1024px) {
+            .document-item-base { padding: 1rem 1.5rem; }
+        }
+        .btn {
+            padding: 0.65rem 1rem; border-radius: 0.375rem; font-weight: 500; text-align: center;
+            transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.3s ease, transform 0.3s ease;
+            display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem; font-size: 0.875rem;
+        }
+        .btn-outline-secondary { background-color: transparent; color: var(--theme-gold-darker); border: 1px solid var(--theme-gold); padding: 0.5rem 1rem; }
+        .btn-outline-secondary:hover { background-color: var(--theme-gold-lighter-bg); }
+        .btn-outline-secondary.active { background-color: var(--theme-gold-lighter-bg); }
+        .btn-outline-secondary i.chevron-icon { transition: transform 0.3s ease; }
+        .btn-outline-secondary.active i.chevron-icon { transform: rotate(180deg); }
+        #collapsible-filters {
+            max-height: 0; overflow: hidden;
+            transition: max-height 0.4s ease-out, padding-top 0.4s ease-out, padding-bottom 0.4s ease-out, margin-top 0.4s ease-out;
+            padding-top: 0; padding-bottom: 0; margin-top: 0; width: 100%;
+        }
+        #collapsible-filters.expanded { max-height: 500px; padding-top: 1rem; padding-bottom: 0.5rem; margin-top: 1rem; }
+        .truncate-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+        .meta-item { display: flex; align-items: center; gap: 0.3rem; text-align: left; }
+        .meta-item i { color: #6b7280; flex-shrink: 0; }
+        .meta-item .meta-category-icon { color: var(--theme-green-dark); }
+        .meta-item .meta-keywords-icon { color: var(--theme-gold-darker); }
+        .clickable-meta { cursor: pointer; text-decoration: none; }
+        .clickable-meta:hover { text-decoration: underline; text-decoration-color: currentColor; }
+        .clickable-author:hover { color: var(--theme-green-darker-text); }
+        .clickable-category:hover { color: var(--theme-green-darker-text); }
+        .keywords-pill-container { display: flex; overflow-x: auto; white-space: nowrap; padding-bottom: 4px; margin-top: 0.125rem; }
+        .keyword-pill { display: inline-block; background-color: var(--theme-gold-lighter-bg); color: var(--text-on-gold); padding: 0.125rem 0.5rem; margin-right: 0.25rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 500; white-space: nowrap; cursor: pointer; }
+        .keyword-pill:hover { background-color: var(--theme-gold-light-bg); }
+         @media (min-width: 1024px) {
+            .keyword-pill { font-size: 0.75rem; padding: 0.2rem 0.6rem; }
+        }
+        .keyword-popup-glass {
+            position: absolute; background: rgba(249, 246, 238, 0.85); backdrop-filter: blur(10px) saturate(150%);
+            -webkit-backdrop-filter: blur(10px) saturate(150%); border: 1px solid rgba(0, 106, 78, 0.25);
+            border-radius: 0.375rem; box-shadow: 0 6px 15px rgba(0,0,0,0.15); padding: 0.75rem; z-index: 1050;
+            max-width: 300px; max-height: 200px; overflow-y: auto; display: none;
+            transition: opacity 0.2s ease-out, transform 0.2s ease-out; opacity: 0; transform: translateY(5px);
+        }
+        .keyword-popup-glass.active { display: block; opacity: 1; transform: translateY(0); }
+        .keyword-popup-glass .keyword-pill { background-color: var(--theme-gold); color: var(--text-on-gold); padding: 0.25rem 0.75rem; margin: 0.25rem; border-radius: 0.25rem; font-size: 0.8rem; cursor: pointer; }
+        .keyword-popup-glass .keyword-pill:hover { background-color: var(--theme-gold-darker); }
+        .list-info-col { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; overflow: hidden; margin-left: 0.5rem; }
+        .list-info-col .document-title { font-size: 1rem; font-weight: 500; white-space: normal; overflow: visible; text-overflow: clip; margin-bottom: 0.1rem; }
+        .list-info-col .document-meta-primary { font-size: 0.8rem; color: #4a5568; display: flex; align-items: center; margin-bottom: 0.25rem; }
+        .list-info-col .document-meta-secondary { font-size: 0.75rem; color: #6b7280; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+        .list-info-col .document-meta-secondary .document-category-meta { color: var(--theme-green-dark); font-weight: 500; }
+        .list-info-col .keywords-meta-container { display: flex; align-items: center; gap: 0.25rem; }
+        .list-info-col .keywords-pill-container { max-width: calc(100% - 20px); }
+        @media (min-width: 1024px) {
+            .list-info-col .document-title { font-size: 1.125rem; margin-bottom: 0.25rem; }
+            .list-info-col .document-meta-primary { font-size: 0.875rem; }
+             .list-info-col .document-meta-secondary { font-size: 0.875rem; gap: 1rem; }
+             .list-info-col .keywords-meta-container { margin-top: 0.25rem; }
+        }
+        .pagination-btn {
+            padding: 0.5rem 0.75rem; border: 1px solid var(--input-border-color); background-color: white;
+            color: #374151; border-radius: 0.375rem; transition: background-color 0.2s ease, color 0.2s ease;
+            font-size: 0.875rem; line-height: 1.25rem;
+        }
+        .pagination-btn:hover:not(:disabled) { background-color: #f3f4f6; }
+        .pagination-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .pagination-btn.active { background-color: var(--theme-green-dark); color: var(--text-on-green); border-color: var(--theme-green-dark); }
+        .month-group {
+            margin-bottom: 1rem; border: 1px solid var(--neutral-border-color);
+            border-radius: 0.375rem; overflow: hidden; background-color: #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .month-header {
+            background-color: var(--theme-green-lighter-bg); color: var(--theme-green-darker-text);
+            padding: 0.6rem 1rem; cursor: pointer; display: flex;
+            justify-content: space-between; align-items: center;
+            font-weight: 600; font-size: 0.9rem; border-bottom: 1px solid var(--neutral-border-color);
+        }
+         .month-header:hover { background-color: var(--theme-green-light-bg); }
+        .month-header .toggle-icon { transition: transform 0.3s ease; font-size: 0.8em; }
+        .month-header.collapsed .toggle-icon { transform: rotate(-90deg); }
+        .month-items {
+            max-height: 1000px; overflow: hidden; transition: max-height 0.4s ease-in-out;
+            & > .document-item-base { border-top: none; border-radius: 0; box-shadow: none; margin-bottom: 0; border-bottom: 1px solid var(--neutral-border-color); }
+            & > .document-item-base:last-child { border-bottom: none; }
+        }
+        .month-items.collapsed { max-height: 0; border-top: none; }
+        @media (min-width: 1024px) {
+            .month-header { padding: 0.75rem 1.5rem; font-size: 1rem; }
+        }
+    </style>
+</head>
+<body class="selection:bg-green-700 selection:text-white">
+    <!-- Navbar will be loaded here -->
+    <div id="navbarContainer"></div>
+    
+    <main class="container mx-auto p-4 md:p-6 lg:p-8">
+        <h1 class="text-3xl md:text-4xl font-bold flex items-center mb-6" style="color: var(--theme-green-dark);">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" class="w-10 h-10 mr-3" style="color: var(--theme-gold);">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            History
+        </h1>
+
+        <section class="controls bg-white p-4 md:p-5 mb-6 rounded-lg shadow-sm border var(--neutral-border-color)">
+            <div class="flex flex-wrap gap-4 items-center justify-between mb-4">
+                <div class="search-container flex-grow w-full sm:w-auto sm:max-w-xs 2xl:max-w-sm">
+                    <div class="relative">
+                        <input type="text" id="search-bar" placeholder="Search history..." class="form-input-professional w-full pl-10 pr-4 py-2 rounded-md text-gray-700 placeholder-var(--placeholder-text-color) focus:outline-none focus:ring-2 focus:border-transparent transition-shadow">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-search text-gray-400"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex gap-2 flex-shrink-0">
+                    <button id="toggle-filters-btn" class="btn btn-outline-secondary">
+                        <i class="fas fa-filter mr-2"></i>
+                        Filters
+                        <i class="fas fa-chevron-down ml-2 text-xs chevron-icon"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="collapsible-filters" class="flex flex-wrap gap-4 items-center w-full">
+                <div class="sort-options select-container basis-full sm:basis-1/2 md:basis-auto min-w-[160px] flex-shrink-0">
+                    <i class="fas fa-sort-amount-down select-icon"></i>
+                    <label for="sort-by" class="sr-only">Sort by:</label>
+                    <select id="sort-by" name="sort-by" class="form-input-professional w-full p-2 bg-white rounded-md text-gray-700 focus:outline-none focus:ring-2 focus:border-transparent transition-shadow">
+                        <option value="date-saved-desc">Date Visited (Newest)</option>
+                        <option value="date-saved-asc">Date Visited (Oldest)</option>
+                        <option value="title-asc">Title (A-Z)</option>
+                        <option value="title-desc">Title (Z-A)</option>
+                        <option value="category">Category</option>
+                    </select>
+                </div>
+                <div class="filter-category-options select-container basis-full sm:basis-1/2 md:basis-auto min-w-[160px] flex-shrink-0">
+                    <i class="fas fa-tags select-icon"></i>
+                    <label for="filter-by-category" class="sr-only">Filter by Category:</label>
+                    <select id="filter-by-category" name="filter-by-category" class="form-input-professional w-full p-2 bg-white rounded-md text-gray-700 focus:outline-none focus:ring-2 focus:border-transparent transition-shadow">
+                        <option value="all">All Categories</option>
+                        <option value="Synergy">Synergy</option>
+                        <option value="Dissertation">Dissertation</option>
+                        <option value="Confluence">Confluence</option>
+                        <option value="Thesis">Thesis</option>
+                    </select>
+                </div>
+                <div class="filter-keywords-options select-container basis-full sm:basis-1/2 md:basis-auto min-w-[160px] flex-shrink-0">
+                    <i class="fas fa-key select-icon"></i>
+                    <label for="filter-by-keywords" class="sr-only">Filter by Keywords:</label>
+                    <select id="filter-by-keywords" name="filter-by-keywords" class="form-input-professional w-full p-2 bg-white rounded-md text-gray-700 focus:outline-none focus:ring-2 focus:border-transparent transition-shadow">
+                        <option value="all">All Keywords</option>
+                        <option value="Paulinian">Paulinian</option>
+                        <option value="Spirituality">Spirituality</option>
+                        </select>
+                </div>
+                 <div class="date-input-container basis-full sm:basis-1/2 md:basis-auto min-w-[200px]">
+                    <label for="start-date">From:</label>
+                    <input type="date" id="start-date" name="start-date" class="form-input-professional">
+                </div>
+                <div class="date-input-container basis-full sm:basis-1/2 md:basis-auto min-w-[200px]">
+                    <label for="end-date">To:</label>
+                    <input type="date" id="end-date" name="end-date" class="form-input-professional">
+                </div>
+            </div>
+        </section>
+
+        <section id="document-container" class="document-view-wrapper view-list">
+            </section>
+
+        <section class="no-documents hidden bg-white p-8 md:p-10 rounded-lg shadow-sm border var(--neutral-border-color) text-center" id="no-documents-message">
+            <i class="fas fa-folder-open text-4xl text-gray-400 mb-5"></i>
+            <p class="text-xl text-gray-700 font-semibold mb-2">No items in your history.</p>
+            <p class="text-gray-500">Try adjusting your search or filters.</p>
+        </section>
+
+        <section id="pagination-controls" class="mt-8 flex justify-center items-center space-x-1 sm:space-x-2">
+            </section>
+    </main>
+
+    <div id="keyword-popup-glass" class="keyword-popup-glass">
+        </div>
+
+    <script>
+        const CSS_CLASSES = {
+            ACTIVE: 'active', EXPANDED: 'expanded', HIDDEN: 'hidden', COLLAPSED: 'collapsed',
+        };
+        const SELECTORS = {
+            SEARCH_BAR: '#search-bar', SORT_SELECT: '#sort-by', CATEGORY_FILTER: '#filter-by-category',
+            KEYWORD_FILTER: '#filter-by-keywords', START_DATE: '#start-date', END_DATE: '#end-date',
+            DOCUMENT_CONTAINER: '#document-container', NO_DOCUMENTS_MSG: '#no-documents-message',
+            PAGINATION_CONTROLS: '#pagination-controls', KEYWORD_POPUP: '#keyword-popup-glass',
+            TOGGLE_FILTERS_BTN: '#toggle-filters-btn', COLLAPSIBLE_FILTERS: '#collapsible-filters',
+            DOCUMENT_ITEM: '.document-item-base', CLICKABLE_AUTHOR: '.clickable-author',
+            CLICKABLE_CATEGORY: '.clickable-category', CLICKABLE_KEYWORD: '.clickable-keyword',
+            CHEVRON_ICON: '.chevron-icon', MONTH_HEADER: '.month-header', MONTH_ITEMS: '.month-items',
+            TOGGLE_ICON: '.toggle-icon',
+        };
+        const ITEMS_PER_PAGE = 10;
+        const DISPLAY_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        const MONTH_YEAR_FORMATTER = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' });
+
+        const searchBar = document.querySelector(SELECTORS.SEARCH_BAR);
+        const sortBySelect = document.querySelector(SELECTORS.SORT_SELECT);
+        const filterByCategorySelect = document.querySelector(SELECTORS.CATEGORY_FILTER);
+        const filterByKeywordsSelect = document.querySelector(SELECTORS.KEYWORD_FILTER);
+        const startDateInput = document.querySelector(SELECTORS.START_DATE);
+        const endDateInput = document.querySelector(SELECTORS.END_DATE);
+        const documentContainer = document.querySelector(SELECTORS.DOCUMENT_CONTAINER);
+        const noDocumentsMessage = document.querySelector(SELECTORS.NO_DOCUMENTS_MSG);
+        const paginationControlsContainer = document.querySelector(SELECTORS.PAGINATION_CONTROLS);
+        const keywordPopupGlass = document.querySelector(SELECTORS.KEYWORD_POPUP);
+        const toggleFiltersBtn = document.querySelector(SELECTORS.TOGGLE_FILTERS_BTN);
+        const collapsibleFilters = document.querySelector(SELECTORS.COLLAPSIBLE_FILTERS);
+
+        let currentPage = 1;
+        let filtersExpanded = false;
+        let currentKeywordGlassPopup = null;
+        let currentTotalItems = 0;
+        let collapsedMonths = new Set();
+
+        const allMockDocuments = [
+            { id: 1, type: 'pdf', category: 'Synergy', keywords: ['Annual Report', 'Finance', 'Corporate'], title: 'Annual Report for the Fiscal Year Ending 2024', author: 'Corporate Communications Department', date: '2025-05-01' },
+            { id: 4, type: 'txt', category: 'Confluence', keywords: ['Meeting Notes', 'Client Strategy'], title: 'Meeting Notes: Client Onboarding (May 6)', author: 'Johnathan M. Smitherson Jr.', date: '2025-05-06' },
+            { id: 5, type: 'xlsx', category: 'Synergy', keywords: ['Budget', 'Finance', 'Projections'], title: 'Q2 Budget Forecast and Financial Projections', author: 'Finance & Accounting Division', date: '2025-04-30' },
+            { id: 7, type: 'pptx', category: 'Synergy', keywords: ['Investment', 'Funding', 'Pitch Deck'], title: 'Investor Pitch Deck: Series B Funding', author: 'CEO & Founder\'s Office', date: '2025-05-05' },
+            { id: 8, type: 'pdf', category: 'Thesis', keywords: ['User Manual', 'Product Guide', 'Technology'], title: 'User Manual for Product X v2.1', author: 'Technical Writing Department', date: '2025-03-20' },
+            { id: 11, type: 'pdf', category: 'Confluence', keywords: ['Legal', 'Contract', 'Template', 'Paulinian'], title: 'Master Service Agreement Template', author: 'Legal Department Review Board', date: '2025-04-01' },
+            { id: 12, type: 'docx', category: 'Synergy', keywords: ['Marketing', 'Campaign', 'Global Partnership'], title: 'Marketing Plan: Q3 Product Launch', author: 'Global Marketing Strategy Team', date: '2025-05-02' },
+            { id: 14, type: 'png', category: 'Dissertation', keywords: ['Web Design', 'UX/UI', 'Mockup', 'Education'], title: 'Website Homepage Redesign Mockup v3', author: 'UX/UI Design Department', date: '2025-05-08' },
+            { id: 15, type: 'pptx', category: 'Confluence', keywords: ['Training', 'HR', 'Onboarding', 'Paulinian'], title: 'New Hire Onboarding Materials', author: 'Human Resources Development', date: '2025-03-10' },
+            { id: 16, type: 'pdf', category: 'Thesis', keywords: ['Research', 'Data Analysis'], title: 'Thesis Chapter 3: Methodology', author: 'Student A', date: '2025-05-09' },
+            { id: 17, type: 'docx', category: 'Synergy', keywords: ['Report', 'Sales', 'Q1'], title: 'Q1 Sales Performance Review', author: 'Sales Team Lead', date: '2025-04-10' },
+            { id: 18, type: 'pdf', category: 'Dissertation', keywords: ['Literature Review', 'Psychology'], title: 'Dissertation Lit Review Draft', author: 'PhD Candidate', date: '2025-04-11' },
+            { id: 19, type: 'txt', category: 'Confluence', keywords: ['Ideas', 'Brainstorming'], title: 'Project Phoenix Ideas', author: 'Team Member', date: '2025-04-12' },
+            { id: 20, type: 'xlsx', category: 'Synergy', keywords: ['Finance', 'Expenses'], title: 'Department Expense Tracking Q2', author: 'Admin Assistant', date: '2025-04-13' },
+            { id: 21, type: 'pdf', category: 'Thesis', keywords: ['Ethics', 'Approval'], title: 'Ethics Committee Approval Letter', author: 'Ethics Board', date: '2025-03-14' },
+            { id: 22, type: 'pptx', category: 'Dissertation', keywords: ['Presentation', 'Defense Prep'], title: 'Dissertation Defense Practice Slides', author: 'PhD Candidate', date: '2025-03-15' },
+        ];
+
+        function truncateText(text, maxLength) {
+            if (!text) return "N/A";
+            if (maxLength > 0 && text.length > maxLength) {
+                return text.substring(0, maxLength) + "...";
+            }
+            return text;
+        }
+
+        function getAuthorIcon(authorString) {
+            if (!authorString) return 'fas fa-user';
+            const lowerAuthor = authorString.toLowerCase();
+            if (lowerAuthor.includes('&') || lowerAuthor.includes(' and ') || lowerAuthor.includes('et al.') || lowerAuthor.includes(',')) {
+                return 'fas fa-users';
+            }
+            return 'fas fa-user';
+        }
+
+        function formatDateYYYYMMDD(date) {
+            try {
+                const d = new Date(date);
+                if (isNaN(d.getTime())) throw new Error("Invalid Date object");
+                const year = d.getFullYear();
+                const month = (d.getMonth() + 1).toString().padStart(2, '0');
+                const day = d.getDate().toString().padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            } catch (error) {
+                console.error("Error formatting date:", date, error);
+                return "";
+            }
+        }
+
+        function formatDisplayDate(dateString) {
+            try {
+                const dateObj = new Date(dateString + 'T00:00:00');
+                if (isNaN(dateObj.getTime())) return dateString;
+                return DISPLAY_DATE_FORMATTER.format(dateObj);
+            } catch (e) {
+                console.error("Error formatting display date:", dateString, e);
+                return dateString;
+            }
+        }
+
+        function createDocumentElement(doc) {
+            const item = document.createElement('div');
+            item.className = 'document-item-base';
+            item.setAttribute('data-category', doc.category);
+            item.setAttribute('data-keywords', (doc.keywords || []).join(', '));
+            item.setAttribute('data-id', doc.id);
+            item.setAttribute('data-date', doc.date);
+
+            const displayedTitle = truncateText(doc.title, 0);
+            const displayedAuthor = truncateText(doc.author, 0);
+            const authorIcon = getAuthorIcon(doc.author);
+            const displayDate = formatDisplayDate(doc.date);
+
+            let keywordsDisplayHTML = '';
+            if (doc.keywords && doc.keywords.length > 0) {
+                const pills = doc.keywords.map(kw => `<span class="keyword-pill clickable-keyword" data-keyword="${kw}">${kw}</span>`).join('');
+                keywordsDisplayHTML = `<div class="keywords-pill-container">${pills}</div>`;
+            }
+
+            item.innerHTML = `
+                <div class="list-info-col flex-grow pl-4 lg:pl-6">
+                    <h3 class="document-title lg:text-lg" title="${doc.title}">${displayedTitle}</h3>
+                    <div class="document-meta-primary lg:text-sm"> <span class="meta-item document-author">
+                            <i class="${authorIcon} fa-fw"></i>
+                            <span class="clickable-author" data-author-name="${doc.author || "N/A"}" title="Author: ${doc.author || "N/A"}">${displayedAuthor}</span>
+                        </span>
+                    </div>
+                    <div class="document-meta-secondary lg:text-sm lg:gap-4"> <span class="meta-item document-date" title="Visited: ${displayDate}">
+                            <i class="fas fa-calendar-check fa-fw"></i> ${displayDate}
+                        </span>
+                         <span class="meta-item document-category-meta uppercase">
+                            <i class="fas fa-folder-open fa-fw meta-category-icon"></i>
+                            <span class="clickable-category" data-category-name="${doc.category}" title="Filter by Category: ${doc.category}">${doc.category}</span>
+                         </span>
+                    </div>
+                    <div class="mt-1 lg:mt-2"> <div class="meta-item text-xs keywords-meta-container">
+                             <i class="fas fa-tags fa-fw meta-keywords-icon mr-1"></i>
+                            ${keywordsDisplayHTML || '<span class="text-gray-500 text-xs lg:text-sm">No keywords</span>'}
+                         </div>
+                    </div>
+                </div>
+            `;
+            return item;
+        }
+
+        function renderPaginationControls(totalFilteredCount) {
+            paginationControlsContainer.innerHTML = '';
+            const totalPages = Math.ceil(totalFilteredCount / ITEMS_PER_PAGE);
+
+            if (totalPages <= 1) {
+                 paginationControlsContainer.classList.add(CSS_CLASSES.HIDDEN);
+                 return;
+            }
+             paginationControlsContainer.classList.remove(CSS_CLASSES.HIDDEN);
+
+            const createButton = (text, pageNum, isDisabled = false, isActive = false) => {
+                const button = document.createElement('button');
+                button.classList.add('pagination-btn');
+                button.innerHTML = text;
+                button.disabled = isDisabled;
+                if (isActive) button.classList.add(CSS_CLASSES.ACTIVE);
+                button.addEventListener('click', () => {
+                    if (currentPage !== pageNum) {
+                        currentPage = pageNum;
+                        fetchAndDisplayDocuments();
+                    }
+                });
+                return button;
+            };
+
+            paginationControlsContainer.appendChild(
+                createButton('<i class="fas fa-chevron-left"></i> <span class="hidden sm:inline ml-1">Prev</span>', currentPage - 1, currentPage === 1)
+            );
+
+            let startPage = Math.max(1, currentPage - 1);
+            let endPage = Math.min(totalPages, currentPage + 1);
+            if (currentPage === 1 && totalPages > 2) endPage = 3;
+            if (currentPage === totalPages && totalPages > 2) startPage = totalPages - 2;
+
+            if (startPage > 1) {
+                paginationControlsContainer.appendChild(createButton('1', 1));
+                if (startPage > 2) {
+                    const ellipsis = document.createElement('span');
+                    ellipsis.textContent = '...';
+                    ellipsis.className = 'px-3 py-1 text-gray-500';
+                    paginationControlsContainer.appendChild(ellipsis);
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                paginationControlsContainer.appendChild(createButton(i.toString(), i, false, i === currentPage));
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    const ellipsis = document.createElement('span');
+                    ellipsis.textContent = '...';
+                    ellipsis.className = 'px-3 py-1 text-gray-500';
+                    paginationControlsContainer.appendChild(ellipsis);
+                }
+                paginationControlsContainer.appendChild(createButton(totalPages.toString(), totalPages));
+            }
+
+            paginationControlsContainer.appendChild(
+                createButton('<span class="hidden sm:inline mr-1">Next</span> <i class="fas fa-chevron-right"></i>', currentPage + 1, currentPage === totalPages)
+            );
+        }
+
+        function groupDocsByMonth(docs) {
+            const grouped = {};
+            docs.forEach(doc => {
+                try {
+                    const dateObj = new Date(doc.date + 'T00:00:00');
+                    if (isNaN(dateObj)) throw new Error('Invalid date');
+                    const monthYear = MONTH_YEAR_FORMATTER.format(dateObj);
+                    if (!grouped[monthYear]) grouped[monthYear] = [];
+                    grouped[monthYear].push(doc);
+                } catch (e) { console.error(`Skipping doc with invalid date: ${doc.date}`, doc); }
+            });
+            return grouped;
+        }
+
+        function renderDocuments(docsToRender) {
+            documentContainer.innerHTML = '';
+
+            if (!docsToRender || docsToRender.length === 0) {
+                noDocumentsMessage.classList.remove(CSS_CLASSES.HIDDEN);
+                documentContainer.classList.add(CSS_CLASSES.HIDDEN);
+                return;
+            }
+
+            noDocumentsMessage.classList.add(CSS_CLASSES.HIDDEN);
+            documentContainer.classList.remove(CSS_CLASSES.HIDDEN);
+
+            const groupedDocs = groupDocsByMonth(docsToRender);
+            const sortedMonths = Object.keys(groupedDocs).sort((a, b) => new Date(b) - new Date(a));
+
+            sortedMonths.forEach(monthYear => {
+                const monthGroupDiv = document.createElement('div');
+                monthGroupDiv.className = 'month-group';
+
+                const header = document.createElement('div');
+                header.className = 'month-header';
+                header.textContent = monthYear;
+                header.setAttribute('data-month', monthYear);
+
+                const icon = document.createElement('i');
+                icon.className = 'fas fa-chevron-down toggle-icon';
+                header.appendChild(icon);
+
+                const itemsContainer = document.createElement('div');
+                itemsContainer.className = 'month-items';
+
+                groupedDocs[monthYear].forEach(doc => {
+                    itemsContainer.appendChild(createDocumentElement(doc));
+                });
+
+                if (collapsedMonths.has(monthYear)) {
+                    header.classList.add(CSS_CLASSES.COLLAPSED);
+                    itemsContainer.classList.add(CSS_CLASSES.COLLAPSED);
+                }
+
+                header.addEventListener('click', handleMonthHeaderClick);
+
+                monthGroupDiv.appendChild(header);
+                monthGroupDiv.appendChild(itemsContainer);
+                documentContainer.appendChild(monthGroupDiv);
+            });
+        }
+
+         async function simulateFetchHistoryData(page, limit, filters) {
+            await new Promise(resolve => setTimeout(resolve, 150));
+
+            let filtered = allMockDocuments.filter(doc => {
+                const docDate = new Date(doc.date + 'T00:00:00');
+                let dateMatch = true;
+                if (filters.startDate) {
+                    try {
+                        const startDate = new Date(filters.startDate + 'T00:00:00');
+                        if (!isNaN(startDate) && docDate < startDate) dateMatch = false;
+                    } catch (e) { /* Ignore */ }
+                }
+                if (filters.endDate) {
+                     try {
+                        const endDate = new Date(filters.endDate + 'T23:59:59');
+                        if (!isNaN(endDate) && docDate > endDate) dateMatch = false;
+                    } catch (e) { /* Ignore */ }
+                }
+                if (!dateMatch) return false;
+
+                const titleMatch = !filters.searchTerm || doc.title.toLowerCase().includes(filters.searchTerm);
+                const authorMatch = !filters.searchTerm || (doc.author || "").toLowerCase().includes(filters.searchTerm);
+                const categoryMatch = filters.category === 'all' || doc.category === filters.category;
+                const keywordMatch = filters.keyword === 'all' || (doc.keywords || []).map(k => k.toLowerCase()).includes(filters.keyword.toLowerCase());
+
+                return (titleMatch || authorMatch) && categoryMatch && keywordMatch;
+            });
+
+            const sortFunctions = {
+                'title-asc': (a, b) => a.title.localeCompare(b.title),
+                'title-desc': (a, b) => b.title.localeCompare(a.title),
+                'date-saved-desc': (a, b) => new Date(b.date) - new Date(a.date),
+                'date-saved-asc': (a, b) => new Date(a.date) - new Date(b.date),
+                'category': (a, b) => (a.category || "").localeCompare(b.category || "")
+            };
+            if (sortFunctions[filters.sortBy]) {
+                filtered.sort(sortFunctions[filters.sortBy]);
+            }
+
+            const totalCount = filtered.length;
+            const startIndex = (page - 1) * limit;
+            const endIndex = startIndex + limit;
+            const itemsForPage = filtered.slice(startIndex, endIndex);
+
+            return { items: itemsForPage, totalCount: totalCount };
+        }
+
+        async function fetchAndDisplayDocuments() {
+            const filters = {
+                searchTerm: searchBar.value.toLowerCase().trim(),
+                category: filterByCategorySelect.value,
+                keyword: filterByKeywordsSelect.value,
+                sortBy: sortBySelect.value,
+                startDate: startDateInput.value,
+                endDate: endDateInput.value,
+            };
+
+            try {
+                documentContainer.style.opacity = '0.5';
+                const response = await simulateFetchHistoryData(currentPage, ITEMS_PER_PAGE, filters);
+                currentTotalItems = response.totalCount;
+                renderDocuments(response.items);
+                renderPaginationControls(response.totalCount);
+            } catch (error) {
+                console.error("Failed to fetch history data:", error);
+                documentContainer.innerHTML = `<p class="text-center text-red-600 p-4">Error loading history.</p>`;
+                noDocumentsMessage.classList.add(CSS_CLASSES.HIDDEN);
+                paginationControlsContainer.innerHTML = '';
+            } finally {
+                 documentContainer.style.opacity = '1';
+            }
+        }
+
+        function handleFilterChange() {
+            currentPage = 1;
+            fetchAndDisplayDocuments();
+        }
+
+        function toggleKeywordPopup(docId, triggerElement) {
+            if (currentKeywordGlassPopup && currentKeywordGlassPopup.trigger === triggerElement) {
+                keywordPopupGlass.classList.remove(CSS_CLASSES.ACTIVE);
+                currentKeywordGlassPopup = null;
+                return;
+            }
+            if (currentKeywordGlassPopup) {
+                currentKeywordGlassPopup.element.classList.remove(CSS_CLASSES.ACTIVE);
+            }
+
+            const doc = allMockDocuments.find(d => d.id === docId);
+            if (doc && doc.keywords && doc.keywords.length > 0) {
+                keywordPopupGlass.innerHTML = doc.keywords.map(kw =>
+                    `<span class="keyword-pill clickable-keyword" data-keyword="${kw}">${kw}</span>`
+                ).join('');
+
+                const rect = triggerElement.getBoundingClientRect();
+                keywordPopupGlass.style.top = `${rect.bottom + window.scrollY + 5}px`;
+                let left = rect.left + window.scrollX;
+
+                keywordPopupGlass.style.display = 'block';
+                const popupRect = keywordPopupGlass.getBoundingClientRect();
+                if (left + popupRect.width > window.innerWidth - 20) {
+                    left = window.innerWidth - popupRect.width - 20;
+                }
+                left = Math.max(10, left);
+                keywordPopupGlass.style.left = `${left}px`;
+                keywordPopupGlass.style.display = '';
+
+                keywordPopupGlass.classList.add(CSS_CLASSES.ACTIVE);
+                currentKeywordGlassPopup = { element: keywordPopupGlass, trigger: triggerElement };
+            }
+        }
+
+        function closePopups(event) {
+            if (currentKeywordGlassPopup && !currentKeywordGlassPopup.element.contains(event.target) && !currentKeywordGlassPopup.trigger.contains(event.target)) {
+                currentKeywordGlassPopup.element.classList.remove(CSS_CLASSES.ACTIVE);
+                currentKeywordGlassPopup = null;
+            }
+            if (filtersExpanded && !collapsibleFilters.contains(event.target) && !toggleFiltersBtn.contains(event.target)) {
+                 toggleFilterExpansion(event, false);
+            }
+        }
+
+        function handleContainerClick(event) {
+            const target = event.target;
+            const clickableAuthor = target.closest(SELECTORS.CLICKABLE_AUTHOR);
+            const clickableCategory = target.closest(SELECTORS.CLICKABLE_CATEGORY);
+            const clickableKeywordPill = target.closest(`${SELECTORS.DOCUMENT_ITEM} ${SELECTORS.CLICKABLE_KEYWORD}`);
+            const keywordTrigger = target.closest('.keywords-meta-container');
+
+            if (clickableAuthor) {
+                alert(`Filtering by author (not implemented): ${clickableAuthor.dataset.authorName}`);
+            } else if (clickableCategory) {
+                filterByCategorySelect.value = clickableCategory.dataset.categoryName;
+                handleFilterChange();
+            } else if (clickableKeywordPill) {
+                filterByKeywordsSelect.value = clickableKeywordPill.dataset.keyword;
+                handleFilterChange();
+            } else if (keywordTrigger && !clickableKeywordPill) {
+                 const itemElement = keywordTrigger.closest('[data-id]');
+                 if(itemElement) {
+                    const docId = parseInt(itemElement.dataset.id);
+                    toggleKeywordPopup(docId, keywordTrigger);
+                 }
+            }
+        }
+
+        function handleKeywordPopupClick(event) {
+             if (event.target.classList.contains('clickable-keyword')) {
+                filterByKeywordsSelect.value = event.target.dataset.keyword;
+                handleFilterChange();
+                keywordPopupGlass.classList.remove(CSS_CLASSES.ACTIVE);
+                currentKeywordGlassPopup = null;
+            }
+        }
+
+        function toggleFilterExpansion(event, forceState = null) {
+             if (event) event.stopPropagation();
+             const shouldBeExpanded = forceState !== null ? forceState : !filtersExpanded;
+
+             if (shouldBeExpanded !== filtersExpanded) {
+                 filtersExpanded = shouldBeExpanded;
+                 collapsibleFilters.classList.toggle(CSS_CLASSES.EXPANDED, filtersExpanded);
+                 toggleFiltersBtn.classList.toggle(CSS_CLASSES.ACTIVE, filtersExpanded);
+                 const chevronIcon = toggleFiltersBtn.querySelector(SELECTORS.CHEVRON_ICON);
+                 if (chevronIcon) {
+                     chevronIcon.classList.toggle('fa-chevron-down', !filtersExpanded);
+                     chevronIcon.classList.toggle('fa-chevron-up', filtersExpanded);
+                 }
+             }
+        }
+
+        function handleMonthHeaderClick(event) {
+            const header = event.currentTarget;
+            const itemsContainer = header.nextElementSibling;
+            const monthYear = header.dataset.month;
+
+            if (header.classList.contains(CSS_CLASSES.COLLAPSED)) {
+                header.classList.remove(CSS_CLASSES.COLLAPSED);
+                itemsContainer.classList.remove(CSS_CLASSES.COLLAPSED);
+                collapsedMonths.delete(monthYear);
+            } else {
+                header.classList.add(CSS_CLASSES.COLLAPSED);
+                itemsContainer.classList.add(CSS_CLASSES.COLLAPSED);
+                collapsedMonths.add(monthYear);
+            }
+        }
+
+        function initializePage() {
+            sortBySelect.value = 'date-saved-desc';
+
+            if (allMockDocuments.length > 0) {
+                const dates = allMockDocuments.map(doc => new Date(doc.date + 'T00:00:00')).filter(date => !isNaN(date));
+                if (dates.length > 0) {
+                    const minDate = new Date(Math.min.apply(null, dates));
+                    const maxDate = new Date(Math.max.apply(null, dates));
+                    startDateInput.value = formatDateYYYYMMDD(minDate);
+                    endDateInput.value = formatDateYYYYMMDD(maxDate);
+                }
+            }
+
+            searchBar.addEventListener('input', handleFilterChange);
+            sortBySelect.addEventListener('change', handleFilterChange);
+            filterByCategorySelect.addEventListener('change', handleFilterChange);
+            filterByKeywordsSelect.addEventListener('change', handleFilterChange);
+            startDateInput.addEventListener('change', handleFilterChange);
+            endDateInput.addEventListener('change', handleFilterChange);
+            documentContainer.addEventListener('click', handleContainerClick);
+            keywordPopupGlass.addEventListener('click', handleKeywordPopupClick);
+            toggleFiltersBtn.addEventListener('click', toggleFilterExpansion);
+            document.addEventListener('click', closePopups);
+
+            fetchAndDisplayDocuments();
+        }
+
+        initializePage();
+
+    </script>
+
+    <!-- Navbar loading script -->
+    <script src="/Components/js/navbar-loader.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize the navbar
+            if (window.NavbarModule) {
+                window.NavbarModule.init();
+            } else {
+                console.error('NavbarModule not found! Make sure navbar-loader.js is loaded correctly.');
+            }
+        });
+    </script>
+</body>
+</html>

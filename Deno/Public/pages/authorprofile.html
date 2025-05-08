@@ -117,8 +117,8 @@
     </style>
 </head>
 <body class="bg-gray-50 text-gray-900" >
-    <!-- Header Component -->
-    <div id="header"></div>
+    <!-- Navbar will be loaded here -->
+    <div id="navbarContainer"></div>
 
     <div class="container mx-auto p-4 md:p-8 min-h-screen font-sans"style="width: 1200px; max-width: 100%; margin: 0 auto;">
 
@@ -927,6 +927,9 @@
                  renderTagFilters();      // Render tag filters based on fetched data
                  filterAndRenderPublications(); // Initial render of publications
 
+                 // Record the author profile visit
+                 recordAuthorVisit(currentAuthorData.id);
+
                  console.log("Author Profile Initialized Successfully.");
             } else {
                  // Handle case where fetch returned null (API error, 404, etc.)
@@ -941,6 +944,64 @@
         }
     });
 
+    /**
+     * Records a visit to the author profile
+     * @param {string} authorId - The ID of the author being viewed
+     */
+    async function recordAuthorVisit(authorId) {
+        if (!authorId) return;
+        
+        try {
+            // Check if user is logged in
+            let userInfo = null;
+            try {
+                userInfo = JSON.parse(sessionStorage.getItem('userInfo'));
+            } catch (e) {
+                console.log('No user info found or invalid format');
+            }
+            
+            // Prepare visit data
+            const visitData = {
+                authorId: authorId,
+                visitorType: userInfo?.isLoggedIn ? 'user' : 'guest',
+                userId: userInfo?.isLoggedIn ? userInfo.id : undefined
+            };
+            
+            // Send the visit data to the API
+            const response = await fetch(`${API_BASE_URL}/author-visits`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(userInfo?.token ? {'Authorization': `Bearer ${userInfo.token}`} : {})
+                },
+                body: JSON.stringify(visitData)
+            });
+            
+            if (!response.ok) {
+                console.warn(`Failed to record author visit: ${response.status} ${response.statusText}`);
+                return;
+            }
+            
+            console.log('Author visit recorded successfully');
+        } catch (error) {
+            console.error('Error recording author visit:', error);
+            // Non-critical error, don't disrupt the user experience
+        }
+    }
+
+</script>
+
+<!-- Navbar loading script -->
+<script src="/Components/js/navbar-loader.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize the navbar
+        if (window.NavbarModule) {
+            window.NavbarModule.init();
+        } else {
+            console.error('NavbarModule not found! Make sure navbar-loader.js is loaded correctly.');
+        }
+    });
 </script>
 
 </body>

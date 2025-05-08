@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compiled Document</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        :root {
+            --theme-gold: #FDB813;
+            --theme-gold-darker: #EAA10F;
+            --theme-gold-light-bg: rgba(253, 184, 19, 0.2);
+            --theme-gold-lighter-bg: rgba(253, 184, 19, 0.1);
+            --theme-gold-highlight: rgba(253, 184, 19, 0.4);
+            --theme-green-dark: #006A4E;
+            --theme-green-darker-text: #00523D;
+            --theme-green-light-bg: rgba(0, 106, 78, 0.3);
+            --theme-green-lighter-bg: rgba(0, 106, 78, 0.15);
+            --theme-green-border: rgba(0, 106, 78, 0.7);
+            --theme-page-bg: #F9F6EE;
+            --neutral-border-color: #e5e7eb;
+            --primary-text-color: #1f2937;
+            --secondary-text-color: #4b5563;
+            --tertiary-text-color: #6b7280;
+        }
+
+        html, body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--theme-page-bg);
+            color: var(--primary-text-color);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+
+        .page-wrapper {
+            padding-top: 2rem;
+            padding-bottom: 4rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+
+        h1, h2, h3 {
+            color: var(--theme-green-dark);
+        }
+
+        .compiled-header {
+            background-color: var(--theme-green-dark);
+            color: white;
+            padding: 3rem 1rem;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .compiled-header h1 {
+            color: white;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .compiled-content {
+            background-color: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .compiled-toc {
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .compiled-toc h2 {
+            border-bottom: 2px solid var(--theme-gold);
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .toc-list {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        .toc-list li {
+            margin-bottom: 0.5rem;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            transition: background-color 0.2s;
+        }
+
+        .toc-list li:hover {
+            background-color: var(--theme-gold-light-bg);
+        }
+
+        .toc-list a {
+            color: var(--theme-green-dark);
+            text-decoration: none;
+            display: block;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            background-color: var(--theme-green-dark);
+            color: white;
+            border-radius: 0.375rem;
+            text-decoration: none;
+            transition: background-color 0.2s;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background-color: var(--theme-green-dark);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--theme-green-darker-text);
+        }
+
+        .btn-secondary {
+            background-color: var(--theme-gold);
+            color: black;
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--theme-gold-darker);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem 0;
+            font-size: 1.2rem;
+            color: var(--tertiary-text-color);
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar will be loaded here -->
+    <div id="navbarContainer"></div>
+
+    <div class="page-wrapper">
+        <header class="compiled-header">
+            <div class="container">
+                <h1>Compiled Document Title</h1>
+                <p>A collection of related documents compiled into a single volume</p>
+            </div>
+        </header>
+
+        <main class="container">
+            <section class="compiled-toc">
+                <h2>Table of Contents</h2>
+                <ul class="toc-list" id="tableOfContents">
+                    <li><a href="#section1">Loading Table of Contents...</a></li>
+                </ul>
+            </section>
+
+            <section class="compiled-content" id="compiledContent">
+                <div class="loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Loading compiled document data...</p>
+                </div>
+            </section>
+
+            <div class="action-buttons">
+                <a href="#" class="btn btn-primary" id="readBtn">
+                    <i class="fas fa-book-open"></i> Read Full Document
+                </a>
+                <a href="#" class="btn btn-secondary" id="saveBtn">
+                    <i class="fas fa-bookmark"></i> Save for Later
+                </a>
+            </div>
+        </main>
+    </div>
+
+    <!-- Navbar loading script -->
+    <script src="/Components/js/navbar-loader.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize the navbar
+            if (window.NavbarModule) {
+                window.NavbarModule.init();
+            } else {
+                console.error('NavbarModule not found! Make sure navbar-loader.js is loaded correctly.');
+            }
+            
+            // Get user information from storage
+            function getUserInfo() {
+                try {
+                    // Check sessionStorage first, then localStorage
+                    const sessionUserInfo = sessionStorage.getItem('userInfo');
+                    const localUserInfo = localStorage.getItem('userInfo');
+                    
+                    // Parse the stored JSON data
+                    if (sessionUserInfo) {
+                        try {
+                            const userInfo = JSON.parse(sessionUserInfo);
+                            return userInfo;
+                        } catch (parseError) {
+                            console.error('Error parsing sessionStorage user info:', parseError);
+                            return null;
+                        }
+                    } else if (localUserInfo) {
+                        try {
+                            const userInfo = JSON.parse(localUserInfo);
+                            return userInfo;
+                        } catch (parseError) {
+                            console.error('Error parsing localStorage user info:', parseError);
+                            return null;
+                        }
+                    }
+                    
+                    return null;
+                } catch (error) {
+                    console.error('Error retrieving user info:', error);
+                    return null;
+                }
+            }
+
+            // Check if user is logged in
+            function isUserLoggedIn(userInfo) {
+                if (!userInfo) {
+                    return false;
+                }
+                
+                // Check for token validity
+                if (!userInfo.token) {
+                    return false;
+                }
+                
+                // Check for login timestamp and validate it's not too old (24 hours)
+                if (userInfo.loginTime) {
+                    const loginTime = new Date(userInfo.loginTime);
+                    const currentTime = new Date();
+                    const hoursSinceLogin = (currentTime - loginTime) / (1000 * 60 * 60);
+                    
+                    if (hoursSinceLogin > 24) {
+                        return false;
+                    }
+                }
+                
+                // Final check for essential properties - ensuring isLoggedIn is explicitly true
+                return userInfo.isLoggedIn === true && userInfo.token && userInfo.token.length > 0;
+            }
+            
+            // Get document ID from URL
+            function getDocumentIdFromUrl() {
+                const urlParams = new URLSearchParams(window.location.search);
+                return urlParams.get('id');
+            }
+            
+            const documentId = getDocumentIdFromUrl();
+            if (documentId) {
+                console.log(`Loading compiled document with ID: ${documentId}`);
+                // You would load the compiled document data here
+                // loadCompiledDocumentData(documentId);
+            } else {
+                console.warn('No document ID provided in URL');
+                document.getElementById('compiledContent').innerHTML = `
+                    <div class="loading" style="color: orange;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p>No document ID provided. Please provide a valid document ID.</p>
+                    </div>
+                `;
+            }
+            
+            // Setup button event listeners
+            document.getElementById('readBtn').addEventListener('click', function(e) {
+                e.preventDefault();
+                if (!documentId) {
+                    alert('No document ID provided');
+                    return;
+                }
+                
+                // Check if user is logged in
+                const userInfo = getUserInfo();
+                const isLoggedIn = isUserLoggedIn(userInfo);
+                
+                if (!isLoggedIn) {
+                    // User is not logged in, redirect to document request form
+                    window.location.href = `/requestForm/documentRequestForm.html?document_id=${documentId}`;
+                    return;
+                }
+                
+                // User is logged in, proceed with normal behavior
+                alert('Reading full document with ID: ' + documentId);
+            });
+            
+            document.getElementById('saveBtn').addEventListener('click', function(e) {
+                e.preventDefault();
+                if (!documentId) {
+                    alert('No document ID provided');
+                    return;
+                }
+                alert('Document saved for later reading');
+            });
+        });
+    </script>
+</body>
+</html>

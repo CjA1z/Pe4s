@@ -1,0 +1,1560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Library - Gold & Green Theme with Transitions</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --theme-gold: #FDB813; 
+            --theme-gold-darker: #EAA10F; 
+            --theme-gold-light-bg: rgba(253, 184, 19, 0.2); 
+            --theme-gold-lighter-bg: rgba(253, 184, 19, 0.1);
+            --theme-gold-highlight: rgba(253, 184, 19, 0.4);
+
+            --theme-green-dark: #006A4E; 
+            --theme-green-darker-text: #00523D; 
+            --theme-green-light-bg: rgba(0, 106, 78, 0.3); 
+            --theme-green-lighter-bg: rgba(0, 106, 78, 0.15);
+            --theme-green-border: rgba(0, 106, 78, 0.7); 
+            
+            --theme-navbar-bg: #F9F6EE; 
+            --neutral-border-color: #e5e7eb; 
+            --input-border-color: #d1d5db; 
+            --placeholder-text-color: #9ca3af; 
+
+            --text-on-gold: #000000; 
+            --text-on-green: #FFFFFF; 
+            --primary-text-color: #1a202c; 
+
+            --icon-color-synergy: var(--theme-green-dark);
+            --icon-color-dissertation: var(--theme-gold-darker);
+            --icon-color-confluence: #4A5568; 
+            --icon-color-thesis: var(--theme-green-darker-text);
+            --icon-color-general: var(--theme-accent-gray); 
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--theme-navbar-bg); 
+            color: var(--primary-text-color); 
+            min-height: 100vh;
+            padding-top: 1.5rem; 
+            padding-bottom: 1.5rem; 
+        }
+
+        select.form-input-professional { 
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2300523D' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e"); 
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            padding-right: 2.5rem; 
+            border-color: var(--theme-green-darker-text); 
+        }
+        .select-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+            flex-grow: 1; 
+        }
+        .select-container .select-icon {
+            position: absolute;
+            left: 0.75rem; 
+            pointer-events: none; 
+            color: var(--theme-green-dark);
+        }
+         .select-container select.form-input-professional {
+            padding-left: 2.5rem; 
+            width: 100%; 
+        }
+        
+        .form-input-professional { 
+            border-color: var(--input-border-color); 
+        }
+        .form-input-professional:focus {
+            border-color: var(--theme-green-dark); 
+            box-shadow: 0 0 0 2px var(--theme-green-light-bg);
+        }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #bbb; }
+        
+        .keywords-pill-container::-webkit-scrollbar { 
+            height: 4px; 
+        }
+        .keywords-pill-container::-webkit-scrollbar-thumb { 
+            background: transparent; 
+            border-radius: 2px;
+        }
+        .keywords-pill-container:hover::-webkit-scrollbar-thumb { 
+            background: var(--theme-gold-lighter-bg); 
+        }
+        .keywords-pill-container {
+            scrollbar-width: thin; 
+            scrollbar-color: var(--theme-gold-lighter-bg) transparent; 
+        }
+
+        .keyword-popup-glass::-webkit-scrollbar,
+        .view-options-popup::-webkit-scrollbar { 
+            width: 8px;
+        }
+        .keyword-popup-glass::-webkit-scrollbar-track,
+        .view-options-popup::-webkit-scrollbar-track {
+            background: rgba(249, 246, 238, 0.5); 
+            border-radius: 10px;
+            margin: 5px 0; 
+        }
+        .keyword-popup-glass::-webkit-scrollbar-thumb,
+        .view-options-popup::-webkit-scrollbar-thumb {
+            background: var(--theme-green-lighter-bg); 
+            border-radius: 10px;
+            border: 2px solid rgba(249, 246, 238, 0.5); 
+        }
+        .keyword-popup-glass::-webkit-scrollbar-thumb:hover,
+        .view-options-popup::-webkit-scrollbar-thumb:hover {
+            background: var(--theme-green-light-bg); 
+        }
+
+
+        .document-item-base {
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease, opacity 0.5s ease; 
+            border: 1px solid var(--neutral-border-color); 
+            background-color: white;
+            cursor: pointer; 
+        }
+        #document-container:not(.view-table) .document-item-base:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1); 
+        }
+         #document-container.view-table tr.document-item-base:hover td { 
+            background-color: var(--theme-gold-lighter-bg) !important; 
+        }
+        
+        .document-item-base.selected {
+            background-color: var(--theme-gold-lighter-bg) !important; 
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1) !important;
+        }
+        #document-container.view-grid .document-item-base.selected,
+        #document-container.view-list .document-item-base.selected {
+            border-left: 4px solid var(--theme-gold-darker) !important;
+        }
+        #document-container.view-table tr.document-item-base.selected td { 
+            background-color: var(--theme-gold-lighter-bg) !important;
+        }
+        #document-container.view-table tr.document-item-base.selected td:first-child {
+            border-left: 4px solid var(--theme-gold-darker) !important; 
+        }
+
+        @keyframes fade-to-dust {
+            0% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+            50% { opacity: 0.5; transform: scale(1.02) translateY(-5px); filter: blur(1px); }
+            99% { opacity: 0; transform: scale(0.8) translateY(10px); filter: blur(3px); }
+            100% { opacity: 0; transform: scale(0.8) translateY(10px); filter: blur(3px); height: 0; padding-top: 0; padding-bottom: 0; margin-bottom: 0; border-width: 0; overflow: hidden;}
+        }
+        .document-item-base.deleting {
+            animation: fade-to-dust 0.6s ease-out forwards;
+            transition: none !important; 
+        }
+        #document-container.view-grid .document-item-base.deleting,
+        #document-container.view-list .document-item-base.deleting {
+             /* Animation handles height reduction */
+        }
+         #document-container.view-table tr.document-item-base.deleting td {
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            line-height: 0; 
+        }
+         #document-container.view-table tr.document-item-base.deleting td > * {
+            visibility: hidden; 
+        }
+
+
+        .btn {
+            padding: 0.65rem 1rem; border-radius: 0.375rem; font-weight: 500; text-align: center;
+            transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.3s ease, transform 0.3s ease;
+            display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem; font-size: 0.875rem;
+            cursor: pointer; 
+        }
+        .btn-primary { 
+            background-color: var(--theme-green-dark); 
+            color: var(--text-on-green); 
+            border: 1px solid var(--theme-green-dark); 
+        }
+        .btn-primary:hover { background-color: var(--theme-green-darker-text); }
+        
+        .btn-secondary { 
+            background-color: var(--theme-gold); 
+            color: var(--text-on-gold); 
+            border: 1px solid var(--theme-gold); 
+        }
+        .btn-secondary:hover { background-color: var(--theme-gold-darker); }
+        
+        .btn-danger { background-color: #b91c1c; color: white; border: 1px solid #b91c1c; } 
+        .btn-danger:hover:not(:disabled) { background-color: #991b1b; }
+        .btn-danger:disabled {
+            background-color: #f8d7da; 
+            border-color: #f5c6cb;
+            color: #721c24;
+            cursor: not-allowed;
+        }
+
+        .btn-outline-primary { 
+            background-color: transparent; 
+            color: var(--theme-green-dark); 
+            border: 1px solid var(--theme-green-dark); 
+        }
+        .btn-outline-primary:hover { background-color: var(--theme-green-lighter-bg); }
+        
+        .btn-outline-secondary { 
+            background-color: transparent; 
+            color: var(--theme-gold-darker); 
+            border: 1px solid var(--theme-gold); 
+            padding: 0.5rem 1rem; 
+        }
+        .btn-outline-secondary:hover { background-color: var(--theme-gold-lighter-bg); }
+        .btn-outline-secondary.active { 
+             background-color: var(--theme-gold-lighter-bg);
+        }
+        .btn-outline-secondary i.chevron-icon { transition: transform 0.3s ease; } 
+        .btn-outline-secondary.active i.chevron-icon { transform: rotate(180deg); }
+
+
+        .btn-outline-danger { background-color: transparent; color: #b91c1c; border: 1px solid #b91c1c; }
+        .btn-outline-danger:hover { background-color: rgba(185, 28, 28, 0.05); }
+        
+        .view-btn { 
+            background-color: #e5e7eb; color: #4b5563; padding: 0.5rem 0.75rem;
+            border-radius: 0.375rem; border: 1px solid var(--input-border-color); 
+            transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+            width: 100%; 
+            justify-content: flex-start; 
+        }
+        .view-btn:hover { background-color: #d1d5db; }
+        .view-btn.active { 
+            background-color: var(--theme-green-dark); 
+            color: var(--text-on-green); 
+            border-color: var(--theme-green-dark); 
+        }
+        .view-btn i { font-size: 0.875rem; margin-right: 0.5rem; } 
+
+        #collapsible-filters {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease-out, padding-top 0.4s ease-out, padding-bottom 0.4s ease-out, margin-top 0.4s ease-out;
+            padding-top: 0;
+            padding-bottom: 0;
+            margin-top: 0;
+            width: 100%; 
+        }
+        #collapsible-filters.expanded {
+            max-height: 500px; 
+            padding-top: 1rem; 
+            padding-bottom: 0.5rem; 
+            margin-top: 1rem; 
+        }
+        
+        .view-options-popup {
+            position: absolute;
+            background: rgba(249, 246, 238, 0.80); 
+            backdrop-filter: blur(10px) saturate(180%);
+            -webkit-backdrop-filter: blur(10px) saturate(180%);
+            border: 1px solid rgba(0, 106, 78, 0.20);
+            border-radius: 0.5rem;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+            padding: 0.5rem; 
+            z-index: 1050; 
+            width: 180px; 
+            display: none; 
+            transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+            opacity: 0;
+            transform: translateY(5px) scale(0.95);
+        }
+        .view-options-popup.active {
+            display: flex; 
+            flex-direction: column;
+            gap: 0.25rem; 
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+
+        .truncate-text {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: block; 
+        }
+        .meta-item { 
+            display: flex;
+            align-items: center;
+            gap: 0.3rem; 
+            text-align: left; 
+        }
+        .meta-item i {
+            color: var(--theme-accent-gray); 
+            flex-shrink: 0; 
+        }
+        .meta-item .meta-category-icon {
+            color: var(--theme-green-dark); 
+        }
+        .meta-item .meta-keywords-icon { 
+            color: var(--theme-gold-darker);
+        }
+        .clickable-meta {
+            cursor: pointer;
+            text-decoration: none; 
+        }
+        .clickable-meta:hover {
+            text-decoration: underline; 
+            text-decoration-color: currentColor; 
+        }
+        .clickable-author:hover { color: var(--theme-green-darker-text); }
+        .clickable-category:hover { color: var(--theme-green-darker-text); }
+
+        .keywords-pill-container {
+            display: flex;
+            overflow-x: auto; 
+            white-space: nowrap; 
+            padding-bottom: 4px; 
+            margin-top: 0.125rem; 
+        }
+        .keyword-pill {
+            display: inline-block;
+            background-color: var(--theme-gold-lighter-bg);
+            color: var(--text-on-gold); 
+            padding: 0.125rem 0.5rem; 
+            margin-right: 0.25rem; 
+            border-radius: 9999px; 
+            font-size: 0.7rem; 
+            font-weight: 500; 
+            white-space: nowrap; 
+            cursor: pointer; 
+        }
+        .keyword-pill:hover {
+            background-color: var(--theme-gold-light-bg);
+        }
+        .keywords-trigger { 
+            display: inline-flex; 
+            align-items: center;
+            gap: 0.25rem; 
+            color: var(--theme-green-dark);
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+        .keywords-trigger:hover {
+            color: var(--theme-green-darker-text);
+        }
+        .keywords-trigger i {
+            color: var(--theme-gold-darker); 
+        }
+
+        .keyword-popup-glass {
+            position: absolute;
+            background: rgba(249, 246, 238, 0.85); 
+            backdrop-filter: blur(10px) saturate(150%);
+            -webkit-backdrop-filter: blur(10px) saturate(150%);
+            border: 1px solid rgba(0, 106, 78, 0.25); 
+            border-radius: 0.375rem; 
+            box-shadow: 0 6px 15px rgba(0,0,0,0.15); 
+            padding: 0.75rem; 
+            z-index: 1050; 
+            max-width: 300px; 
+            max-height: 200px; 
+            overflow-y: auto;  
+            display: none; 
+            transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+            opacity: 0;
+            transform: translateY(5px); 
+        }
+        .keyword-popup-glass.active {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .keyword-popup-glass .keyword-pill { 
+            background-color: var(--theme-gold); 
+            color: var(--text-on-gold); 
+            padding: 0.25rem 0.75rem; 
+            margin: 0.25rem; 
+            border-radius: 0.25rem; 
+            font-size: 0.8rem; 
+            cursor: pointer; 
+        }
+        .keyword-popup-glass .keyword-pill:hover {
+            background-color: var(--theme-gold-darker);
+        }
+
+        #document-container.view-list .document-item-base {
+            display: flex; flex-direction: row; align-items: center; width: 100%;
+            padding: 0.75rem 1rem; margin-bottom: 0.75rem; 
+        }
+        #document-container.view-list .list-info-col {
+            flex-grow: 1; display: flex; flex-direction: column; 
+            justify-content: center; overflow: hidden; 
+            margin-left: 0.5rem; 
+        }
+        #document-container.view-list .list-info-col .document-title { 
+            font-size: 1rem; font-weight: 500;
+            white-space: normal; 
+            overflow: visible; 
+            text-overflow: clip; 
+        }
+        #document-container.view-list .list-info-col .document-meta-primary { 
+            font-size: 0.8rem; color: #4a5568; display: flex;
+            align-items: center; 
+            margin-bottom: 0.25rem;
+        }
+         #document-container.view-list .list-info-col .document-meta-secondary { 
+            font-size: 0.75rem; color: #6b7280; display: flex;
+            gap: 0.75rem; align-items: center; flex-wrap: wrap; 
+            margin-top: 0.25rem;
+        }
+         #document-container.view-list .list-info-col .document-meta-secondary .document-category-meta { 
+            color: var(--theme-green-dark); 
+            font-weight: 500;
+        }
+        #document-container.view-list .list-info-col .keywords-meta-container { 
+            display: flex;
+            align-items: center;
+            gap: 0.25rem; 
+            margin-top: 0.125rem; 
+        }
+        #document-container.view-list .list-info-col .keywords-pill-container { 
+            max-width: calc(100% - 20px); 
+        }
+        #document-container.view-list .list-actions-col {
+            flex-shrink: 0; margin-left: 1rem; display: flex; gap: 0.5rem; 
+        }
+        #document-container.view-list .list-actions-col .btn { padding: 0.5rem; } 
+        #document-container.view-list .list-actions-col .individual-delete-btn {
+             padding: 0.5rem; 
+             width: auto; 
+             height: auto; 
+        }
+        #document-container.view-list .list-actions-col .btn i { margin-right: 0; font-size: 0.9rem; }
+
+
+        .table-scroll-wrapper { 
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch; 
+            border: 1px solid var(--neutral-border-color); 
+            border-radius: 0.375rem; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05); 
+        }
+        #document-container.view-table table { 
+            min-width: 750px; 
+        }
+        #document-container.view-table th {
+            padding: 0.75rem 1rem; text-align: left; font-size: 0.75rem; font-weight: 600; 
+            color: var(--theme-green-darker-text); text-transform: uppercase; letter-spacing: 0.05em; background-color: var(--theme-green-lighter-bg); 
+        }
+        #document-container.view-table th.col-checkbox,
+        #document-container.view-table td.col-checkbox {
+            width: 50px; 
+            min-width: 50px;
+            padding-left: 0.75rem;
+            padding-right: 0.75rem;
+        }
+        #document-container.view-table th.col-title,
+        #document-container.view-table td.col-title {
+            min-width: 200px; 
+        }
+        #document-container.view-table th.col-author,
+        #document-container.view-table td.col-author {
+            min-width: 150px; 
+        }
+        #document-container.view-table th.col-category,
+        #document-container.view-table td.col-category {
+            min-width: 120px;
+        }
+        #document-container.view-table th.col-keywords,
+        #document-container.view-table td.col-keywords {
+            min-width: 180px; 
+        }
+        #document-container.view-table th.col-actions,
+        #document-container.view-table td.col-actions {
+            min-width: 140px; 
+            text-align: right;
+        }
+
+        #document-container.view-table td {
+            padding: 0.75rem 1rem; font-size: 0.875rem; color: var(--primary-text-color); 
+            border-bottom-width: 1px; border-color: var(--neutral-border-color); 
+        }
+         #document-container.view-table td .document-title-in-table { 
+            font-weight: 500; color: var(--primary-text-color); 
+        }
+        #document-container.view-table .action-btn { padding: 0.375rem 0.5rem; }
+        #document-container.view-table .action-btn i { font-size: 0.8rem; }
+        #document-container.view-table .keywords-pill-container {
+            max-width: 180px; 
+        }
+
+        .pagination-btn {
+            padding: 0.5rem 0.75rem; border: 1px solid var(--input-border-color); background-color: white;
+            color: #374151; border-radius: 0.375rem; 
+            transition: background-color 0.2s ease, color 0.2s ease;
+            font-size: 0.875rem; line-height: 1.25rem;
+        }
+        .pagination-btn:hover:not(:disabled) { background-color: #f3f4f6; }
+        .pagination-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .pagination-btn.active { 
+            background-color: var(--theme-green-dark); 
+            color: var(--text-on-green); 
+            border-color: var(--theme-green-dark); 
+        }
+
+        .document-view-wrapper {
+            transition: clip-path 0.4s cubic-bezier(0.4, 0, 0.2, 1); 
+            clip-path: inset(0 0 0 0); 
+        }
+        .document-view-wrapper.loading-content {
+            clip-path: inset(0 100% 0 0); 
+        }
+        
+        .document-checkbox-container {
+            display: inline-flex; 
+            align-items: center;
+            position: relative; 
+        }
+         #document-container.view-grid .document-checkbox-container {
+            display: flex; 
+            align-items: center;
+        }
+        #document-container.view-list .document-checkbox-container {
+            padding-right: 0.5rem; 
+        }
+        #document-container.view-table .document-checkbox-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .document-checkbox {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            width: 1.5rem; 
+            height: 1.5rem; 
+            border: 2px solid var(--input-border-color);
+            border-radius: 0.25rem; 
+            outline: none;
+            cursor: pointer;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .document-checkbox:checked {
+            background-color: var(--theme-green-dark);
+            border-color: var(--theme-green-dark);
+            background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e");
+            background-size: 100% 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+        .document-checkbox:focus {
+            box-shadow: 0 0 0 2px var(--theme-green-light-bg);
+        }
+        #select-all-table-checkbox { 
+            width: 1.15rem; 
+            height: 1.15rem; 
+        }
+
+        .individual-delete-btn { 
+            opacity: 0.6; 
+            transform: scale(1);
+            transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s linear 0s;
+            visibility: visible;
+            padding: 0.3rem; 
+            width: 1.75rem; 
+            height: 1.75rem;
+            line-height: 1; 
+        }
+        .individual-delete-btn:hover {
+            opacity: 1; 
+        }
+        .individual-delete-btn i {
+            font-size: 0.8rem;
+            margin-right: 0 !important; 
+        }
+        .individual-delete-btn.hidden-by-multiselect {
+            opacity: 0;
+            transform: scale(0.8);
+            pointer-events: none;
+            visibility: hidden;
+            transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s linear 0.2s;
+        }
+        
+        #document-container.view-grid .grid-item-top-controls {
+            position: absolute;
+            top: 0.75rem;
+            left: 0.75rem;
+            right: 0.75rem; 
+            z-index: 10;
+            display: flex;
+            justify-content: space-between; 
+            align-items: center;
+        }
+
+        #delete-selected-btn-container { 
+            position: fixed;
+            top: 1.5rem; 
+            right: 1.5rem; 
+            z-index: 1000; 
+        }
+        #delete-selected-btn {
+            opacity: 0;
+            transform: translateY(-20px) scale(0.9);
+            pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        #delete-selected-btn.visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
+
+        #toast-notification {
+            position: fixed; bottom: 1.5rem; right: 1.5rem;
+            background-color: var(--theme-green-dark); color: var(--text-on-green);
+            padding: 0.75rem 1.25rem; border-radius: 0.375rem;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); z-index: 1100;
+            opacity: 0; visibility: hidden; transform: translateY(20px);
+            transition: opacity 0.3s ease, transform 0.3s ease, visibility 0s linear 0.3s;
+        }
+        #toast-notification.show {
+            opacity: 1; visibility: visible; transform: translateY(0);
+            transition: opacity 0.3s ease, transform 0.3s ease, visibility 0s linear 0s;
+        }
+        #toast-notification.error { background-color: #b91c1c; }
+
+    </style>
+</head>
+<body class="selection:bg-green-700 selection:text-white"> 
+    <!-- Navbar will be loaded here -->
+    <div id="navbarContainer"></div>
+    
+    <main class="container mx-auto p-4 md:p-6 lg:p-8">
+        <div id="delete-selected-btn-container">
+            <button id="delete-selected-btn" class="btn btn-danger"><i class="fas fa-trash-alt mr-2"></i>Delete Selected</button>
+        </div>
+
+        <h1 class="text-3xl md:text-4xl font-bold flex items-center mb-6" style="color: var(--theme-green-dark);">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" class="w-10 h-10 mr-3" style="color: var(--theme-gold);">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />
+            </svg>
+            Your Library
+        </h1>
+        <section class="controls bg-white p-4 md:p-5 mb-6 rounded-lg shadow-sm border var(--neutral-border-color)"> 
+            <div class="flex flex-wrap gap-4 items-center justify-between">
+                <div class="search-container flex-grow w-full sm:w-auto sm:max-w-xs 2xl:max-w-sm"> 
+                    <div class="relative">
+                        <input type="text" id="search-bar" placeholder="Search documents..." class="form-input-professional w-full pl-10 pr-4 py-2 rounded-md text-gray-700 placeholder-var(--placeholder-text-color) focus:outline-none focus:ring-2 focus:border-transparent transition-shadow">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-search text-gray-400"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex gap-2 flex-shrink-0"> 
+                    <button id="toggle-filters-btn" class="btn btn-outline-secondary">
+                        <i class="fas fa-filter mr-2"></i>
+                        Filters
+                        <i class="fas fa-chevron-down ml-2 text-xs chevron-icon"></i>
+                    </button>
+                    <button id="toggle-views-btn" class="btn btn-outline-secondary">
+                        <i class="fas fa-eye mr-1"></i> <span id="current-view-text-label" class="mr-1">Views</span> <i class="fas fa-chevron-down ml-1 text-xs chevron-icon"></i> </button>
+                </div>
+            </div>
+            <div id="collapsible-filters" class="flex flex-wrap sm:flex-nowrap gap-3 items-center w-full"> 
+                <div class="sort-options select-container basis-full sm:basis-auto min-w-[160px] flex-shrink-0"> 
+                    <i class="fas fa-sort-amount-down select-icon"></i>
+                    <label for="sort-by" class="sr-only">Sort by:</label>
+                    <select id="sort-by" name="sort-by" class="form-input-professional w-full p-2 bg-white rounded-md text-gray-700 focus:outline-none focus:ring-2 focus:border-transparent transition-shadow">
+                        <option value="date-saved-desc">Date (Newest)</option>
+                        <option value="date-saved-asc">Date (Oldest)</option>
+                        <option value="title-asc">Title (A-Z)</option>
+                        <option value="title-desc">Title (Z-A)</option>
+                        <option value="category">Category</option> 
+                    </select>
+                </div>
+                <div class="filter-category-options select-container basis-full sm:basis-auto min-w-[160px] flex-shrink-0"> 
+                    <i class="fas fa-tags select-icon"></i>
+                    <label for="filter-by-category" class="sr-only">Filter by Category:</label> 
+                    <select id="filter-by-category" name="filter-by-category" class="form-input-professional w-full p-2 bg-white rounded-md text-gray-700 focus:outline-none focus:ring-2 focus:border-transparent transition-shadow">
+                        <option value="all">All Categories</option>
+                        <option value="Synergy">Synergy</option>
+                        <option value="Dissertation">Dissertation</option>
+                        <option value="Confluence">Confluence</option>
+                        <option value="Thesis">Thesis</option>
+                        <option value="General Document">General Document</option>
+                    </select>
+                </div>
+                <div class="filter-keywords-options select-container basis-full sm:basis-auto min-w-[160px] flex-shrink-0"> 
+                    <i class="fas fa-key select-icon"></i>
+                    <label for="filter-by-keywords" class="sr-only">Filter by Keywords:</label> 
+                    <select id="filter-by-keywords" name="filter-by-keywords" class="form-input-professional w-full p-2 bg-white rounded-md text-gray-700 focus:outline-none focus:ring-2 focus:border-transparent transition-shadow">
+                        <option value="all">All Keywords</option>
+                        <option value="Paulinian">Paulinian</option>
+                        <option value="Spirituality">Spirituality</option>
+                        <option value="Global Partnership">Global Partnership</option>
+                        <option value="Advocacy">Advocacy</option>
+                        <option value="Mental Health">Mental Health</option>
+                        <option value="Curriculum">Curriculum</option>
+                        <option value="Technology">Technology</option>
+                        <option value="Innovation">Innovation</option>
+                        <option value="Leadership">Leadership</option>
+                        <option value="Finance">Finance</option>
+                        <option value="Environment">Environment</option>
+                        <option value="Education">Education</option>
+                        <option value="Community">Community</option>
+                        <option value="Mobility">Mobility</option>
+                     </select>
+                </div>
+            </div>
+        </section>
+
+        <div id="view-options-popup" class="view-options-popup">
+            <button class="view-btn" data-view="grid" title="Grid View"><i class="fas fa-th-large"></i>Grid</button>
+            <button class="view-btn" data-view="list" title="List View"><i class="fas fa-list"></i>List</button>
+            <button class="view-btn" data-view="table" title="Table View"><i class="fas fa-table"></i>Table</button> 
+        </div>
+
+        <section id="document-container" class="document-view-wrapper view-grid grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-3 gap-6">
+            </section>
+
+        <section class="no-documents hidden bg-white p-8 md:p-10 rounded-lg shadow-sm border var(--neutral-border-color) text-center" id="no-documents-message">
+            <i class="fas fa-folder-open text-4xl text-gray-400 mb-5"></i>
+            <p class="text-xl text-gray-700 font-semibold mb-2">No documents found.</p>
+            <p class="text-gray-500">Try adjusting your search or filters, or add new documents to your library.</p>
+        </section>
+        
+        <section id="pagination-controls" class="mt-8 flex justify-center items-center space-x-1 sm:space-x-2">
+            </section>
+    </main>
+
+    <div id="keyword-popup-glass" class="keyword-popup-glass">
+        </div>
+    
+    <div id="toast-notification" role="alert" aria-live="assertive">
+        <span id="toast-message"></span>
+    </div>
+
+
+    <script>
+        // DOM Element References
+        const searchBar = document.getElementById('search-bar');
+        const sortBySelect = document.getElementById('sort-by');
+        const filterByCategorySelect = document.getElementById('filter-by-category'); 
+        const filterByKeywordsSelect = document.getElementById('filter-by-keywords'); 
+        const documentContainer = document.getElementById('document-container');
+        const noDocumentsMessage = document.getElementById('no-documents-message');
+        const paginationControlsContainer = document.getElementById('pagination-controls');
+        const keywordPopupGlass = document.getElementById('keyword-popup-glass'); 
+        const deleteSelectedBtn = document.getElementById('delete-selected-btn');
+        const toggleFiltersBtn = document.getElementById('toggle-filters-btn'); 
+        const collapsibleFilters = document.getElementById('collapsible-filters'); 
+        const toggleViewsBtn = document.getElementById('toggle-views-btn'); 
+        const currentViewTextLabel = document.getElementById('current-view-text-label'); 
+        const viewOptionsPopup = document.getElementById('view-options-popup'); 
+        const toastNotification = document.getElementById('toast-notification'); 
+        const toastMessage = document.getElementById('toast-message'); 
+        
+        // State Variables
+        let currentView = 'grid'; 
+        let currentPage = 1;
+        const itemsPerPage = 10; 
+        const MAX_TITLE_LENGTH = 0; // Set to 0 to disable truncation, or a specific number e.g., 50
+        const MAX_AUTHOR_LENGTH = 0; // Set to 0 to disable truncation, or a specific number e.g., 30
+        let selectedDocuments = []; 
+        let filtersExpanded = false; 
+        let viewsPopupActive = false; 
+        let toastTimeout; 
+
+        // Constants for Deletion and Toast
+        const TOAST_DURATION = 3000; // ms
+        const CSS_CLASS_DELETING = 'deleting';
+        const CSS_CLASS_SHOW = 'show';
+        const CSS_CLASS_ERROR = 'error';
+
+
+        // Mock data (Ensure this matches your actual data structure)
+        const mockDocuments = [
+            { id: 1, type: 'pdf', category: 'Synergy', keywords: ['Annual Report', 'Finance', 'Corporate', 'Yearly Review', 'Stakeholders', 'Q1 Performance', 'Q2 Outlook', 'Q3 Strategy', 'Q4 Goals', 'Budgeting Cycle', 'Financial Forecast', 'Investor Relations Update', 'Audit Committee Report', 'Compliance Overview', 'Strategic Initiatives', 'Market Analysis', 'Risk Assessment', 'Shareholder Value', 'Sustainability Report', 'Executive Summary'], title: 'Annual Report for the Fiscal Year Ending 2024', author: 'Corporate Communications Department', date: 'May 1, 2025', url: '#details?docId=1' }, 
+            { id: 2, type: 'docx', category: 'General Document', keywords: ['Innovation', 'OBE', 'Education', 'Proposal', 'Curriculum'], title: 'Project Proposal Alpha: A New Dawn for Innovation in OBE', author: 'Dr. Eleanor Vance & Team', date: 'April 22, 2025', url: '#details?docId=2' }, 
+            { id: 3, type: 'jpg', category: 'General Document', keywords: ['Team Building', 'Retreat', 'HR', 'Company Event'], title: 'Team Photo: Q1 Company Retreat in the Bahamas', author: 'HR Department Photography', date: 'March 15, 2025', url: '#details?docId=3' }, 
+            { id: 4, type: 'txt', category: 'Confluence', keywords: ['Meeting Notes', 'Client Strategy', 'Onboarding', 'Minutes'], title: 'Meeting Notes: Client Onboarding Strategy Discussion (May 6)', author: 'Johnathan M. Smitherson Jr.', date: 'May 6, 2025', url: '#details?docId=4' },
+            { id: 5, type: 'xlsx', category: 'Synergy', keywords: ['Budget', 'Finance', 'Projections', 'Analysis', 'Spreadsheet'], title: 'Q2 Budget Forecast and Financial Projections Analysis Report', author: 'Finance & Accounting Division', date: 'April 30, 2025', url: '#details?docId=5' }, 
+            { id: 6, type: 'png', category: 'General Document', keywords: ['Branding', 'Logo', 'Marketing', 'Design', 'Assets'], title: 'Company Logo (Transparent, High Resolution, PNG Format)', author: 'Marketing Design Team', date: 'February 10, 2025', url: '#details?docId=6' },
+            { id: 7, type: 'pptx', category: 'Synergy', keywords: ['Investment', 'Funding', 'Pitch Deck', 'Startup', 'Presentation'], title: 'Investor Pitch Deck: Series B Funding Round Presentation Slides', author: 'CEO & Founder\'s Office', date: 'May 5, 2025', url: '#details?docId=7' }, 
+            { id: 8, type: 'pdf', category: 'Thesis', keywords: ['User Manual', 'Product Guide', 'Technology', 'Documentation', 'Instructions'], title: 'Comprehensive User Manual for Product X Model Gamma v2.1', author: 'Technical Writing Department', date: 'March 20, 2025', url: '#details?docId=8' },
+            { id: 9, type: 'txt', category: 'General Document', keywords: ['Research', 'AI', 'Energy', 'Sustainability', 'Innovation', 'Paulinian'], title: 'Research Paper: The Future of AI in Sustainable Energy Solutions', author: 'Dr. A. K. Singh et al.', date: 'May 10, 2025', url: '#details?docId=9' },
+            { id: 10, type: 'jpg', category: 'General Document', keywords: ['Travel', 'Photography', 'Personal', 'Vacation'], title: 'Personal Vacation Photographs: Hawaiian Islands Adventure Collection', author: 'Jane Doe (Personal)', date: 'January 15, 2025', url: '#details?docId=10' },
+            { id: 11, type: 'pdf', category: 'Confluence', keywords: ['Legal', 'Contract', 'Agreement', 'Template', 'Paulinian'], title: 'Master Service Agreement Template (Standard Client Contract)', author: 'Legal Department Review Board', date: 'April 1, 2025', url: '#details?docId=11' },
+            { id: 12, type: 'docx', category: 'Synergy', keywords: ['Marketing', 'Campaign', 'Strategy', 'Product Launch', 'Paulinian', 'Global Partnership'], title: 'Detailed Marketing Plan: Q3 Product Launch Campaign Strategy', author: 'Global Marketing Strategy Team', date: 'May 2, 2025', url: '#details?docId=12' },
+            { id: 13, type: 'xlsx', category: 'General Document', keywords: ['Sales Data', 'Analytics', 'Finance', 'Annual Report'], title: 'Consolidated Sales Data: Fiscal Year 2024 (Regional Breakdown)', author: 'Sales Operations & Analytics', date: 'January 5, 2025', url: '#details?docId=13' },
+            { id: 14, type: 'png', category: 'Dissertation', keywords: ['Web Design', 'UX/UI', 'Mockup', 'Education', 'Inclusivity', 'Technology'], title: 'Website Homepage Redesign Mockup v3 (User Feedback Incorporated)', author: 'UX/UI Design Department', date: 'May 8, 2025', url: '#details?docId=14' },
+            { id: 15, type: 'pptx', category: 'Confluence', keywords: ['Training', 'HR', 'Onboarding', 'Faculty Development', 'Paulinian'], title: 'New Hire Onboarding & Training Presentation Materials Package', author: 'Human Resources Development', date: 'March 10, 2025', url: '#details?docId=15' },
+            { id: 16, type: 'pdf', category: 'Dissertation', keywords: ['Newsletter', 'Archive', 'Internal Comms', 'Spirituality', 'Community'], title: 'Archived Internal Company Newsletter - May 2024 Edition (PDF)', author: 'Internal Communications Team', date: 'May 30, 2024', url: '#details?docId=16' },
+            { id: 17, type: 'txt', category: 'General Document', keywords: ['Security', 'Server Logs', 'IT Audit', 'Technology'], title: 'Critical Server Access Logs: Security Audit May 9th Report', author: 'IT Security Operations Center', date: 'May 9, 2025', url: '#details?docId=17' },
+            { id: 18, type: 'jpg', category: 'Synergy', keywords: ['Conference', 'Event Design', 'Marketing', 'Expo', 'Global Partnership'], title: 'Finalized Conference Booth Design: Tech Expo 2025 Showcase', author: 'Events and Exhibitions Team', date: 'February 20, 2025', url: '#details?docId=18' },
+            { id: 19, type: 'pdf', category: 'Thesis', keywords: ['HR Policy', 'Employee Handbook', 'Paulinian', 'Documentation', 'Advocacy'], title: 'Official Employee Handbook - Updated January 2025 Version (PDF)', author: 'Human Resources Policy Division', date: 'January 1, 2025', url: '#details?docId=19' },
+            { id: 20, type: 'docx', category: 'Confluence', keywords: ['Client Feedback', 'Analysis', 'Q1 Review', 'Advocacy', 'Community'], title: 'Client Feedback Summary & Analysis: Q1 Product Review Cycle', author: 'Customer Success Management', date: 'April 15, 2025', url: '#details?docId=20' },
+            { id: 21, type: 'xlsx', category: 'General Document', keywords: ['Inventory', 'Logistics', 'Supply Chain', 'Infrastructure', 'Finance'], title: 'Real-time Inventory Stock Levels & Reorder Point Tracking Sheet', author: 'Supply Chain & Logistics Dept.', date: 'May 9, 2025', url: '#details?docId=21' },
+            { id: 22, type: 'pdf', category: 'Thesis', keywords: ['Paulinian', 'Spirituality', 'Global Partnership', 'Research', 'Education'], title: 'Study on Paulinian Values in Global Partnerships', author: 'Theology Department', date: 'June 1, 2025', url: '#details?docId=22' },
+            { id: 23, type: 'docx', category: 'Dissertation', keywords: ['Mental Health', 'Wellness', 'Global Study', 'Psychology', 'Advocacy'], title: 'Global Mental Wellness Initiatives: A Comparative Study', author: 'Psychology Faculty', date: 'June 15, 2025', url: '#details?docId=23' },
+            { id: 24, type: 'pptx', category: 'Synergy', keywords: ['Leadership', 'Ethics', 'Global Context', 'Workshop', 'Paulinian', 'Mobility'], title: 'Developing Ethical Leadership in a Global Context', author: 'Business School Ethics Committee', date: 'July 1, 2025', url: '#details?docId=24' }
+        ];
+        let documentItemsData = [...mockDocuments]; 
+
+        // Utility Functions
+        function truncateText(text, maxLength) {
+            if (!text) return "N/A"; 
+            if (maxLength > 0 && text.length > maxLength) { 
+                return text.substring(0, maxLength) + "...";
+            }
+            return text;
+        }
+        
+        function getAuthorIcon(authorString) {
+            if (!authorString) return 'fas fa-user';
+            const lowerAuthor = authorString.toLowerCase();
+            if (lowerAuthor.includes('&') || lowerAuthor.includes(' and ') || lowerAuthor.includes('et al.') || lowerAuthor.includes(',')) {
+                return 'fas fa-users';
+            }
+            return 'fas fa-user';
+        }
+
+        function showToast(message, type = 'success', duration = TOAST_DURATION) {
+            clearTimeout(toastTimeout);
+            toastMessage.textContent = message;
+            toastNotification.className = ''; 
+            toastNotification.classList.add(CSS_CLASS_SHOW);
+            if (type === CSS_CLASS_ERROR) {
+                toastNotification.classList.add(CSS_CLASS_ERROR);
+            }
+            toastTimeout = setTimeout(() => {
+                toastNotification.classList.remove(CSS_CLASS_SHOW);
+            }, duration);
+        }
+
+
+        // DOM Manipulation Functions
+        function createDocumentElement(doc) {
+            const item = document.createElement('div'); 
+            item.setAttribute('data-category', doc.category); 
+            item.setAttribute('data-keywords', (doc.keywords || []).join(', ')); 
+            item.setAttribute('data-id', doc.id);
+            
+            const displayedTitle = truncateText(doc.title, MAX_TITLE_LENGTH); 
+            const displayedAuthor = truncateText(doc.author, MAX_AUTHOR_LENGTH); 
+            const authorIcon = getAuthorIcon(doc.author);
+            
+            let keywordsDisplayHTML = '';
+            if (doc.keywords && doc.keywords.length > 0) {
+                if (currentView === 'list') { 
+                    const pills = doc.keywords.map(kw => `<span class="keyword-pill clickable-keyword" data-keyword="${kw}">${kw}</span>`).join('');
+                    keywordsDisplayHTML = `<div class="keywords-pill-container">${pills}</div>`;
+                } else { 
+                    keywordsDisplayHTML = `<span class="keywords-trigger" data-doc-id="${doc.id}"><i class="fas fa-tags fa-fw"></i> View Keywords (${doc.keywords.length})</span>`;
+                }
+            }
+
+            const checkboxHTML = `
+                <div class="document-checkbox-container">
+                    <input type="checkbox" class="document-checkbox form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" data-doc-id="${doc.id}">
+                </div>`;
+
+            if (currentView === 'grid') {
+                item.classList.add('document-item-base', 'rounded-lg', 'shadow-sm', 'p-5', 'flex', 'flex-col', 'relative'); 
+                let gridTopControls = `<div class="grid-item-top-controls">
+                                            ${checkboxHTML}
+                                            <button class="action-btn delete-btn btn btn-outline-danger individual-delete-btn" title="Delete"><i class="fas fa-trash-alt"></i></button>
+                                        </div>`;
+
+                item.innerHTML = `
+                    ${gridTopControls}
+                    <div class="document-info flex-grow mb-4 text-left mt-10"> 
+                        <h3 class="document-title text-md font-semibold text-gray-800 mb-1" title="${doc.title}">${displayedTitle}</h3>
+                        <div class="meta-item text-xs text-gray-600 mb-1">
+                            <i class="${authorIcon} fa-fw"></i>
+                            <span class="clickable-author" data-author-name="${doc.author || "N/A"}" title="View profile: ${doc.author || "N/A"}">${displayedAuthor}</span>
+                        </div>
+                        <div class="meta-item text-xs text-gray-500 mb-0.5" title="Saved: ${doc.date}">
+                            <i class="fas fa-calendar-plus fa-fw"></i>
+                            <span>${doc.date}</span>
+                        </div>
+                         <div class="meta-item text-xs text-gray-500 mt-1" style="color: var(--theme-primary-blue); font-weight: 500;">
+                            <i class="fas fa-folder-open fa-fw meta-category-icon"></i>
+                            <span class="clickable-category" data-category-name="${doc.category}" title="Filter by: ${doc.category}">${doc.category}</span>
+                         </div>
+                         <div class="meta-item text-xs mt-1">
+                            ${keywordsDisplayHTML || '<span class="text-gray-500 text-xs"><i class="fas fa-tags fa-fw meta-keywords-icon"></i> No keywords</span>'}
+                         </div>
+                    </div>
+                    <div class="document-actions mt-auto pt-3 border-t var(--neutral-border-color) flex flex-col sm:flex-row justify-center gap-2">
+                        <button class="action-btn open-btn btn btn-outline-primary w-full sm:w-auto"><i class="fas fa-eye text-xs"></i> Open</button>
+                        <button class="action-btn download-btn btn btn-secondary w-full sm:w-auto"><i class="fas fa-download text-xs"></i> Download</button>
+                        </div>
+                `;
+            } else if (currentView === 'list') {
+                item.classList.add('document-item-base', 'rounded-lg', 'flex', 'items-center'); 
+                item.innerHTML = `
+                    <div class="document-checkbox-container p-2">
+                        <input type="checkbox" class="document-checkbox form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" data-doc-id="${doc.id}">
+                    </div>
+                    <div class="list-info-col flex-grow"> 
+                        <h3 class="document-title" title="${doc.title}">${displayedTitle}</h3> 
+                        <div class="document-meta-primary"> 
+                             <span class="meta-item document-author">
+                                <i class="${authorIcon} fa-fw"></i>
+                                <span class="clickable-author" data-author-name="${doc.author || "N/A"}" title="View profile: ${doc.author || "N/A"}">${displayedAuthor}</span>
+                            </span>
+                        </div>
+                        <div class="document-meta-secondary"> 
+                            <span class="meta-item document-date" title="Saved: ${doc.date}">
+                                <i class="fas fa-calendar-plus fa-fw"></i> ${doc.date}
+                            </span>
+                             <span class="meta-item document-category-meta uppercase">
+                                <i class="fas fa-folder-open fa-fw meta-category-icon"></i>
+                                <span class="clickable-category" data-category-name="${doc.category}" title="Filter by: ${doc.category}">${doc.category}</span>
+                             </span>
+                             <div class="meta-item text-xs keywords-meta-container"> 
+                                 <i class="fas fa-tags fa-fw meta-keywords-icon mr-1"></i> 
+                                ${keywordsDisplayHTML || '<span class="text-gray-500 text-xs">No keywords</span>'}
+                             </div>
+                        </div>
+                    </div>
+                    <div class="list-actions-col">
+                        <button class="action-btn open-btn btn btn-outline-primary" title="Open"><i class="fas fa-eye"></i></button>
+                        <button class="action-btn download-btn btn btn-secondary" title="Download"><i class="fas fa-download"></i></button>
+                        <button class="action-btn delete-btn btn btn-outline-danger individual-delete-btn" title="Delete"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                `;
+            } else if (currentView === 'table') {
+                const tr = document.createElement('tr'); 
+                tr.classList.add('document-item-base'); 
+                tr.setAttribute('data-category', doc.category); 
+                tr.setAttribute('data-keywords', (doc.keywords || []).join(', ')); 
+                tr.setAttribute('data-id', doc.id);
+                
+                let tableKeywordsTriggerHTML = 'N/A';
+                if (doc.keywords && doc.keywords.length > 0) {
+                    tableKeywordsTriggerHTML = `<span class="keywords-trigger" data-doc-id="${doc.id}"><i class="fas fa-tags fa-fw"></i> View (${doc.keywords.length})</span>`;
+                }
+
+                tr.innerHTML = `
+                    <td class="text-center col-checkbox">
+                        <input type="checkbox" class="document-checkbox form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" data-doc-id="${doc.id}">
+                    </td>
+                    <td class="col-title"><span class="document-title-in-table block" title="${doc.title}">${displayedTitle}</span></td> 
+                    <td class="col-author"><span class="block clickable-author" data-author-name="${doc.author || "N/A"}" title="View profile: ${doc.author || "N/A"}">${displayedAuthor}</span></td> 
+                    <td class="col-category"><span class="clickable-category" data-category-name="${doc.category}" title="Filter by: ${doc.category}">${doc.category}</span></td> 
+                    <td class="col-keywords">${tableKeywordsTriggerHTML}</td>
+                    <td>${doc.date}</td>
+                    <td class="text-right col-actions">
+                        <div class="flex justify-end gap-1">
+                            <button class="action-btn open-btn btn btn-outline-primary" title="Open"><i class="fas fa-eye"></i></button>
+                            <button class="action-btn download-btn btn btn-secondary" title="Download"><i class="fas fa-download"></i></button>
+                            <button class="action-btn delete-btn btn btn-outline-danger individual-delete-btn" title="Delete"><i class="fas fa-trash-alt"></i></button>
+                        </div>
+                    </td>
+                `;
+                return tr; 
+            }
+            if (selectedDocuments.includes(doc.id)) {
+                item.classList.add('selected');
+                const checkbox = item.querySelector('.document-checkbox');
+                if (checkbox) checkbox.checked = true;
+            }
+            return item; 
+        }
+
+        function renderPaginationControls(totalItems, filteredItemsCount) {
+            paginationControlsContainer.innerHTML = ''; 
+            if (filteredItemsCount <= itemsPerPage && totalItems <= itemsPerPage) { 
+                return;
+            }
+            
+            const totalPages = Math.ceil(filteredItemsCount / itemsPerPage);
+            if (totalPages <= 1) return; 
+
+            const prevButton = document.createElement('button');
+            prevButton.innerHTML = `<i class="fas fa-chevron-left"></i> <span class="hidden sm:inline ml-1">Prev</span>`;
+            prevButton.classList.add('pagination-btn');
+            prevButton.disabled = currentPage === 1;
+            prevButton.addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    filterAndDisplayDocuments();
+                }
+            });
+            paginationControlsContainer.appendChild(prevButton);
+
+            let startPage = Math.max(1, currentPage - 1);
+            let endPage = Math.min(totalPages, currentPage + 1);
+            if (currentPage === 1) endPage = Math.min(totalPages, 3);
+            if (currentPage === totalPages) startPage = Math.max(1, totalPages - 2);
+
+            if (startPage > 1) {
+                const firstPageBtn = document.createElement('button');
+                firstPageBtn.textContent = '1';
+                firstPageBtn.classList.add('pagination-btn');
+                firstPageBtn.addEventListener('click', () => { currentPage = 1; filterAndDisplayDocuments(); });
+                paginationControlsContainer.appendChild(firstPageBtn);
+                if (startPage > 2) {
+                    const ellipsis = document.createElement('span');
+                    ellipsis.textContent = '...';
+                    ellipsis.classList.add('px-3', 'py-1', 'text-gray-500');
+                    paginationControlsContainer.appendChild(ellipsis);
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                const pageButton = document.createElement('button');
+                pageButton.textContent = i;
+                pageButton.classList.add('pagination-btn');
+                if (i === currentPage) {
+                    pageButton.classList.add('active');
+                }
+                pageButton.addEventListener('click', () => {
+                    currentPage = i;
+                    filterAndDisplayDocuments();
+                });
+                paginationControlsContainer.appendChild(pageButton);
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    const ellipsis = document.createElement('span');
+                    ellipsis.textContent = '...';
+                    ellipsis.classList.add('px-3', 'py-1', 'text-gray-500');
+                    paginationControlsContainer.appendChild(ellipsis);
+                }
+                const lastPageBtn = document.createElement('button');
+                lastPageBtn.textContent = totalPages;
+                lastPageBtn.classList.add('pagination-btn');
+                lastPageBtn.addEventListener('click', () => { currentPage = totalPages; filterAndDisplayDocuments(); });
+                paginationControlsContainer.appendChild(lastPageBtn);
+            }
+
+            const nextButton = document.createElement('button');
+            nextButton.innerHTML = `<span class="hidden sm:inline mr-1">Next</span> <i class="fas fa-chevron-right"></i>`;
+            nextButton.classList.add('pagination-btn');
+            nextButton.disabled = currentPage === totalPages;
+            nextButton.addEventListener('click', () => {
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    filterAndDisplayDocuments();
+                }
+            });
+            paginationControlsContainer.appendChild(nextButton);
+        }
+
+        // Core Logic Functions
+        function filterAndDisplayDocuments() {
+            documentContainer.classList.add('loading-content'); 
+            
+            setTimeout(() => {
+                const searchTerm = searchBar.value.toLowerCase().trim();
+                const filterCategoryValue = filterByCategorySelect.value; 
+                const filterKeywordValue = filterByKeywordsSelect.value; 
+                const sortValue = sortBySelect.value; 
+
+                let filteredItemsData = documentItemsData.filter(doc => {
+                    const title = doc.title.toLowerCase();
+                    const author = (doc.author || "").toLowerCase(); 
+                    const category = doc.category;
+                    const keywords = (doc.keywords || []).map(k => k.toLowerCase()); 
+
+                    const matchesSearch = searchTerm === '' || title.includes(searchTerm) || author.includes(searchTerm);
+                    const matchesCategory = (filterCategoryValue === 'all' || category === filterCategoryValue);
+                    const matchesKeyword = (filterKeywordValue === 'all' || keywords.includes(filterKeywordValue.toLowerCase()));
+                    
+                    return matchesSearch && matchesCategory && matchesKeyword;
+                });
+
+                if (sortValue === 'title-asc') filteredItemsData.sort((a, b) => a.title.localeCompare(b.title));
+                else if (sortValue === 'title-desc') filteredItemsData.sort((a, b) => b.title.localeCompare(a.title));
+                else if (sortValue === 'date-saved-desc') filteredItemsData.sort((a, b) => new Date(b.date) - new Date(a.date));
+                else if (sortValue === 'date-saved-asc') filteredItemsData.sort((a, b) => new Date(a.date) - new Date(b.date));
+                else if (sortValue === 'category') filteredItemsData.sort((a,b) => (a.category || "").localeCompare(b.category || "")); 
+
+                const totalFilteredItems = filteredItemsData.length;
+                const startIndex = (currentPage - 1) * itemsPerPage;
+                const endIndex = startIndex + itemsPerPage;
+                const paginatedItems = filteredItemsData.slice(startIndex, endIndex);
+
+                renderDocuments(paginatedItems);
+                renderPaginationControls(documentItemsData.length, totalFilteredItems); 
+                
+                requestAnimationFrame(() => {
+                    documentContainer.classList.remove('loading-content'); 
+                });
+            }, 150); 
+        }
+        
+        function renderDocuments(docsToRender) {
+            documentContainer.innerHTML = ''; 
+            if (currentView === 'table') {
+                const tableWrapper = document.createElement('div');
+                tableWrapper.classList.add('table-scroll-wrapper');
+                const table = document.createElement('table');
+                table.classList.add('min-w-full', 'w-full', 'bg-white', 'shadow-sm', 'rounded-lg', 'overflow-hidden'); 
+                table.innerHTML = `
+                    <thead style="background-color: #cdd8cd;"> <tr>
+                        <th class="text-center px-2 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider col-checkbox">
+                            <input type="checkbox" id="select-all-table-checkbox" class="document-checkbox form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" title="Select all on page">
+                        </th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-title">Title</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-author">Author</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-category">Category</th> 
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-keywords">Keywords</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Saved</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider col-actions">Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody></tbody>
+                `;
+                const tbody = table.querySelector('tbody');
+                if (docsToRender.length > 0) {
+                    docsToRender.forEach(doc => {
+                        const docElement = createDocumentElement(doc); 
+                        tbody.appendChild(docElement);
+                    });
+                    tableWrapper.appendChild(table);
+                    documentContainer.appendChild(tableWrapper);
+                    const selectAllTableCheckbox = document.getElementById('select-all-table-checkbox');
+                    if(selectAllTableCheckbox) {
+                        selectAllTableCheckbox.addEventListener('change', handleSelectAllCheckboxChange);
+                    }
+
+                    noDocumentsMessage.classList.add('hidden'); 
+                    documentContainer.classList.remove('hidden');
+                } else {
+                    documentContainer.classList.add('hidden'); 
+                    noDocumentsMessage.classList.remove('hidden');
+                }
+            } else { 
+                if (docsToRender.length > 0) {
+                    docsToRender.forEach(doc => {
+                        const docElement = createDocumentElement(doc);
+                        documentContainer.appendChild(docElement);
+                    });
+                    noDocumentsMessage.classList.add('hidden');
+                    documentContainer.classList.remove('hidden');
+                } else {
+                    noDocumentsMessage.classList.remove('hidden');
+                    documentContainer.classList.add('hidden');
+                }
+            }
+            attachCheckboxListeners(); 
+        }
+        
+        function changeView(newView) {
+            currentPage = 1; 
+            currentView = newView;
+            
+            documentContainer.className = 'document-view-wrapper'; // Reset classes
+            let viewButtonText = "Views"; 
+            if (newView === 'grid') {
+                // MODIFIED: Updated grid classes for responsiveness
+                documentContainer.classList.add('view-grid', 'grid', 'grid-cols-1', 'sm:grid-cols-2', 'md:grid-cols-2', 'lg:grid-cols-3', 'xl:grid-cols-3', '2xl:grid-cols-3', 'gap-6');
+                viewButtonText = "Grid View";
+            } else if (newView === 'list') {
+                documentContainer.classList.add('view-list');
+                viewButtonText = "List View";
+            } else if (newView === 'table') {
+                documentContainer.classList.add('view-table'); 
+                viewButtonText = "Table View";
+            }
+            
+            if(currentViewTextLabel) { 
+                currentViewTextLabel.textContent = viewButtonText;
+            }
+
+            viewOptionsPopup.querySelectorAll('.view-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('data-view') === newView);
+            });
+            
+            filterAndDisplayDocuments(); 
+            localStorage.setItem('libraryPreferredView', newView);
+        }
+
+        // Event Handlers
+        searchBar.addEventListener('input', () => { currentPage = 1; filterAndDisplayDocuments(); });
+        filterByCategorySelect.addEventListener('change', () => { currentPage = 1; filterAndDisplayDocuments(); }); 
+        filterByKeywordsSelect.addEventListener('change', () => { currentPage = 1; filterAndDisplayDocuments(); });
+        sortBySelect.addEventListener('change', () => { currentPage = 1; filterAndDisplayDocuments(); });
+
+        toggleViewsBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); 
+            viewsPopupActive = !viewsPopupActive;
+            viewOptionsPopup.classList.toggle('active', viewsPopupActive);
+            toggleViewsBtn.classList.toggle('active', viewsPopupActive);
+
+            if (viewsPopupActive) {
+                const btnRect = toggleViewsBtn.getBoundingClientRect();
+                viewOptionsPopup.style.top = `${btnRect.bottom + window.scrollY + 5}px`;
+                let leftPosition = btnRect.left + window.scrollX + (btnRect.width / 2) - (viewOptionsPopup.offsetWidth / 2);
+                leftPosition = Math.max(10, Math.min(leftPosition, window.innerWidth - viewOptionsPopup.offsetWidth - 10)); 
+                viewOptionsPopup.style.left = `${leftPosition}px`;
+            }
+             const chevronIcon = toggleViewsBtn.querySelector('.chevron-icon');
+            if (chevronIcon) {
+                chevronIcon.classList.toggle('fa-chevron-down', !viewsPopupActive);
+                chevronIcon.classList.toggle('fa-chevron-up', viewsPopupActive);
+            }
+        });
+
+        viewOptionsPopup.addEventListener('click', (e) => {
+            const button = e.target.closest('.view-btn');
+            if (button) {
+                const newView = button.getAttribute('data-view');
+                if (newView !== currentView) {
+                    changeView(newView);
+                }
+                viewsPopupActive = false;
+                viewOptionsPopup.classList.remove('active');
+                toggleViewsBtn.classList.remove('active');
+                 const chevronIcon = toggleViewsBtn.querySelector('.chevron-icon');
+                if (chevronIcon) {
+                    chevronIcon.classList.remove('fa-chevron-up');
+                    chevronIcon.classList.add('fa-chevron-down');
+                }
+            }
+        });
+        
+        let currentKeywordGlassPopup = null; 
+
+        function toggleKeywordGlassPopup(docId, triggerElement) {
+            const popup = document.getElementById('keyword-popup-glass');
+            
+            if (currentKeywordGlassPopup && currentKeywordGlassPopup.trigger === triggerElement) {
+                popup.classList.remove('active');
+                currentKeywordGlassPopup = null;
+                return;
+            }
+            
+            if (currentKeywordGlassPopup) { 
+                currentKeywordGlassPopup.element.classList.remove('active');
+            }
+            
+            const doc = documentItemsData.find(d => d.id === docId);
+            if (doc && doc.keywords && doc.keywords.length > 0) {
+                popup.innerHTML = doc.keywords.map(kw => 
+                    `<span class="keyword-pill keyword-popup-pill" data-keyword="${kw}">${kw}</span>`
+                ).join('');
+                
+                const rect = triggerElement.getBoundingClientRect(); 
+                
+                popup.style.top = `${rect.bottom + window.scrollY + 5}px`; 
+                let left = rect.left + window.scrollX;
+
+                popup.style.display = 'block'; 
+                const popupRect = popup.getBoundingClientRect();
+                 if (left + popupRect.width > window.innerWidth - 20) { 
+                    left = window.innerWidth - popupRect.width - 20;
+                }
+                if (left < 10) left = 10; 
+
+                popup.style.left = `${left}px`;
+                
+                popup.classList.add('active'); 
+                currentKeywordGlassPopup = { element: popup, trigger: triggerElement };
+            }
+        }
+
+        function updateDeleteSelectedButtonState() {
+            const individualDeleteButtons = document.querySelectorAll('.individual-delete-btn');
+            if (selectedDocuments.length > 0) {
+                deleteSelectedBtn.style.display = 'inline-flex'; 
+                deleteSelectedBtn.classList.add('visible'); 
+                deleteSelectedBtn.disabled = false;
+                deleteSelectedBtn.textContent = `Delete Selected (${selectedDocuments.length})`;
+                individualDeleteButtons.forEach(btn => btn.classList.add('hidden-by-multiselect'));
+            } else {
+                deleteSelectedBtn.classList.remove('visible'); 
+                setTimeout(() => { 
+                    if (selectedDocuments.length === 0) { 
+                         deleteSelectedBtn.style.display = 'none'; 
+                    }
+                }, 300); 
+                deleteSelectedBtn.disabled = true;
+                deleteSelectedBtn.textContent = 'Delete Selected';
+                individualDeleteButtons.forEach(btn => btn.classList.remove('hidden-by-multiselect'));
+            }
+        }
+
+        function handleCheckboxChange(event) {
+            const checkbox = event.target;
+            const docId = parseInt(checkbox.getAttribute('data-doc-id'));
+            const itemElement = checkbox.closest('.document-item-base'); 
+
+            if (checkbox.checked) {
+                if (!selectedDocuments.includes(docId)) {
+                    selectedDocuments.push(docId);
+                }
+                if (itemElement) itemElement.classList.add('selected'); 
+            } else {
+                selectedDocuments = selectedDocuments.filter(id => id !== docId);
+                if (itemElement) itemElement.classList.remove('selected'); 
+            }
+            updateDeleteSelectedButtonState();
+        }
+        
+        function handleSelectAllCheckboxChange(event) {
+            const isChecked = event.target.checked;
+            const checkboxes = documentContainer.querySelectorAll('.document-checkbox'); 
+            selectedDocuments = []; 
+
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = isChecked;
+                const docId = parseInt(checkbox.getAttribute('data-doc-id'));
+                const itemElement = checkbox.closest('.document-item-base');
+                if (isChecked) {
+                    if (!selectedDocuments.includes(docId)) { 
+                        selectedDocuments.push(docId);
+                    }
+                    if (itemElement) itemElement.classList.add('selected');
+                } else {
+                    if (itemElement) itemElement.classList.remove('selected');
+                }
+            });
+            updateDeleteSelectedButtonState();
+        }
+
+        function attachCheckboxListeners() {
+            const checkboxes = documentContainer.querySelectorAll('.document-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.removeEventListener('change', handleCheckboxChange); 
+                checkbox.addEventListener('change', handleCheckboxChange);
+            });
+        }
+
+        function handleDeleteItem(docId, itemElement, docTitle) {
+            if (!itemElement) return;
+
+            if (confirm(`Are you sure you want to delete "${docTitle}"?`)) {
+                documentItemsData = documentItemsData.filter(d => d.id !== docId);
+                selectedDocuments = selectedDocuments.filter(id => id !== docId); 
+
+                itemElement.classList.add(CSS_CLASS_DELETING);
+
+                itemElement.addEventListener('animationend', () => {
+                    itemElement.remove();
+                    showToast('Document removed from library.');
+                    updateDeleteSelectedButtonState();
+                    const itemsLeftOnPage = Array.from(documentContainer.children).filter(child => child.matches('.document-item-base:not(.deleting)')).length;
+                    if (itemsLeftOnPage === 0 && currentPage > 1) {
+                        currentPage--;
+                    }
+                    filterAndDisplayDocuments(); 
+                }, { once: true });
+            }
+        }
+
+        function handleBulkDelete() {
+            if (selectedDocuments.length === 0) return;
+            const numToDelete = selectedDocuments.length;
+            if (!confirm(`Are you sure you want to remove ${numToDelete} selected document(s) from your library?`)) {
+                return;
+            }
+
+            const itemsToDelete = [...selectedDocuments]; 
+            const elementsToRemove = [];
+            const animationPromises = [];
+
+            documentItemsData = documentItemsData.filter(doc => !itemsToDelete.includes(doc.id));
+            selectedDocuments = []; 
+
+            itemsToDelete.forEach(id => {
+                const itemElement = documentContainer.querySelector(`.document-item-base[data-id="${id}"]`);
+                if (itemElement) {
+                    elementsToRemove.push(itemElement);
+                    itemElement.classList.add(CSS_CLASS_DELETING);
+                    animationPromises.push(new Promise(resolve => {
+                        itemElement.addEventListener('animationend', resolve, { once: true });
+                    }));
+                }
+            });
+
+            Promise.all(animationPromises).then(() => {
+                elementsToRemove.forEach(el => el.remove());
+                showToast(`${numToDelete} document(s) removed from library.`);
+                updateDeleteSelectedButtonState(); 
+                const itemsLeftOnPage = Array.from(documentContainer.children).filter(child => child.matches('.document-item-base:not(.deleting)')).length;
+                 if (itemsLeftOnPage === 0 && currentPage > 1) {
+                    currentPage--;
+                }
+                filterAndDisplayDocuments(); 
+            });
+        }
+
+        documentContainer.addEventListener('click', function(e) {
+            const itemElementBase = e.target.closest('.document-item-base'); 
+            if (!itemElementBase) return; 
+
+            const docId = parseInt(itemElementBase.getAttribute('data-id'));
+            const doc = documentItemsData.find(d => d.id === docId); 
+            
+            if (!doc) return; 
+
+            const target = e.target;
+
+            if (target.closest('.open-btn')) {
+                if (doc.url) {
+                    window.location.href = doc.url;
+                } else {
+                    showToast(`No URL available for "${doc.title}"`, CSS_CLASS_ERROR);
+                }
+                return;
+            }
+            if (target.closest('.download-btn')) {
+                showToast(`Simulating download of: "${doc.title}"`);
+                return;
+            }
+            if (target.closest('.delete-btn')) { 
+                handleDeleteItem(docId, itemElementBase, doc.title);
+                return;
+            }
+            if (target.closest('.keywords-trigger')) {
+                toggleKeywordGlassPopup(docId, target.closest('.keywords-trigger'));
+                return;
+            }
+            if (target.closest('.clickable-author')) {
+                const authorName = target.closest('.clickable-author').getAttribute('data-author-name');
+                showToast(`Filtering by author (not implemented): ${authorName}`); 
+                return;
+            }
+            if (target.closest('.clickable-category')) {
+                const categoryName = target.closest('.clickable-category').getAttribute('data-category-name');
+                filterByCategorySelect.value = categoryName;
+                currentPage = 1;
+                filterAndDisplayDocuments();
+                return;
+            }
+            if (target.closest('.keywords-pill-container .keyword-pill') && currentView === 'list') {
+                const keyword = target.closest('.keyword-pill').textContent;
+                const keywordOptionExists = Array.from(filterByKeywordsSelect.options).some(opt => opt.value === keyword);
+                if (keywordOptionExists) {
+                    filterByKeywordsSelect.value = keyword;
+                } else {
+                    console.warn(`Keyword "${keyword}" not found in filter dropdown.`);
+                    filterByKeywordsSelect.value = 'all'; 
+                }
+                currentPage = 1;
+                filterAndDisplayDocuments();
+                return;
+            }
+            if (target.closest('.document-checkbox')) {
+                return;
+            }
+
+            // If no specific action button was clicked, treat the card click as "open"
+            if (doc.url) {
+                // Check if the click was on an interactive element inside the card that should not trigger navigation
+                const nonNavigatingElements = ['.document-checkbox-container', '.delete-btn', '.keywords-trigger', '.clickable-author', '.clickable-category', '.action-btn'];
+                if (!nonNavigatingElements.some(selector => target.closest(selector))) {
+                    window.location.href = doc.url;
+                }
+            } 
+        });
+        
+        document.addEventListener('click', function(e) { 
+            if (currentKeywordGlassPopup) {
+                if (!currentKeywordGlassPopup.element.contains(e.target) && e.target !== currentKeywordGlassPopup.trigger && !currentKeywordGlassPopup.trigger.contains(e.target) ) {
+                    currentKeywordGlassPopup.element.classList.remove('active');
+                    currentKeywordGlassPopup = null;
+                }
+            }
+            if (viewsPopupActive) {
+                if (!viewOptionsPopup.contains(e.target) && e.target !== toggleViewsBtn && !toggleViewsBtn.contains(e.target)) {
+                    viewsPopupActive = false;
+                    viewOptionsPopup.classList.remove('active');
+                    toggleViewsBtn.classList.remove('active');
+                    const chevronIcon = toggleViewsBtn.querySelector('.chevron-icon');
+                    if (chevronIcon) {
+                        chevronIcon.classList.remove('fa-chevron-up');
+                        chevronIcon.classList.add('fa-chevron-down');
+                    }
+                }
+            }
+        });
+
+        keywordPopupGlass.addEventListener('click', function(e) {
+            if (e.target.classList.contains('keyword-pill')) {
+                const keyword = e.target.textContent;
+                const keywordOptionExists = Array.from(filterByKeywordsSelect.options).some(opt => opt.value === keyword);
+                if (keywordOptionExists) {
+                    filterByKeywordsSelect.value = keyword;
+                } else {
+                    console.warn(`Keyword "${keyword}" from popup not found in filter dropdown.`);
+                    filterByKeywordsSelect.value = 'all'; 
+                }
+                currentPage = 1; 
+                filterAndDisplayDocuments(); 
+                keywordPopupGlass.classList.remove('active'); 
+                currentKeywordGlassPopup = null;
+            }
+        });
+
+        deleteSelectedBtn.addEventListener('click', handleBulkDelete);
+
+        toggleFiltersBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            filtersExpanded = !filtersExpanded;
+            collapsibleFilters.classList.toggle('expanded', filtersExpanded);
+            toggleFiltersBtn.classList.toggle('active', filtersExpanded);
+            const chevronIcon = toggleFiltersBtn.querySelector('.chevron-icon');
+            if (chevronIcon) {
+                chevronIcon.classList.toggle('fa-chevron-down', !filtersExpanded);
+                chevronIcon.classList.toggle('fa-chevron-up', filtersExpanded);
+            }
+        });
+
+        // Initial Setup
+        function initializePage() {
+            const preferredView = localStorage.getItem('libraryPreferredView') || 'list'; 
+            documentContainer.classList.add('loading-content'); 
+            
+            viewOptionsPopup.querySelectorAll('.view-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('data-view') === preferredView);
+            });
+            
+            changeView(preferredView); 
+            
+            requestAnimationFrame(() => {
+                setTimeout(() => { 
+                    documentContainer.classList.remove('loading-content');
+                }, 50); 
+            });
+        }
+
+        initializePage(); 
+
+    </script>
+
+    <!-- Navbar loading script -->
+    <script src="/Components/js/navbar-loader.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize the navbar
+            if (window.NavbarModule) {
+                window.NavbarModule.init();
+            } else {
+                console.error('NavbarModule not found! Make sure navbar-loader.js is loaded correctly.');
+            }
+        });
+    </script>
+</body>
+</html>

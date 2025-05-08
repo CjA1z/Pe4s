@@ -22,6 +22,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (sideBar) {
             highlightActiveSidebarLink(sideBar);
         }
+        
+        // Setup logout functionality AFTER sidebar is loaded
+        setupLogout();
     })
     .catch(error => console.error('Error loading sidebar:', error));
 });
@@ -60,14 +63,20 @@ function highlightActiveSidebarLink(sideBar) {
  * Side bar functionality
  */
 
+// Remove duplicate DOMContentLoaded listener to avoid conflicts
+// document.addEventListener('DOMContentLoaded', () => {
+//   console.log('Side bar script loaded');
+//   
+//   // Setup logout functionality
+//   setupLogout();
+//   
+//   // Initialize prevention on page load
+//   preventBackNavigation();
+// });
+
+// Initialize prevention on page load - moved outside of duplicate event listener
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('Side bar script loaded');
-  
-  // Setup logout functionality
-  setupLogout();
-  
-  // Initialize prevention on page load
-  preventBackNavigation();
+    preventBackNavigation();
 });
 
 // Function to prevent back navigation
@@ -96,38 +105,74 @@ globalThis.addEventListener('beforeunload', function() {
  * Setup logout functionality
  */
 function setupLogout() {
-  // Try multiple selectors to find the logout button
-  const logoutButton = document.querySelector('.logout-btn') || 
-                       document.querySelector('a[href="/logout"]') ||
-                       document.querySelector('.icon-wrapper [onclick*="handleLogout"]');
+  console.log('Setting up logout functionality');
+  
+  // Try multiple selectors to find the logout button - improved selector specificity
+  const logoutButton = document.querySelector('.icon-wrapper.logout-btn') || 
+                       document.querySelector('a.logout-btn') ||
+                       document.querySelector('a[href="/logout"].icon-wrapper.logout-btn') ||
+                       document.querySelector('a[onclick*="handleLogout"]');
   
   if (logoutButton) {
-    // Remove any existing event listeners
-    logoutButton.removeEventListener('click', handleLogout);
-    // Add fresh event listener
-    logoutButton.addEventListener('click', handleLogout);
-    console.log('Logout button found and listener attached');
+    // Check if the button already has an event handler
+    if (logoutButton.getAttribute('data-has-logout-handler') !== 'true') {
+      // Remove any existing event listeners to prevent duplicates
+      logoutButton.removeEventListener('click', handleLogout);
+      
+      // Add fresh event listener
+      logoutButton.addEventListener('click', handleLogout);
+      
+      // Mark this button as having a handler to prevent duplicates
+      logoutButton.setAttribute('data-has-logout-handler', 'true');
+      
+      // Also ensure the onclick attribute is set correctly
+      logoutButton.setAttribute('onclick', 'handleLogout(event); return false;');
+      
+      console.log('Logout button found and listener attached');
+    } else {
+      console.log('Logout button already has an event handler');
+    }
   } else {
     console.warn('Logout button not found');
     // Add a fallback timeout to try again after sidebar is fully loaded
     setTimeout(() => {
-      const retryLogoutButton = document.querySelector('.logout-btn') || 
-                                document.querySelector('a[href="/logout"]') ||
-                                document.querySelector('.icon-wrapper [onclick*="handleLogout"]');
-      if (retryLogoutButton) {
+      // Try a more comprehensive set of selectors
+      const retryLogoutButton = document.querySelector('.icon-wrapper.logout-btn') || 
+                                document.querySelector('a.logout-btn') ||
+                                document.querySelector('a[href="/logout"].icon-wrapper.logout-btn') ||
+                                document.querySelector('a[onclick*="handleLogout"]');
+                                
+      if (retryLogoutButton && retryLogoutButton.getAttribute('data-has-logout-handler') !== 'true') {
         retryLogoutButton.removeEventListener('click', handleLogout);
         retryLogoutButton.addEventListener('click', handleLogout);
+        retryLogoutButton.setAttribute('data-has-logout-handler', 'true');
+        retryLogoutButton.setAttribute('onclick', 'handleLogout(event); return false;');
         console.log('Logout button found on retry and listener attached');
+      } else if (retryLogoutButton) {
+        console.log('Logout button already has an event handler (on retry)');
+      } else {
+        console.error('Logout button still not found after retry');
       }
     }, 1000);
   }
 }
 
 function handleLogout(event) {
-  event.preventDefault();
-  console.log("Logout function called");
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation(); // Stop event propagation to prevent multiple handlers
+  }
+  console.log("Sidebar logout function called");
   
-  // Show loading popup
+  // Prevent multiple logout attempts
+  if (window.logoutInProgress) {
+    console.log("Logout already in progress");
+    return;
+  }
+  
+  window.logoutInProgress = true;
+  
+  // Add visual indicator that logout is happening
   const loadingPopup = document.createElement('div');
   loadingPopup.style.position = 'fixed';
   loadingPopup.style.top = '0';
@@ -179,81 +224,120 @@ function handleLogout(event) {
   loadingPopup.appendChild(loadingContent);
   document.body.appendChild(loadingPopup);
   
-  // Get the session token before clearing storage
-  let sessionToken = null;
-  
-  // First check localStorage for session token
+  // More thorough client-side storage clearing
   try {
-    sessionToken = localStorage.getItem('session_token');
-    if (sessionToken) {
-      console.log("Found session token in localStorage");
-    }
-  } catch (e) {
-    console.error("Error accessing localStorage:", e);
-  }
-  
-  // If not in localStorage, check cookies as fallback
-  if (!sessionToken) {
-    const cookies = document.cookie.split(';');
-    for (let i = 0; i < cookies.length; i++) {
-      const cookie = cookies[i].trim();
-      if (cookie.startsWith('session_token=')) {
-        sessionToken = cookie.substring('session_token='.length);
-        console.log("Found session token in cookies");
-        break;
-      }
-    }
-  }
-  
-  // Double-check that token is a valid string
-  if (sessionToken !== null && (typeof sessionToken !== 'string' || sessionToken.trim() === '')) {
-    console.log("Invalid token format, setting to null");
-    sessionToken = null;
-  } else if (sessionToken) {
-    console.log("Valid session token found for logout");
-  }
-  
-  // Clear client-side storage 
-  try {
-    localStorage.clear();
-    console.log("Cleared localStorage");
+    // Clear localStorage - first specific keys then everything
+    const localStorageKeys = ['userInfo', 'session_token', 'accessToken', 'user', 'userData', 'auth', 'role'];
+    localStorageKeys.forEach(key => localStorage.removeItem(key));
+    localStorage.clear(); // Clear all localStorage items
     
-    // Clear cookies
+    // Clear sessionStorage - first specific keys then everything
+    const sessionStorageKeys = ['userInfo', 'session_token', 'accessToken', 'user', 'userData', 'auth', 'role'];
+    sessionStorageKeys.forEach(key => sessionStorage.removeItem(key));
+    sessionStorage.clear(); // Clear all sessionStorage items
+    
+    // Clear specific cookies
+    const cookiesToClear = ['session_token', 'accessToken', 'user', 'auth', 'role'];
+    cookiesToClear.forEach(cookieName => {
+      document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+      // Also try to clear cookies with different paths
+      document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/admin/;`;
+      document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/api/;`;
+    });
+    
+    // Clear all cookies (more aggressive approach)
     document.cookie.split(";").forEach(function(c) {
       document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/admin/");
+      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/api/");
     });
-    console.log("Cleared cookies");
+    
+    console.log("Cleared all client-side storage");
+
+    // Check if we're still on admin dashboard after storage clearing
+    if (window.location.pathname.includes('/admin/')) {
+      console.log("Still on admin page after storage clearing; will redirect directly");
+    }
   } catch (e) {
     console.error("Error clearing client storage:", e);
   }
   
-  // Call the logout endpoint with the token if available
-  fetch('/logout', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(sessionToken ? { 'Authorization': `Bearer ${sessionToken}` } : {})
-    }
-  })
+  // Try multiple logout endpoints to ensure we hit the right one
+  Promise.any([
+    fetch('/logout', {
+      method: 'POST',
+      credentials: 'include',
+      redirect: 'follow' // Allow the server's redirect to be followed
+    }),
+    fetch('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+      redirect: 'follow' // Allow the server's redirect to be followed
+    }),
+    fetch('/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+      redirect: 'follow' // Allow the server's redirect to be followed
+    })
+  ])
   .then(response => {
     console.log("Logout response status:", response.status);
-    // Wait a moment to show the loading animation
-    setTimeout(() => {
-      // Remove loading popup
-      document.body.removeChild(loadingPopup);
-      // Redirect to entry/index page
-      window.location.href = '/';
-    }, 1000);
+    
+    // Check if redirect location contains the string 'dashboard'
+    const hasRedirectHeader = response.headers && response.headers.get('Location');
+    if (hasRedirectHeader) {
+      const location = response.headers.get('Location');
+      console.log("Redirect location from server:", location);
+      
+      if (location && location.includes('dashboard')) {
+        console.log("WARNING: Server tried to redirect to dashboard after logout; overriding");
+        window.location.href = '/index.html?nocache=' + Date.now();
+        return;
+      }
+    }
+    
+    console.log("Logout successful, following server redirect");
+    
+    if (response.redirected) {
+      window.location.href = response.url;
+    } else {
+      // Fallback if the server didn't redirect
+      window.location.href = '/index.html?nocache=' + Date.now();
+    }
   })
   .catch(error => {
     console.error("Error during logout:", error);
-    // Remove loading popup
-    document.body.removeChild(loadingPopup);
-    // Still redirect to entry/index page even if fetch fails
-    window.location.href = '/';
+    // Fallback on error
+    window.location.href = '/index.html?nocache=' + Date.now();
+  })
+  .finally(() => {
+    // Small delay to show the loading animation
+    setTimeout(() => {
+      // Clean up loading popup
+      if (document.body.contains(loadingPopup)) {
+        document.body.removeChild(loadingPopup);
+      }
+      
+      // Final safety check - if we're still on admin page after 2 seconds, force redirect
+      if (window.location.pathname.includes('/admin/')) {
+        console.log("FINAL SAFETY: Still on admin page after logout; forcing redirect");
+        window.location.href = '/index.html?forcedRedirect=true&t=' + Date.now();
+      }
+    }, 1000);
   });
 }
 
-// Export the function for use in other files
+// Export the function for use in other files and make it globally available
+window.handleLogout = handleLogout;
+window.sidebarHandleLogout = handleLogout; // Add this for dashboard.html to use
 globalThis.handleLogout = handleLogout;
-window.handleLogout = handleLogout; // Make sure it's available on the window object for direct onclick handlers
+globalThis.sidebarHandleLogout = handleLogout;
+
+// Make sure the function is available after the page loads too
+document.addEventListener('DOMContentLoaded', () => {
+  window.handleLogout = handleLogout;
+  window.sidebarHandleLogout = handleLogout; // Add this for dashboard.html to use
+  globalThis.handleLogout = handleLogout;
+  globalThis.sidebarHandleLogout = handleLogout;
+  console.log("Sidebar logout handler registered globally");
+});

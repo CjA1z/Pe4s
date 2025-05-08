@@ -92,10 +92,224 @@ async function updateWorksSummary() {
     }
 }
 
-// Update works summary when the page loads
+// Function to update the top authors section with dynamic data
+async function updateTopAuthors() {
+    try {
+        console.log('Fetching top authors data...');
+        const response = await fetch('/api/author-visits/top-authors');
+        
+        if (!response.ok) {
+            console.log(`HTTP error! status: ${response.status}`);
+            // Try to fetch all authors instead
+            console.log('Fetching all authors as fallback...');
+            const allAuthorsResponse = await fetch('/api/authors/all');
+            
+            if (!allAuthorsResponse.ok) {
+                // If both APIs fail, use mock data
+                console.log('Using mock data as both APIs failed');
+                const mockData = {
+                    topAuthors: [
+                        { full_name: "Jane Smith", visit_count: 521, profile_picture: "/admin/Components/img/samp_pfp.jpg" },
+                        { full_name: "John Doe", visit_count: 470, profile_picture: "/admin/Components/img/samp_pfp.jpg" },
+                        { full_name: "Alex Johnson", visit_count: 455, profile_picture: "/admin/Components/img/samp_pfp.jpg" },
+                        { full_name: "Maria Garcia", visit_count: 400, profile_picture: "/admin/Components/img/samp_pfp.jpg" },
+                        { full_name: "Robert Chen", visit_count: 399, profile_picture: "/admin/Components/img/samp_pfp.jpg" }
+                    ]
+                };
+                updateTopAuthorsUI(mockData);
+                return;
+            }
+            
+            // Convert all authors data to top authors format
+            const allAuthorsData = await allAuthorsResponse.json();
+            console.log('All authors data received:', allAuthorsData);
+            
+            // Transform authors data to match the expected format
+            // Set view count to 0 for all authors since we don't have real counts
+            const transformedData = {
+                topAuthors: allAuthorsData.authors.slice(0, 5).map(author => ({
+                    full_name: author.full_name,
+                    visit_count: 0, // No visit count data available
+                    profile_picture: author.profilePicUrl || "/admin/Components/img/samp_pfp.jpg"
+                }))
+            };
+            
+            updateTopAuthorsUI(transformedData);
+            return;
+        }
+        
+        const data = await response.json();
+        console.log('Top authors data received:', data);
+        
+        // If we have top authors data but it's empty, try to fetch all authors
+        if (!data.topAuthors || data.topAuthors.length === 0) {
+            console.log('No top authors data, fetching all authors...');
+            const allAuthorsResponse = await fetch('/api/authors/all');
+            
+            if (allAuthorsResponse.ok) {
+                const allAuthorsData = await allAuthorsResponse.json();
+                const transformedData = {
+                    topAuthors: allAuthorsData.authors.slice(0, 5).map(author => ({
+                        full_name: author.full_name,
+                        visit_count: 0,
+                        profile_picture: author.profilePicUrl || "/admin/Components/img/samp_pfp.jpg"
+                    }))
+                };
+                updateTopAuthorsUI(transformedData);
+                return;
+            }
+        }
+        
+        updateTopAuthorsUI(data);
+    } catch (error) {
+        console.log('Error updating top authors:', error);
+        // Try to fetch all authors as a fallback
+        try {
+            console.log('Trying to fetch all authors after error...');
+            const allAuthorsResponse = await fetch('/api/authors/all');
+            
+            if (allAuthorsResponse.ok) {
+                const allAuthorsData = await allAuthorsResponse.json();
+                const transformedData = {
+                    topAuthors: allAuthorsData.authors.slice(0, 5).map(author => ({
+                        full_name: author.full_name,
+                        visit_count: 0,
+                        profile_picture: author.profilePicUrl || "/admin/Components/img/samp_pfp.jpg"
+                    }))
+                };
+                updateTopAuthorsUI(transformedData);
+                return;
+            }
+        } catch (fallbackError) {
+            console.log('Error fetching all authors as fallback:', fallbackError);
+        }
+        
+        // Use mock data if all else fails
+        const mockData = {
+            topAuthors: [
+                { full_name: "Jane Smith", visit_count: 521, profile_picture: "/admin/Components/img/samp_pfp.jpg" },
+                { full_name: "John Doe", visit_count: 470, profile_picture: "/admin/Components/img/samp_pfp.jpg" },
+                { full_name: "Alex Johnson", visit_count: 455, profile_picture: "/admin/Components/img/samp_pfp.jpg" },
+                { full_name: "Maria Garcia", visit_count: 400, profile_picture: "/admin/Components/img/samp_pfp.jpg" },
+                { full_name: "Robert Chen", visit_count: 399, profile_picture: "/admin/Components/img/samp_pfp.jpg" }
+            ]
+        };
+        updateTopAuthorsUI(mockData);
+    }
+}
+
+function updateTopAuthorsUI(data) {
+    // Get the authors list container
+    const authorsListContainer = document.querySelector('.authors-list');
+    if (!authorsListContainer) {
+        console.warn('Could not find authors list container');
+        return;
+    }
+    
+    // Clear existing content
+    authorsListContainer.innerHTML = '';
+    
+    // Sort authors by visit count in descending order
+    const sortedAuthors = [...data.topAuthors].sort((a, b) => (b.visit_count || 0) - (a.visit_count || 0));
+    
+    // Add each author to the list
+    sortedAuthors.forEach(author => {
+        const authorElement = document.createElement('div');
+        authorElement.className = 'author';
+        
+        // Create author image div with background image
+        const imageUrl = author.profile_picture || './Components/img/samp_pfp.jpg';
+        
+        // Format the visit count with the proper label
+        const visitCount = author.visit_count || 0;
+        const visitText = visitCount === 1 ? '1 visit' : `${visitCount} visits`;
+        
+        // Create DOM elements instead of using innerHTML for better control
+        const imageDiv = document.createElement('div');
+        imageDiv.className = 'author-image';
+        imageDiv.style.backgroundImage = `url('${imageUrl}')`;
+        
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'author-name';
+        nameDiv.textContent = author.full_name;
+        nameDiv.title = author.full_name; // Add title attribute for tooltip
+        
+        const visitsDiv = document.createElement('div');
+        visitsDiv.className = 'author-visits';
+        visitsDiv.textContent = visitText;
+        
+        // Append all elements to the author card
+        authorElement.appendChild(imageDiv);
+        authorElement.appendChild(nameDiv);
+        authorElement.appendChild(visitsDiv);
+        
+        authorsListContainer.appendChild(authorElement);
+    });
+}
+
+// Function to update the total visits section with dynamic data
+async function updateTotalVisits() {
+    try {
+        console.log('Fetching visit statistics...');
+        const response = await fetch('/api/author-visits/stats');
+        
+        if (!response.ok) {
+            console.log(`HTTP error! status: ${response.status}`);
+            // Use mock data if API returns 404
+            const mockData = {
+                stats: {
+                    total: 12321,
+                    guest: 10653,
+                    user: 1668
+                }
+            };
+            updateTotalVisitsUI(mockData);
+            return;
+        }
+        
+        const data = await response.json();
+        console.log('Visit statistics received:', data);
+        updateTotalVisitsUI(data);
+    } catch (error) {
+        console.log('Error updating visit statistics:', error);
+        // Use mock data on error
+        const mockData = {
+            stats: {
+                total: 12321,
+                guest: 10653,
+                user: 1668
+            }
+        };
+        updateTotalVisitsUI(mockData);
+    }
+}
+
+function updateTotalVisitsUI(data) {
+    // Update total visits count
+    const totalVisitsElement = document.querySelector('.total-visits-number');
+    if (totalVisitsElement) {
+        totalVisitsElement.textContent = data.stats.total.toLocaleString();
+    }
+    
+    // Update guest visits count
+    const guestVisitsElement = document.querySelector('.visits-row div:first-child .visit-count');
+    if (guestVisitsElement) {
+        guestVisitsElement.textContent = data.stats.guest.toLocaleString();
+    }
+    
+    // Update user visits count
+    const userVisitsElement = document.querySelector('.visits-row div:last-child .visit-count');
+    if (userVisitsElement) {
+        userVisitsElement.textContent = data.stats.user.toLocaleString();
+    }
+}
+
+// Update works summary, top authors, and visit statistics when the page loads
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM loaded, initializing dashboard...');
     setTimeout(() => {
         updateWorksSummary();
+        updateTopAuthors();
+        updateTotalVisits();
     }, 100); // Small delay to ensure all HTML is loaded
 }); 

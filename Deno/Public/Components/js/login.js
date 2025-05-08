@@ -89,25 +89,33 @@ document.addEventListener("DOMContentLoaded", () => {
                         sessionStorage.setItem('userInfo', JSON.stringify(userInfo));
                         console.log("User info stored:", userInfo);
                         
+                        // Also update localStorage to trigger storage event for other tabs
+                        localStorage.setItem('userInfo', JSON.stringify(userInfo));
+                        
+                        // Dispatch storage event to notify current tab
+                        window.dispatchEvent(new StorageEvent('storage', {
+                            key: 'userInfo',
+                            newValue: JSON.stringify(userInfo),
+                            storageArea: localStorage
+                        }));
+                        
                         // Update header UI
                         updateHeaderUI(userInfo);
                     }
                     
-                    // Redirect based on role
-                    if (data.redirect) {
-                        console.log(`Redirecting to ${data.redirect}...`);
-                        // Force redirect with explicit window.location assignment
-                        window.location = data.redirect;
-                        
-                        // Fallback redirect in case the above doesn't work
-                        setTimeout(() => {
-                            console.log("Fallback redirect activated");
-                            document.location.href = data.redirect;
-                        }, 500);
-                    } else {
-                        console.log("No redirect URL provided, defaulting to index");
-                        window.location = "http://localhost:8000/index.html";
+                    // Determine redirect based on role
+                    const userRole = data.role ? data.role.toLowerCase() : 'user';
+                    let redirectUrl = '/index.html';  // Default redirect for users
+                    
+                    if (userRole === 'admin') {
+                        redirectUrl = '/admin/dashboard.html';
+                    } else if (userRole === 'user') {
+                        // User role - redirect to index page which will load the user navbar
+                        redirectUrl = '/index.html';
                     }
+                    
+                    console.log(`Redirecting ${userRole} to ${redirectUrl}...`);
+                    window.location.href = redirectUrl;
                 } else {
                     alert(data.message || "Login failed. Please check your credentials.");
                 }
@@ -124,6 +132,16 @@ document.addEventListener("DOMContentLoaded", () => {
 // Function to update header UI after login
 function updateHeaderUI(userInfo) {
     if (!userInfo) return;
+    
+    // Try to refresh using navbar module if available
+    if (window.NavbarModule && typeof window.NavbarModule.refresh === 'function') {
+        console.log('Refreshing navbar using NavbarModule...');
+        window.NavbarModule.refresh();
+        return;
+    }
+    
+    // Fallback to old method if NavbarModule not available
+    console.log('NavbarModule not available, using legacy update method');
     
     // Try to get the header elements
     const loginContainer = document.getElementById('loginContainer');

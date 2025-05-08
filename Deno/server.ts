@@ -41,6 +41,16 @@ import { createDocumentRequestRoutes } from "./routes/documentRequestRoutes.ts";
 import { DocumentRequestModel } from "./models/documentRequestModel.ts";
 import { DocumentRequestController } from "./controllers/documentRequestController.ts";
 import { emailRoutes } from "./routes/emailRoutes.ts"; // Import email routes
+import { authorVisitsRoutes, authorVisitsAllowedMethods } from "./routes/authorVisitsRoutes.ts"; // Import author visits routes
+import { getCompiledDocument } from "./api/compiledDocument.ts";
+import { handleGetUserProfileForNavbar } from "./api/user.ts"; // Import user profile handler
+import { handleLogout } from "./routes/logout.ts"; // Import logout handler
+// Import the document view controller
+// TODO: Fix DocumentViewController implementation
+// import { DocumentViewController } from "./controllers/documentViewController.ts";
+
+// Import Deno standard library file API for reading migration files
+// Removed - not needed after removing document views functionality
 
 // -----------------------------
 // SECTION: Configuration
@@ -437,6 +447,60 @@ router.get("/api/authors/all", async (ctx) => {
     ctx.response.body = { 
       error: error instanceof Error ? error.message : "Unknown error", 
       authors: [] 
+    };
+  }
+});
+
+// Add author search endpoint
+router.get("/api/authors/search", async (ctx) => {
+  try {
+    // Get search query parameter
+    const url = new URL(ctx.request.url);
+    const query = url.searchParams.get("q") || '';
+    
+    console.log(`Server: Handling author search request for query: "${query}"`);
+    
+    if (!query) {
+      ctx.response.status = 200;
+      ctx.response.body = [];
+      return;
+    }
+    
+    // Import AuthorModel dynamically to avoid circular dependencies
+    const { AuthorModel } = await import("./models/authorModel.ts");
+    
+    // Search authors with the query
+    const searchSQL = `
+      SELECT * FROM authors 
+      WHERE full_name ILIKE $1 
+      OR department ILIKE $1 
+      OR affiliation ILIKE $1
+      OR biography ILIKE $1
+      OR email ILIKE $1
+      LIMIT 10
+    `;
+    
+    const searchParam = `%${query}%`;
+    const searchResult = await client.queryObject(searchSQL, [searchParam]);
+    
+    // Format the search results
+    const authors = searchResult.rows.map((author: any) => ({
+      id: author.id,
+      full_name: author.full_name,
+      department: author.department || '',
+      affiliation: author.affiliation || '',
+      email: author.email || '',
+      bio: author.biography || '',
+      profile_picture: author.profile_picture || '',
+    }));
+    
+    ctx.response.status = 200;
+    ctx.response.body = authors;
+  } catch (error) {
+    console.error("Error searching authors:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { 
+      error: error instanceof Error ? error.message : "Unknown error" 
     };
   }
 });
@@ -1030,30 +1094,62 @@ async function setupDirectories() {
   }
 }
 
+// Function to run database migrations
+// Removed - related to document views functionality
+// async function runMigrations() {
+//   console.log("[DATABASE] Running migrations...");
+//   
+//   try {
+//     // Document Views table
+//     console.log("[DATABASE] Migrating document_views table...");
+//     const documentViewsMigration = await readTextFile("./db/migrations/document_views_table.sql");
+//     await client.queryArray(documentViewsMigration);
+//     
+//     // Call the migration function
+//     await client.queryArray("SELECT migrate_document_views()");
+//     
+//     console.log("[DATABASE] Migrations completed successfully");
+//   } catch (error) {
+//     console.error("[DATABASE] Error running migrations:", error);
+//   }
+// }
+
 // -----------------------------
 // SECTION: Server Startup
 // -----------------------------
 async function startServer() {
+  console.log(`[SERVER] Starting server at ${new Date().toISOString()}`);
+  
   try {
-    // Setup storage directories
+    // Create necessary directories
     await setupDirectories();
     
     // Connect to the database
     console.log("Connecting to database...");
     await connectToDb();
+    console.log("[SERVER] Database connected successfully");
     
     // Run database diagnostics
     await diagnoseDatabaseIssues();
+    
+    // Run migrations
+    // TODO: Fix migration functions when DocumentViewController is properly implemented
+    // await runMigrations();
     
     // Register routes with the application
     app.use(router.routes());
     app.use(router.allowedMethods());
     
+    // Register author visits routes
+    console.log("Registering author visits routes...");
+    app.use(authorVisitsRoutes);
+    app.use(authorVisitsAllowedMethods);
+    
     // Start the server
     console.log(`🌐 Server running on http://localhost:${PORT}`);
     await app.listen({ port: Number(PORT) });
   } catch (error) {
-    console.error("Failed to start server:", error);
+    console.error(`[SERVER] Failed to start server: ${error.message}`);
     Deno.exit(1);
   }
 }
@@ -1189,6 +1285,212 @@ router.get("/api/email-logs", async (ctx) => {
       error: "Server error while retrieving email logs",
       details: error instanceof Error ? error.message : String(error)
     };
+  }
+});
+
+// Add a route for getting a compiled document by ID
+router.get("/api/compiled-documents/:id", async (ctx) => {
+  try {
+    const id = parseInt(ctx.params.id);
+    if (isNaN(id)) {
+      ctx.response.status = 400;
+      ctx.response.body = { error: "Invalid ID" };
+      return;
+    }
+    
+    // Fetch the compiled document
+    const compiledDoc = await getCompiledDocument(id);
+    if (!compiledDoc) {
+      ctx.response.status = 404;
+      ctx.response.body = { error: "Compiled document not found" };
+      return;
+    }
+    
+    // Get child documents
+    let childDocs = [];
+    try {
+      const childDocsResponse = await fetchChildDocuments(id);
+      childDocs = childDocsResponse.documents || [];
+    } catch (childError) {
+      console.warn(`Could not fetch child documents for compiled doc ${id}:`, childError);
+    }
+    
+    // Fetch authors for the document if they're not already included
+    let authors = [];
+    try {
+      // Authors might already be included in the document
+      if (compiledDoc.authors && Array.isArray(compiledDoc.authors)) {
+        authors = compiledDoc.authors;
+      } else {
+        // Try to fetch authors separately
+        const authorsData = await getDocumentAuthors(id);
+        authors = authorsData || [];
+      }
+    } catch (authorError) {
+      console.warn(`Could not fetch authors for compiled doc ${id}:`, authorError);
+    }
+    
+    // Combine all data
+    const result = {
+      ...compiledDoc,
+      authors: authors,
+      child_documents: childDocs
+    };
+    
+    console.log(`Fetched compiled document ${id} with ${childDocs.length} child documents and ${authors.length} authors`);
+    
+    ctx.response.body = result;
+  } catch (error) {
+    console.error(`Error fetching compiled document: ${error.message}`);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Failed to fetch compiled document" };
+  }
+});
+
+// Register user profile endpoint for the navbar
+router.get("/api/user/profile", async (ctx) => {
+  const request = new Request(ctx.request.url.toString(), {
+    method: ctx.request.method,
+    headers: ctx.request.headers
+  });
+  
+  const response = await handleGetUserProfileForNavbar(request);
+  
+  ctx.response.status = response.status;
+  ctx.response.headers = response.headers;
+  ctx.response.body = await response.json();
+  
+  console.log(`[SERVER] User profile request processed, status: ${response.status}`);
+});
+
+// Register logout endpoint 
+router.post("/logout", async (ctx) => {
+  console.log("[SERVER] Processing logout POST request");
+  
+  const request = new Request(ctx.request.url.toString(), {
+    method: "POST",
+    headers: ctx.request.headers
+  });
+  
+  const response = await handleLogout(request);
+  
+  ctx.response.status = response.status;
+  
+  // Copy all headers from the response
+  for (const [key, value] of response.headers.entries()) {
+    ctx.response.headers.set(key, value);
+  }
+  
+  if (response.status === 302) {
+    console.log("[SERVER] Logout successful, redirecting to:", response.headers.get("Location"));
+  } else {
+    console.warn("[SERVER] Logout returned non-redirect status:", response.status);
+  }
+});
+
+// Also handle GET requests to /logout (for direct link access)
+router.get("/logout", async (ctx) => {
+  console.log("[SERVER] Processing logout GET request");
+  
+  const request = new Request(ctx.request.url.toString(), {
+    method: "GET",
+    headers: ctx.request.headers
+  });
+  
+  const response = await handleLogout(request);
+  
+  ctx.response.status = response.status;
+  
+  // Copy all headers from the response
+  for (const [key, value] of response.headers.entries()) {
+    ctx.response.headers.set(key, value);
+  }
+  
+  if (response.status === 302) {
+    console.log("[SERVER] GET Logout successful, redirecting to:", response.headers.get("Location"));
+  } else {
+    console.warn("[SERVER] GET Logout returned non-redirect status:", response.status);
+  }
+});
+
+// Add route for most visited documents
+router.get("/api/documents/most-visited", async (ctx) => {
+  try {
+    console.log("[SERVER] Fetching most visited documents");
+    // TODO: Fix DocumentViewController implementation
+    // const request = new Request(ctx.request.url.toString(), {
+    //   method: ctx.request.method,
+    //   headers: ctx.request.headers
+    // });
+    
+    // const response = await DocumentViewController.getMostVisited(request);
+    
+    // ctx.response.status = response.status;
+    // ctx.response.headers = response.headers;
+    // ctx.response.body = await response.json();
+    
+    // Temporary mock data
+    ctx.response.status = 200;
+    ctx.response.body = { 
+      mostVisited: [] 
+    };
+  } catch (error) {
+    console.error("[SERVER] Error fetching most visited documents:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Internal server error" };
+  }
+});
+
+// Add route for recording document view
+router.post("/api/document-views", async (ctx) => {
+  try {
+    console.log("[SERVER] Recording document view");
+    // TODO: Fix DocumentViewController implementation
+    // const request = new Request(ctx.request.url.toString(), {
+    //   method: ctx.request.method,
+    //   headers: ctx.request.headers,
+    //   body: ctx.request.hasBody ? await ctx.request.body({ type: "json" }).value : undefined
+    // });
+    
+    // const response = await DocumentViewController.recordView(request);
+    
+    // ctx.response.status = response.status;
+    // ctx.response.headers = response.headers;
+    // ctx.response.body = await response.json();
+    
+    // Temporary mock response
+    ctx.response.status = 200;
+    ctx.response.body = { success: true };
+  } catch (error) {
+    console.error("[SERVER] Error recording document view:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Internal server error" };
+  }
+});
+
+// Add route for getting document view statistics
+router.get("/api/document-views/stats", async (ctx) => {
+  try {
+    console.log("[SERVER] Fetching document view statistics");
+    // TODO: Fix DocumentViewController implementation
+    // const request = new Request(ctx.request.url.toString(), {
+    //   method: ctx.request.method,
+    //   headers: ctx.request.headers
+    // });
+    
+    // const response = await DocumentViewController.getStats(request);
+    
+    // ctx.response.status = response.status;
+    // ctx.response.headers = response.headers;
+    // ctx.response.body = await response.json();
+    
+    // Temporary mock response
+    ctx.response.status = 200;
+    ctx.response.body = { stats: {} };
+  } catch (error) {
+    console.error("[SERVER] Error fetching document view statistics:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Internal server error" };
   }
 });
 

@@ -82,18 +82,17 @@
 
         /* Style for the logo placeholder */
         .header-container .logo-placeholder {
-            width: 80px; /* Adjusted size for side-by-side */
-            height: 80px; /* Adjusted size for side-by-side */
-            background-color: #fff; /* Solid white background for placeholder */
+            width: 280px; /* Adjusted size for side-by-side */
+            height: 280px; /* Adjusted size for side-by-side */
+            /* Solid white background for placeholder */
             border-radius: 50%; /* Keep it round */
             /* Adjusted margin for spacing between logo and text */
-            margin-right: 20px;
+            
             display: flex;
             justify-content: center;
             align-items: center;
             font-size: 1.5em; /* Adjusted font size */
             color: #333; /* Darker color for 'Logo' text */
-            border: 2px solid #228B22; /* Solid border matching the green */
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2); /* Added shadow to the logo */
             /* Ensure logo doesn't shrink */
             flex-shrink: 0;
@@ -217,13 +216,14 @@
 <body>
     <div class="header-container">
         <div class="logo-placeholder">
-            <img src="images/spud_logo_s.png" loading="lazy" alt="SPUP Logo" style="max-width: 100%; max-height: 100%;" />
+            <img src="/components/images/spud_logo_s.png" loading="lazy" alt="SPUP Logo" style="max-width: 100%; max-height: 100%;" />
         </div>
-        <h1>Paulinian Electronic Archiving System (PeAS)</h1>
+        
     </div>
 
     <div class="login-container">
         <h2>Log In</h2>
+        <p class="paragraph small">Fill in your log in details below.</p>
         <form id="login-form" method="post" action="/login" onsubmit="return false;">
             <div class="form-group">
                 <label for="wf-log-in-id">School ID</label>

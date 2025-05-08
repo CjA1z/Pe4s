@@ -428,7 +428,7 @@
                 
                 <!-- Compiled Document Form -->
                 <div id="compiledDocForm" class="form-section">
-                    <form id="uploadCompiledForm">
+                    <form id="uploadCompiledForm" enctype="multipart/form-data">
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 mb-6">
                             <div>
                                 <label for="compiled-pub-year-start" class="block text-sm font-medium text-gray-700">Publication Year</label>
@@ -508,6 +508,27 @@
                                 }
                             });
                         </script>
+
+                        <div class="mt-6 mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Attach Foreword Document <span class="text-red-500">*</span></label>
+                            <div id="foreword-dropZone" class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-primary transition-colors duration-200 ease-in-out">
+                                <div class="space-y-1 text-center">
+                                    <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                    <div class="flex text-sm text-gray-600 justify-center">
+                                        <label for="foreword-file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-primary-dark">
+                                            <span>Upload a file</span>
+                                            <input id="foreword-file-upload" name="foreword" type="file" class="hidden-file-input" required accept=".pdf">
+                                        </label>
+                                        <p class="pl-1">or drag and drop</p>
+                                    </div>
+                                    <p class="text-xs text-gray-500">PDF up to 10MB</p>
+                                    <p id="foreword-fileNameDisplay" class="text-sm text-gray-900 font-medium pt-2"></p>
+                                </div>
+                            </div>
+                            <p class="mt-2 text-xs text-gray-500">Upload the foreword document that will be included at the beginning of the compiled document.</p>
+                        </div>
 
                         <div class="border-t border-gray-200 pt-6">
                             <h2 class="text-lg font-medium text-gray-900 mb-4">Contents Section</h2>
@@ -663,6 +684,12 @@
                             </div>
                         </div>
 
+                        <div class="pt-4 mb-6">
+                            <button type="button" id="read-foreword-btn" class="w-full inline-flex justify-center py-2 px-4 border border-primary shadow-sm text-sm font-medium rounded-md text-primary-dark bg-white hover:bg-primary-light focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                                <i data-lucide="file-text" class="w-4 h-4 mr-2"></i> Read Foreword
+                            </button>
+                        </div>
+
                         <div>
                             <h4 class="text-md font-medium text-gray-800 mb-3">Included Studies:</h4>
                             <div id="preview-studies-list" class="space-y-2 text-sm text-gray-700 max-h-96 overflow-y-auto">
@@ -731,6 +758,60 @@
                     singleFileNameDisplay.textContent = e.target.files[0].name;
                 }
             });
+            
+            // File upload handling for foreword document
+            const forewordFileInput = document.getElementById('foreword-file-upload');
+            const forewordFileNameDisplay = document.getElementById('foreword-fileNameDisplay');
+            const forewordDropZone = document.getElementById('foreword-dropZone');
+            
+            forewordFileInput.addEventListener('change', function(e) {
+                if (e.target.files.length > 0) {
+                    forewordFileNameDisplay.textContent = e.target.files[0].name;
+                }
+            });
+            
+            // Add drag and drop functionality for foreword document
+            if (forewordDropZone) {
+                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                    forewordDropZone.addEventListener(eventName, preventDefaults, false);
+                });
+                
+                function preventDefaults(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                
+                // Visual feedback for drag actions
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    forewordDropZone.addEventListener(eventName, function() {
+                        forewordDropZone.classList.add('border-primary', 'bg-primary-light');
+                    }, false);
+                });
+                
+                ['dragleave', 'drop'].forEach(eventName => {
+                    forewordDropZone.addEventListener(eventName, function() {
+                        forewordDropZone.classList.remove('border-primary', 'bg-primary-light');
+                    }, false);
+                });
+                
+                // Handle dropped files
+                forewordDropZone.addEventListener('drop', function(e) {
+                    const dt = e.dataTransfer;
+                    const files = dt.files;
+                    
+                    if (files.length > 0 && files[0].type === 'application/pdf') {
+                        forewordFileInput.files = files;
+                        forewordFileNameDisplay.textContent = files[0].name;
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Invalid File',
+                            text: 'Please upload a PDF file',
+                            confirmButtonColor: '#10B981'
+                        });
+                    }
+                }, false);
+            }
             
             // Add research section button handler
             const addSectionBtn = document.getElementById('add-research-section-btn');
@@ -1103,6 +1184,27 @@
                         window.open(url, '_blank');
                     } else {
                         alert('Please upload a document first');
+                    }
+                });
+            }
+            
+            // Add functionality to the Read Foreword button
+            const readForewordBtn = document.getElementById('read-foreword-btn');
+            const forewordFileInputGlobal = document.getElementById('foreword-file-upload'); // Create a global reference
+
+            if (readForewordBtn) {
+                readForewordBtn.addEventListener('click', function() {
+                    // Only open document if a file is selected
+                    if (forewordFileInputGlobal && forewordFileInputGlobal.files && forewordFileInputGlobal.files[0]) {
+                        const url = URL.createObjectURL(forewordFileInputGlobal.files[0]);
+                        window.open(url, '_blank');
+                    } else {
+                        Swal.fire({
+                            icon: 'info',
+                            title: 'No Foreword',
+                            text: 'Please upload a foreword document first',
+                            confirmButtonColor: '#10B981'
+                        });
                     }
                 });
             }

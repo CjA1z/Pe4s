@@ -4,6 +4,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard</title>
+  <!-- Session validation script - must run first -->
+  <script>
+    // Immediately check if user is logged in
+    (function() {
+      const sessionToken = localStorage.getItem('session_token') || 
+                         sessionStorage.getItem('session_token') || 
+                         document.cookie.split(';').find(c => c.trim().startsWith('session_token='));
+      
+      // If no session token found, redirect immediately to index page
+      if (!sessionToken) {
+        console.log('No session token found, redirecting to index page');
+        window.location.href = '/index.html?redirected=true&t=' + Date.now();
+      }
+    })();
+  </script>
   <!-- Load all CSS with correct paths -->
   <link rel="stylesheet" href="/admin/Components/css/dashboard.css">
   <link rel="stylesheet" href="/admin/Components/css/side_bar.css">
@@ -11,6 +26,7 @@
   <link rel="stylesheet" href="/admin/Components/css/chart.css">
   <!-- Then load JavaScript -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="/Components/js/login.js"></script>
   <script src="/admin/Components/js/dashboard.js"></script>
   <script src="/admin/Components/js/side_bar.js"></script>
 </head>
@@ -27,7 +43,7 @@
 
   <div class="row"><!---row Mark-->
    
-      <div class="column">
+      <div class="column visits-column">
         <div class="total-visits">
             <div class="total-visits-number">12,321</div>
             <div>Total Visits</div>
@@ -198,7 +214,7 @@
         </div>
       </div>
       <div class="trending-topics">
-        <h3 class="trending-topics-heading">Trending topics</h3>
+        <h3 class="trending-topics-heading">Trending Keywords</h3>
         <div class="topics-list">
           <div class="topic">Mathematics</div>
           <div class="topic">Nursing</div>
@@ -354,51 +370,40 @@
 </script>
 
 <script>
-  // Define a global function to handle logout that doesn't depend on the sidebar.js
-  let logoutInProgress = false;
+  // Use a minimal handler that just delegates to the sidebar implementation
   window.handleLogout = function(event) {
-    if (event) event.preventDefault();
-    console.log("Global logout function called");
-    
-    // Prevent duplicate requests
-    if (logoutInProgress) {
-      console.log("Logout already in progress, ignoring duplicate request");
-      return;
+    if (typeof window.sidebarHandleLogout === 'function') {
+      return window.sidebarHandleLogout(event);
     }
     
-    // Set flag to prevent duplicate requests
-    logoutInProgress = true;
+    // Only if the sidebar handler isn't available, use a minimal approach
+    // that respects the server's redirect
+    if (event) event.preventDefault();
+    localStorage.clear();
+    sessionStorage.clear();
+    document.cookie.split(";").forEach(c => {
+      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+    });
     
-    // Get token from localStorage
-    const sessionToken = localStorage.getItem('session_token');
-    console.log("Token from localStorage:", sessionToken ? "Found" : "Not found");
-    
-    // Call the logout endpoint
+    // Use the server's logout endpoint and allow redirect to be followed
     fetch('/logout', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(sessionToken ? { 'Authorization': `Bearer ${sessionToken}` } : {})
-      }
+      credentials: 'include',
+      redirect: 'follow'
     })
     .then(response => {
-      console.log("Logout response status:", response.status);
-      // Clear client-side storage
-      localStorage.clear();
-      document.cookie.split(";").forEach(function(c) {
-        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
-      });
-      // Redirect to home page
-      window.location.href = '/';
+      if (response.redirected) {
+        window.location.href = response.url;
+      } else {
+        window.location.href = '/index.html?nocache=' + new Date().getTime();
+      }
     })
-    .catch(error => {
-      console.error("Error during logout:", error);
-      logoutInProgress = false; // Reset flag on error
-      window.location.href = '/';
+    .catch(() => {
+      window.location.href = '/index.html?nocache=' + new Date().getTime();
     });
   }
 
-  // Use the correct paths to load sidebar and navbar
+  // Load sidebar and navbar without adding duplicate event listeners
   fetch('/admin/Components/side_bar.html')
     .then(response => {
       if (!response.ok) {
@@ -408,15 +413,7 @@
     })
     .then(data => {
       document.getElementById('sidebar-container').innerHTML = data;
-      // Add event listeners to the logout buttons after sidebar is loaded
-      setTimeout(() => {
-        const logoutButtons = document.querySelectorAll('.logout-btn, a[href="javascript:void(0)"][onclick*="handleLogout"]');
-        logoutButtons.forEach(btn => {
-          btn.removeEventListener('click', window.handleLogout);
-          btn.addEventListener('click', window.handleLogout);
-          console.log('Logout button found and listener attached in dashboard');
-        });
-      }, 100);
+      // No event handlers added here - side_bar.js will handle this
     })
     .catch(error => console.error('Error loading sidebar:', error));
 

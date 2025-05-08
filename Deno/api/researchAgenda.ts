@@ -32,11 +32,12 @@ export async function handleAddResearchAgendaItems(request: Request): Promise<Re
       
       // Process based on available data
       if (hasAgendaItems) {
-        // Traditional approach - simply add the agenda items by name
-        success = await ResearchAgendaModel.addItems(
+        // Use linkItemsToDocumentByName instead of addItems to avoid the document_id column issue
+        const result = await ResearchAgendaModel.linkItemsToDocumentByName(
           parseInt(body.document_id),
           body.agenda_items
         );
+        success = result.success;
       } else {
         // New approach - handle IDs and names separately
         

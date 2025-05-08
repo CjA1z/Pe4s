@@ -279,37 +279,93 @@ const logout = async (ctx: RouterContext<any, any, any>) => {
     // If we have a token, try to delete it from the database
     if (token) {
       try {
-        // Log the token (safely) - adding type checking for string
-        if (typeof token === 'string') {
-          const tokenStart = token.substring(0, 8);
-          const tokenEnd = token.length > 16 ? token.substring(token.length - 8) : '';
-          console.log(`Processing logout for token: ${tokenStart}...${tokenEnd}`);
+        // Handle case when token is an object instead of a string
+        let tokenString;
+        
+        if (typeof token === 'object') {
+          try {
+            console.log("Token is an object, attempting to stringify");
+            tokenString = JSON.stringify(token);
+          } catch (jsonError) {
+            console.error("Failed to stringify token object:", jsonError);
+            tokenString = String(token);
+          }
         } else {
-          console.log(`Processing logout for non-string token type: ${typeof token}`);
+          tokenString = String(token);
+        }
+        
+        // Log the token (safely)
+        const tokenStart = tokenString.substring(0, 8);
+        const tokenEnd = tokenString.length > 16 ? tokenString.substring(tokenString.length - 8) : '';
+        console.log(`Processing logout for token: ${tokenStart}...${tokenEnd}`);
+        
+        // Also try the raw token value if it's been encoded
+        let decodedTokenString;
+        try {
+          decodedTokenString = decodeURIComponent(tokenString);
+          if (decodedTokenString !== tokenString) {
+            console.log("Using decoded token value for deletion");
+          }
+        } catch (e) {
+          console.log("Token decoding failed, using original value");
+          decodedTokenString = tokenString;
         }
         
         // Get the user ID from the session before deleting it
         try {
           const { client } = await import("../db/denopost_conn.ts");
-          const sessionResult = await client.queryObject(
-            `SELECT user_id FROM sessions WHERE token = $1`,
-            [token as string]
-          );
           
-          if (sessionResult.rows && sessionResult.rows.length > 0) {
-            const row = sessionResult.rows[0] as { user_id: string };
-            userId = row.user_id;
-            console.log(`Found user ID ${userId} for logout`);
+          // Try both token formats
+          let userId = null;
+          let foundToken = false;
+          
+          for (const tokenVal of [tokenString, decodedTokenString]) {
+            if (!tokenVal) continue;
+            
+            try {
+              const sessionResult = await client.queryObject(
+                `SELECT user_id FROM sessions WHERE token = $1`,
+                [tokenVal]
+              );
+              
+              if (sessionResult.rows && sessionResult.rows.length > 0) {
+                const row = sessionResult.rows[0] as { user_id: string };
+                userId = row.user_id;
+                console.log(`Found user ID ${userId} for logout using token: ${tokenVal.substring(0, 8)}...`);
+                foundToken = true;
+                break;
+              }
+            } catch (sessionError) {
+              console.error(`Error retrieving user ID with token ${tokenVal.substring(0, 8)}...`, sessionError);
+            }
+          }
+          
+          if (!foundToken) {
+            console.log("Could not find user ID for token in sessions table");
           }
         } catch (sessionError) {
           console.error("Error retrieving user ID from session:", sessionError);
         }
         
-        // Try to delete the token from the database
-        const success = await sessionService.deleteSessionToken(token as string);
-        if (success) {
-          console.log("Session token successfully deleted from database");
-        } else {
+        // Try to delete the token from the database using both formats
+        let success = false;
+        
+        for (const tokenVal of [tokenString, decodedTokenString]) {
+          if (!tokenVal) continue;
+          
+          try {
+            const deleteResult = await sessionService.deleteSessionToken(tokenVal);
+            if (deleteResult) {
+              console.log(`Successfully deleted token from database using value: ${tokenVal.substring(0, 8)}...`);
+              success = true;
+              break;
+            }
+          } catch (deleteError) {
+            console.error(`Error deleting token ${tokenVal.substring(0, 8)}...`, deleteError);
+          }
+        }
+        
+        if (!success) {
           console.log("Token not found in database or already deleted");
         }
         
@@ -340,15 +396,47 @@ const logout = async (ctx: RouterContext<any, any, any>) => {
       console.log("No token provided in logout request");
     }
     
-    // Always return success response for logout
-    ctx.response.status = 200;
-    ctx.response.body = { message: "Logout successful" };
+    // Clear session cookie
+    if (ctx.cookies && typeof ctx.cookies.set === "function") {
+      ctx.cookies.set("session_token", "", {
+        expires: new Date(0),
+        path: "/",
+        httpOnly: true
+      });
+    }
+    
+    // Set more forceful redirect headers and status
+    const redirectUrl = `/index.html?loggedOut=true&t=${Date.now()}`;
+    console.log(`[REDIRECT] Setting redirect to ${redirectUrl}`);
+    
+    ctx.response.headers.set("Location", redirectUrl);
+    ctx.response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+    ctx.response.headers.set("Pragma", "no-cache");
+    ctx.response.headers.set("Expires", "0");
+    ctx.response.headers.set("Clear-Site-Data", "\"cache\", \"cookies\", \"storage\"");
+    
+    // Make sure response status is 302 for redirect
+    ctx.response.status = 302; // Use redirect status code
+    
+    // Empty body for redirect
+    ctx.response.body = null;
+    
+    console.log("Logout successful, redirecting to index page");
   } catch (error) {
     const err = error as Error;
     console.error("Logout error:", err);
-    // Still return success to ensure client-side logout completes
-    ctx.response.status = 200;
-    ctx.response.body = { message: "Logout completed with errors", error: err.message };
+    
+    // More forceful redirect on error
+    const errorRedirectUrl = `/index.html?loggedOut=true&error=true&t=${Date.now()}`;
+    ctx.response.headers.set("Location", errorRedirectUrl);
+    ctx.response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+    ctx.response.headers.set("Pragma", "no-cache");
+    ctx.response.headers.set("Expires", "0");
+    ctx.response.headers.set("Clear-Site-Data", "\"cache\", \"cookies\", \"storage\"");
+    ctx.response.status = 302;
+    ctx.response.body = null;
+    
+    console.log(`[ERROR REDIRECT] Setting redirect to ${errorRedirectUrl}`);
   }
 };
 
