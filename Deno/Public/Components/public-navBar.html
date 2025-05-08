@@ -592,8 +592,8 @@
                     <div class="hidden md:block">
                         <div class="ml-10 flex items-baseline space-x-4">
                             <a href="/index.html" class="nav-link-desktop text-gray-700 px-3 py-2 rounded-md text-sm font-medium">Home</a>
-                            <a href="/pages/doc-compiled.html" class="nav-link-desktop text-gray-700 px-3 py-2 rounded-md text-sm font-medium">Browse</a>
                             <a href="#" class="nav-link-desktop text-gray-700 px-3 py-2 rounded-md text-sm font-medium">About</a>
+                            <a href="#" class="nav-link-desktop text-gray-700 px-3 py-2 rounded-md text-sm font-medium">Contact</a>
                         </div>
                     </div>
                 </div>
@@ -1340,15 +1340,15 @@
                     // Build the result HTML based on type
                     if (item.is_author) {
                         // Author result
-                    resultElement.innerHTML = `
+                        resultElement.innerHTML = `
                             <div class="search-result-title">${titleHighlighted || 'Unnamed Author'}</div>
-                        <div class="search-result-meta-primary">
+                            <div class="search-result-meta-primary">
                                 <span class="search-result-author-type">Author Profile</span>
-                        </div>
-                        <div class="search-result-category-keywords">
+                            </div>
+                            <div class="search-result-category-keywords">
                                 <span class="search-result-category-tag">Author</span>
-                            ${keywordsHTML ? `<div class="search-result-keywords-container">${keywordsHTML}</div>` : ''}
-                        </div>
+                                ${keywordsHTML ? `<div class="search-result-keywords-container">${keywordsHTML}</div>` : ''}
+                            </div>
                             <div class="search-result-desc">${descHighlighted || 'No author description available.'}</div>
                         `;
                     } else {
