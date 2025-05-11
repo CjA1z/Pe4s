@@ -224,7 +224,7 @@ export async function createDocument(req: Request): Promise<Response> {
       }
 
       // Validate document_type against known types
-      const validDocumentTypes = ['THESIS', 'DISSERTATION', 'CONFLUENCE', 'SYNERGY', 'RESEARCH_STUDY'];
+      const validDocumentTypes = ['THESIS', 'DISSERTATION', 'CONFLUENCE', 'SYNERGY', 'HELLO'];
       if (body.document_type && !validDocumentTypes.includes(body.document_type)) {
         return new Response(JSON.stringify({ 
           error: `Invalid document_type. Must be one of: ${validDocumentTypes.join(', ')}` 
@@ -238,25 +238,22 @@ export async function createDocument(req: Request): Promise<Response> {
       if (!body.file_path && body.document_type) {
         switch (body.document_type) {
           case 'THESIS':
-            body.file_path = 'storage/single/thesis/';
+            body.file_path = 'storage/thesis/';
             break;
           case 'DISSERTATION':
-            body.file_path = 'storage/single/dissertation/';
+            body.file_path = 'storage/dissertation/';
             break;
           case 'CONFLUENCE':
-            body.file_path = 'storage/compiled/confluence/';
+            body.file_path = 'storage/confluence/';
             break;
           case 'SYNERGY':
-            body.file_path = 'storage/compiled/synergy/';
+            body.file_path = 'storage/synergy/';
             break;
-          case 'RESEARCH_STUDY':
-            // If it's part of a compiled document, file path will be set elsewhere
-            if (body.parent_document_id) {
-              // We'll leave it as is since the parent document path is needed first
-            } else {
-              body.file_path = 'storage/research_studies/';
-            }
+          case 'HELLO':
+            body.file_path = 'storage/hello/';
             break;
+          default:
+            body.file_path = 'storage/hello/';
         }
       }
       
@@ -279,7 +276,7 @@ export async function createDocument(req: Request): Promise<Response> {
       }
 
       // For research studies in compiled documents, set appropriate category_id if not already set
-      if (body.document_type === 'RESEARCH_STUDY' && body.parent_document_id && !body.category_id) {
+      if (body.document_type === 'HELLO' && body.parent_document_id && !body.category_id) {
         body.category_id = 5; // Default research study category ID
       }
       

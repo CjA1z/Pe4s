@@ -59,14 +59,20 @@
                         
                         <div class="form-group">
                             <label>Document File</label>
-                            <div class="file-upload">
+                            <div id="edit-single-document-file-current" class="current-file" style="display: none;">
+                                <i class="fas fa-file-pdf"></i>
+                                <span id="edit-single-document-file-indicator"></span>
+                                <button type="button" id="edit-single-document-replace-btn" class="btn-secondary btn-sm replace-btn">
+                                    <i class="fas fa-sync-alt"></i> Replace File
+                                </button>
+                                <input type="file" id="edit-single-document-file" name="document_file" accept=".pdf" style="display: none;">
+                            </div>
+                            <div id="edit-single-document-file-upload" class="upload-area">
                                 <i class="fas fa-cloud-upload-alt"></i>
                                 <p>Drag & drop a new file or click to browse</p>
                                 <p class="file-types">Accepts PDF documents only</p>
-                                <input type="file" id="edit-single-document-file" name="document_file" style="display: none;" accept=".pdf">
-                                <div id="edit-single-document-file-indicator"></div>
                             </div>
-                            
+                            <div id="edit-single-document-file-note"></div>
                         </div>
                         
                         <div class="submit-container">

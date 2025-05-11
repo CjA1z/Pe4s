@@ -1,6 +1,13 @@
 /**
  * Document edit functionality
  * Handles editing of existing documents
+ * 
+ * FIXES: 
+ * - Fixed author duplication issue by checking for existing authors before creating new ones
+ * - Fixed research agenda item duplication by checking for existing items before creation
+ * - Improved error handling and logging for debugging
+ * - Fixed ID handling to ensure proper use of UUIDs without converting to integers
+ * - Added temporary IDs for authors/topics that couldn't be created via API
  */
 
 console.log('Document edit module loaded');
@@ -22,6 +29,81 @@ console.log('Document edit module loaded');
             opacity: 0;
             transform: translateY(10px);
             animation: slide-in-toast 0.3s forwards;
+        }
+        
+        /* File Upload Styles */
+        .file-upload {
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            background: #f8f9fa;
+            transition: all 0.3s ease;
+        }
+        
+        .file-upload.highlight {
+            border-color: #2196F3;
+            background: #E3F2FD;
+        }
+        
+        .current-file {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 5;
+        }
+        
+        .current-file i {
+            font-size: 24px;
+            color: #dc3545;
+            margin-right: 10px;
+        }
+        
+        .current-file span {
+            flex-grow: 1;
+            margin-right: 10px;
+        }
+        
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+        
+        .replace-btn {
+            position: relative;
+            z-index: 10;
+            pointer-events: auto;
+        }
+        
+        .upload-area {
+            cursor: pointer;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .upload-area i {
+            font-size: 48px;
+            color: #6c757d;
+            margin-bottom: 10px;
+        }
+        
+        .upload-area p {
+            margin: 5px 0;
+            color: #6c757d;
+        }
+        
+        .upload-area .file-types {
+            font-size: 12px;
+            color: #999;
+        }
+        
+        @keyframes slide-in-toast {
+            to { opacity: 1; transform: translateY(0); }
         }
         
         @keyframes slide-in-toast {
@@ -209,6 +291,36 @@ function showToast(message, type = 'info') {
 
 // Document edit module
 window.documentEdit = {
+    // Get document type icon path
+    getDocumentTypeIcon: function(documentType) {
+        if (!documentType) {
+            return '/admin/Components/icons/Category-icons/default_category_icon.png';
+        }
+
+        // Normalize document type to uppercase
+        const type = documentType.toUpperCase();
+        
+        // Map document types to icon paths
+        const iconMap = {
+            'THESIS': '/admin/Components/icons/Category-icons/thesis.png',
+            'DISSERTATION': '/admin/Components/icons/Category-icons/dissertation.png',
+            'CONFLUENCE': '/admin/Components/icons/Category-icons/confluence.png',
+            'RESEARCH': '/admin/Components/icons/Category-icons/research.png',
+            'ARTICLE': '/admin/Components/icons/Category-icons/article.png',
+            'REPORT': '/admin/Components/icons/Category-icons/report.png',
+            'BOOK': '/admin/Components/icons/Category-icons/book.png',
+            'JOURNAL': '/admin/Components/icons/Category-icons/journal.png',
+            'PROCEEDINGS': '/admin/Components/icons/Category-icons/proceedings.png',
+            'PRESENTATION': '/admin/Components/icons/Category-icons/presentation.png',
+            'POSTER': '/admin/Components/icons/Category-icons/poster.png',
+            'PATENT': '/admin/Components/icons/Category-icons/patent.png',
+            'OTHER': '/admin/Components/icons/Category-icons/other.png'
+        };
+
+        // Return the mapped icon path or default if not found
+        return iconMap[type] || '/admin/Components/icons/Category-icons/default_category_icon.png';
+    },
+    
     // Function to show the edit modal for a single document
     showEditModal: function(documentId) {
         console.log(`Showing edit modal for document ID: ${documentId}`);
@@ -747,6 +859,34 @@ window.documentEdit = {
         const singleModal = document.getElementById('edit-single-document-modal');
         if (singleModal) {
             console.log('Found single document modal');
+            
+            // Add document type change listener
+            const typeSelect = document.getElementById('edit-single-document-type');
+            if (typeSelect) {
+                // Remove any existing listeners to prevent duplicates
+                const oldListener = typeSelect._typeChangeListener;
+                if (oldListener) {
+                    typeSelect.removeEventListener('change', oldListener);
+                }
+                
+                // Create new listener
+                const typeChangeListener = (e) => {
+                    const selectedType = e.target.value;
+                    const typeIcon = document.getElementById('edit-single-document-type-icon');
+                    if (typeIcon) {
+                        const iconPath = this.getDocumentTypeIcon(selectedType);
+                        typeIcon.src = iconPath;
+                        console.log(`Updated type icon to: ${iconPath} for type: ${selectedType}`);
+                    }
+                };
+                
+                // Store reference to listener for future removal
+                typeSelect._typeChangeListener = typeChangeListener;
+                
+                // Add the event listener
+                typeSelect.addEventListener('change', typeChangeListener);
+                console.log('Added document type change listener');
+            }
             
             // Cancel button - try multiple selector approaches to ensure we find all buttons
             const cancelButtons = singleModal.querySelectorAll('.cancel-edit-btn, button.btn-secondary');
@@ -1364,24 +1504,54 @@ window.documentEdit = {
                             console.log(`Authors data from ${endpoint}:`, data);
                             
                             // Handle different API response formats
+                            let fetchedAuthors = [];
                             if (data.authors && Array.isArray(data.authors)) {
-                                authors = data.authors;
-                                succeeded = true;
-                                console.log(`Found ${authors.length} authors at ${endpoint}`);
-                                break;
+                                fetchedAuthors = data.authors;
+                                console.log(`Found ${fetchedAuthors.length} authors at ${endpoint}`);
                             } else if (Array.isArray(data)) {
-                                authors = data;
-                                succeeded = true;
-                                console.log(`Found ${authors.length} authors at ${endpoint} (array format)`);
-                                break;
+                                fetchedAuthors = data;
+                                console.log(`Found ${fetchedAuthors.length} authors at ${endpoint} (array format)`);
                             } else if (data.document_authors && Array.isArray(data.document_authors)) {
-                                authors = data.document_authors;
-                                succeeded = true;
-                                console.log(`Found ${authors.length} authors at ${endpoint} (document_authors format)`);
-                                break;
+                                fetchedAuthors = data.document_authors;
+                                console.log(`Found ${fetchedAuthors.length} authors at ${endpoint} (document_authors format)`);
                             } else {
                                 console.warn(`Response from ${endpoint} doesn't contain authors in expected format:`, data);
+                                continue;
                             }
+                            
+                            // Process author objects to ensure they have proper name fields
+                            authors = fetchedAuthors.map(author => {
+                                // If author is just a string, create basic object
+                                if (typeof author === 'string') {
+                                    return { id: author, full_name: author, name: author };
+                                }
+                                
+                                // If author is just an ID without name fields
+                                if (author.id && !author.full_name && !author.name && !author.first_name && !author.last_name) {
+                                    // This is the problematic case - we have an ID but no name
+                                    console.warn(`Author with ID ${author.id} has no name fields, adding placeholder name`);
+                                    return { 
+                                        ...author, 
+                                        full_name: `Author ${author.id.slice(0, 8)}`,
+                                        name: `Author ${author.id.slice(0, 8)}`
+                                    };
+                                }
+                                
+                                // Return full author object - ensure it has a name field
+                                return {
+                                    ...author,
+                                    full_name: author.full_name || author.name || 
+                                               [author.first_name, author.last_name].filter(Boolean).join(' ') || 
+                                               `Author ${author.id.slice(0, 8)}`,
+                                    name: author.name || author.full_name || 
+                                          [author.first_name, author.last_name].filter(Boolean).join(' ') || 
+                                          `Author ${author.id.slice(0, 8)}`
+                                };
+                            });
+                            
+                            console.log(`Processed author data with names:`, authors);
+                            succeeded = true;
+                            break;
                         } else {
                             console.warn(`Failed to fetch authors from ${endpoint}: ${response.status}`);
                         }
@@ -1428,12 +1598,45 @@ window.documentEdit = {
                         
                         // If we have data, extract authors
                         if (docData && docData.authors && Array.isArray(docData.authors)) {
-                            authors = docData.authors;
+                            // Process author objects to ensure they have proper name fields
+                            authors = docData.authors.map(author => {
+                                // If author is just a string, create basic object
+                                if (typeof author === 'string') {
+                                    return { id: author, full_name: author, name: author };
+                                }
+                                
+                                // If author is just an ID without name fields
+                                if (author.id && !author.full_name && !author.name && !author.first_name && !author.last_name) {
+                                    console.warn(`Author with ID ${author.id} has no name fields, adding placeholder name`);
+                                    return { 
+                                        ...author, 
+                                        full_name: `Author ${author.id.slice(0, 8)}`,
+                                        name: `Author ${author.id.slice(0, 8)}`
+                                    };
+                                }
+                                
+                                // Return full author object
+                                return {
+                                    ...author,
+                                    full_name: author.full_name || author.name || 
+                                               [author.first_name, author.last_name].filter(Boolean).join(' ') || 
+                                               `Author ${author.id.slice(0, 8)}`,
+                                    name: author.name || author.full_name || 
+                                          [author.first_name, author.last_name].filter(Boolean).join(' ') || 
+                                          `Author ${author.id.slice(0, 8)}`
+                                };
+                            });
+                            
                             console.log(`Extracted ${authors.length} authors from document data`);
                         }
                     } catch (docError) {
                         console.warn('No authors found for this document');
                     }
+                }
+                
+                // If we still have no authors, create a placeholder
+                if (authors.length === 0) {
+                    console.log('No authors found, returning empty array');
                 }
                 
                 resolve(authors);
@@ -1473,24 +1676,49 @@ window.documentEdit = {
                             console.log(`Research agenda data from ${endpoint}:`, data);
                             
                             // Handle different API response formats
+                            let fetchedTopics = [];
                             if (data.topics && Array.isArray(data.topics)) {
-                                topics = data.topics;
-                                succeeded = true;
-                                console.log(`Found ${topics.length} topics at ${endpoint}`);
-                                break;
+                                fetchedTopics = data.topics;
+                                console.log(`Found ${fetchedTopics.length} topics at ${endpoint}`);
                             } else if (data.research_agenda && Array.isArray(data.research_agenda)) {
-                                topics = data.research_agenda;
-                                succeeded = true;
-                                console.log(`Found ${topics.length} topics at ${endpoint} (research_agenda format)`);
-                                break;
+                                fetchedTopics = data.research_agenda;
+                                console.log(`Found ${fetchedTopics.length} topics at ${endpoint} (research_agenda format)`);
                             } else if (Array.isArray(data)) {
-                                topics = data;
-                                succeeded = true;
-                                console.log(`Found ${topics.length} topics at ${endpoint} (array format)`);
-                                break;
+                                fetchedTopics = data;
+                                console.log(`Found ${fetchedTopics.length} topics at ${endpoint} (array format)`);
                             } else {
                                 console.warn(`Response from ${endpoint} doesn't contain topics in expected format:`, data);
+                                continue;
                             }
+                            
+                            // Process topic objects to ensure they have proper name fields
+                            topics = fetchedTopics.map(topic => {
+                                // If topic is just a string, create basic object
+                                if (typeof topic === 'string') {
+                                    return { id: topic, name: topic, title: topic };
+                                }
+                                
+                                // If topic is just an ID without name fields
+                                if (topic.id && !topic.name && !topic.title) {
+                                    console.warn(`Topic with ID ${topic.id} has no name fields, adding placeholder name`);
+                                    return { 
+                                        ...topic, 
+                                        name: `Topic ${topic.id.slice(0, 8)}`,
+                                        title: `Topic ${topic.id.slice(0, 8)}`
+                                    };
+                                }
+                                
+                                // Return full topic object - ensure it has a name field
+                                return {
+                                    ...topic,
+                                    name: topic.name || topic.title || `Topic ${topic.id.slice(0, 8)}`,
+                                    title: topic.title || topic.name || `Topic ${topic.id.slice(0, 8)}`
+                                };
+                            });
+                            
+                            console.log(`Processed topic data with names:`, topics);
+                            succeeded = true;
+                            break;
                         } else {
                             console.warn(`Failed to fetch research agenda from ${endpoint}: ${response.status}`);
                         }
@@ -1507,17 +1735,48 @@ window.documentEdit = {
                         if (docResponse.ok) {
                             const docData = await docResponse.json();
                             
+                            let fetchedTopics = [];
                             if (docData.research_agenda && Array.isArray(docData.research_agenda)) {
-                                topics = docData.research_agenda;
-                                console.log(`Extracted ${topics.length} topics from document data (research_agenda)`);
+                                fetchedTopics = docData.research_agenda;
+                                console.log(`Extracted ${fetchedTopics.length} topics from document data (research_agenda)`);
                             } else if (docData.topics && Array.isArray(docData.topics)) {
-                                topics = docData.topics;
-                                console.log(`Extracted ${topics.length} topics from document data (topics)`);
+                                fetchedTopics = docData.topics;
+                                console.log(`Extracted ${fetchedTopics.length} topics from document data (topics)`);
                             }
+                            
+                            // Process topic objects to ensure they have proper name fields
+                            topics = fetchedTopics.map(topic => {
+                                // If topic is just a string, create basic object
+                                if (typeof topic === 'string') {
+                                    return { id: topic, name: topic, title: topic };
+                                }
+                                
+                                // If topic is just an ID without name fields
+                                if (topic.id && !topic.name && !topic.title) {
+                                    console.warn(`Topic with ID ${topic.id} has no name fields, adding placeholder name`);
+                                    return { 
+                                        ...topic, 
+                                        name: `Topic ${topic.id.slice(0, 8)}`,
+                                        title: `Topic ${topic.id.slice(0, 8)}`
+                                    };
+                                }
+                                
+                                // Return full topic object
+                                return {
+                                    ...topic,
+                                    name: topic.name || topic.title || `Topic ${topic.id.slice(0, 8)}`,
+                                    title: topic.title || topic.name || `Topic ${topic.id.slice(0, 8)}`
+                                };
+                            });
                         }
                     } catch (docError) {
                         console.warn('No research agenda found for this document');
                     }
+                }
+                
+                // If we still have no topics, return empty array
+                if (topics.length === 0) {
+                    console.log('No research agenda topics found, returning empty array');
                 }
                 
                 resolve(topics);
@@ -1568,27 +1827,200 @@ window.documentEdit = {
             }
         }
         
-        // Set abstract field
-        const abstractField = document.getElementById('edit-single-document-abstract');
-        if (abstractField && data.abstract) {
-            abstractField.value = data.abstract;
-        }
-        
         // Handle file path if available
         if (data.file_path) {
             const fileIndicator = document.getElementById('edit-single-document-file-indicator');
-            if (fileIndicator) {
+            const currentFileDiv = document.getElementById('edit-single-document-file-current');
+            const uploadAreaDiv = document.getElementById('edit-single-document-file-upload');
+            const fileInput = document.getElementById('edit-single-document-file');
+            const replaceBtn = document.getElementById('edit-single-document-replace-btn');
+            
+            if (fileIndicator && currentFileDiv && uploadAreaDiv && fileInput && replaceBtn) {
                 const fileName = data.file_path.split('/').pop();
-                fileIndicator.textContent = `Current file: ${fileName}`;
-                fileIndicator.classList.add('has-file');
+                fileIndicator.textContent = fileName;
                 
-                // Add a note about replacement
-                const fileNoteContainer = document.getElementById('edit-single-document-file-note');
-                if (fileNoteContainer) {
-                    fileNoteContainer.innerHTML = '<div class="file-replace-note">Select a new file to replace the current document</div>';
-                }
+                // Show current file section and hide upload area
+                currentFileDiv.style.display = 'flex';
+                uploadAreaDiv.style.display = 'none';
+                
+                // Store original filename for replacement
+                currentFileDiv.dataset.originalName = fileName;
+                currentFileDiv.dataset.originalPath = data.file_path;
+                currentFileDiv.dataset.filePath = data.file_path;  // Add this attribute for consistency
+                
+                // Clear any existing event listeners
+                const newReplaceBtn = replaceBtn.cloneNode(true);
+                replaceBtn.parentNode.replaceChild(newReplaceBtn, replaceBtn);
+                
+                // Add click handler for replace button
+                newReplaceBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    fileInput.click();
+                });
+                
+                // Clear any existing event listeners on file input
+                const newFileInput = fileInput.cloneNode(true);
+                fileInput.parentNode.replaceChild(newFileInput, fileInput);
+                
+                // Handle file selection
+                newFileInput.addEventListener('change', async (e) => {
+                    if (newFileInput.files.length > 0) {
+                        const file = newFileInput.files[0];
+                        const originalName = currentFileDiv.dataset.originalName;
+                        const originalPath = currentFileDiv.dataset.originalPath;
+                        
+                        if (originalName && originalPath) {
+                            try {
+                                // Create FormData for the file upload
+                                const formData = new FormData();
+                                formData.append('file', file);
+                                formData.append('is_replacement', 'true');
+                                formData.append('original_name', originalName);
+                                formData.append('original_path', originalPath);
+                                
+                                // Add document type to ensure proper storage directory
+                                const documentType = document.getElementById('edit-single-document-type')?.value || 'DISSERTATION';
+                                formData.append('document_type', documentType);
+                                
+                                // Add document ID for reference
+                                const documentId = document.getElementById('edit-single-document-id')?.value;
+                                if (documentId) {
+                                    formData.append('document_id', documentId);
+                                }
+                                
+                                console.log('Replacing file with params:', {
+                                    originalName, 
+                                    originalPath,
+                                    documentType,
+                                    documentId,
+                                    fileType: file.type,
+                                    fileSize: file.size,
+                                    fileName: file.name
+                                });
+                                
+                                // Upload the file
+                                const response = await fetch('/api/upload', {
+                                    method: 'POST',
+                                    body: formData
+                                });
+                                
+                                if (!response.ok) {
+                                    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                                    throw new Error(errorData.error || `Server responded with status: ${response.status}`);
+                                }
+                                
+                                const result = await response.json();
+                                
+                                if (result.error) {
+                                    throw new Error(result.error);
+                                }
+                                
+                                // Update display
+                                fileIndicator.textContent = originalName + ' (Replaced)';
+                                
+                                // Show current file view
+                                currentFileDiv.style.display = 'flex';
+                                uploadAreaDiv.style.display = 'none';
+                                
+                                // Add success indicator
+                                const successIndicator = document.createElement('div');
+                                successIndicator.className = 'file-status-indicator success';
+                                successIndicator.innerHTML = '<i class="fas fa-check-circle"></i> File replaced successfully';
+                                successIndicator.style.backgroundColor = '#d4edda';
+                                successIndicator.style.color = '#155724';
+                                successIndicator.style.padding = '8px 12px';
+                                successIndicator.style.borderRadius = '4px';
+                                successIndicator.style.marginTop = '8px';
+                                successIndicator.style.display = 'flex';
+                                successIndicator.style.alignItems = 'center';
+                                successIndicator.style.gap = '6px';
+                                
+                                // Remove any existing status indicators
+                                const existingIndicator = currentFileDiv.parentNode.querySelector('.file-status-indicator');
+                                if (existingIndicator) {
+                                    existingIndicator.remove();
+                                }
+                                
+                                // Add the success indicator after the current file div
+                                currentFileDiv.parentNode.insertBefore(successIndicator, currentFileDiv.nextSibling);
+                                
+                                // Auto-remove the indicator after 5 seconds
+                                setTimeout(() => {
+                                    successIndicator.style.transition = 'opacity 0.5s';
+                                    successIndicator.style.opacity = '0';
+                                    setTimeout(() => successIndicator.remove(), 500);
+                                }, 5000);
+                                
+                                // Update the dataset with the new file path
+                                if (result.filePath) {
+                                    currentFileDiv.dataset.filePath = result.filePath;
+                                    currentFileDiv.dataset.originalPath = result.filePath;
+                                    console.log('Updated file path in data attributes:', result.filePath);
+                                }
+                                
+                                console.log('File replacement completed:', result);
+                                showToast('File replaced successfully', 'success');
+                            } catch (error) {
+                                console.error('Error replacing file:', error);
+                                
+                                // Add error indicator
+                                const errorIndicator = document.createElement('div');
+                                errorIndicator.className = 'file-status-indicator error';
+                                errorIndicator.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${error.message || 'Error replacing file'}`;
+                                errorIndicator.style.backgroundColor = '#f8d7da';
+                                errorIndicator.style.color = '#721c24';
+                                errorIndicator.style.padding = '8px 12px';
+                                errorIndicator.style.borderRadius = '4px';
+                                errorIndicator.style.marginTop = '8px';
+                                errorIndicator.style.display = 'flex';
+                                errorIndicator.style.alignItems = 'center';
+                                errorIndicator.style.gap = '6px';
+                                
+                                // Remove any existing status indicators
+                                const existingIndicator = currentFileDiv.parentNode.querySelector('.file-status-indicator');
+                                if (existingIndicator) {
+                                    existingIndicator.remove();
+                                }
+                                
+                                // Add the error indicator after the current file div
+                                currentFileDiv.parentNode.insertBefore(errorIndicator, currentFileDiv.nextSibling);
+                                
+                                // Show current file view with the error message
+                                currentFileDiv.style.display = 'flex';
+                                uploadAreaDiv.style.display = 'none';
+                                
+                                showToast('Error replacing file: ' + error.message, 'error');
+                            }
+                        }
+                    }
+                });
             }
         }
+        
+        // Add styles for file handling
+        const style = document.createElement('style');
+        style.textContent += `
+            .no-modal-close {
+                pointer-events: auto !important;
+                position: relative !important;
+                z-index: 10000 !important;
+            }
+            
+            .current-file {
+                position: relative;
+                z-index: 1;
+            }
+            
+            #edit-single-document-file-current {
+                pointer-events: auto !important;
+            }
+            
+            .modal-content {
+                pointer-events: auto !important;
+            }
+        `;
+        document.head.appendChild(style);
         
         // Populate authors
         this.populateAuthorsContainer(data.authors || []);
@@ -1645,9 +2077,11 @@ window.documentEdit = {
                 const authorElement = document.createElement('div');
                 authorElement.className = 'selected-author';
                 authorElement.dataset.id = authorId;
+                    
+                    // Only display the name, not the ID
                 authorElement.innerHTML = `
                     ${authorName}
-                    <span class="remove-author" data-id="${authorId}">&times;</span>
+                        <span class="remove-author">&times;</span>
                 `;
                 
                 // Add to container
@@ -1778,9 +2212,11 @@ window.documentEdit = {
                 const topicElement = document.createElement('div');
                 topicElement.className = 'selected-topic';
                 topicElement.dataset.id = itemId;
+                
+                // Only display the name, not the ID
                 topicElement.innerHTML = `
                     ${itemName}
-                    <span class="remove-topic" data-id="${itemId}">&times;</span>
+                    <span class="remove-topic">&times;</span>
                 `;
                 
                 // Add to container
@@ -1861,7 +2297,51 @@ window.documentEdit = {
     
     // Show success message
     showSaveSuccess: function() {
-        // ... existing code ...
+        // Show success toast
+        showToast('Document saved successfully!', 'success');
+        
+        // Get the modal element
+        const modal = document.getElementById('edit-single-document-modal');
+        
+        // Ensure the modal exists before trying to close it
+        if (modal) {
+            // First set display to none
+            modal.style.display = 'none';
+            
+            // Then clear any form data
+            const form = modal.querySelector('form');
+            if (form) {
+                form.reset();
+            }
+            
+            // Clear any selected items
+            const selectedAuthors = modal.querySelector('.selected-authors');
+            if (selectedAuthors) {
+                selectedAuthors.innerHTML = '';
+            }
+            
+            const selectedTopics = modal.querySelector('.selected-topics');
+            if (selectedTopics) {
+                selectedTopics.innerHTML = '';
+            }
+            
+            // Clear file input if it exists
+            const fileInput = modal.querySelector('input[type="file"]');
+            if (fileInput) {
+                fileInput.value = '';
+            }
+            
+            // Clear file indicator if it exists
+            const fileIndicator = modal.querySelector('.file-indicator');
+            if (fileIndicator) {
+                fileIndicator.textContent = '';
+            }
+        }
+        
+        // If we're on a page with a document list, refresh it
+        if (typeof window.documentList !== 'undefined' && typeof window.documentList.refreshDocumentList === 'function') {
+            window.documentList.refreshDocumentList();
+        }
     },
     
     // Show error message
@@ -1871,41 +2351,498 @@ window.documentEdit = {
     
     // Hide modal by ID
     hideModal: function(modalId) {
-        // ... existing code ...
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            console.log(`Hiding modal: ${modalId}`);
+            modal.style.display = 'none';
+            
+            // Clear form data if it exists
+            const form = modal.querySelector('form');
+            if (form) {
+                form.reset();
+            }
+            
+            // Clear any selected items
+            const selectedAuthors = modal.querySelector('.selected-authors');
+            if (selectedAuthors) {
+                selectedAuthors.innerHTML = '';
+            }
+            
+            const selectedTopics = modal.querySelector('.selected-topics');
+            if (selectedTopics) {
+                selectedTopics.innerHTML = '';
+            }
+            
+            // Clear file input if it exists
+            const fileInput = modal.querySelector('input[type="file"]');
+            if (fileInput) {
+                fileInput.value = '';
+            }
+            
+            // Clear file indicator if it exists
+            const fileIndicator = modal.querySelector('.file-indicator');
+            if (fileIndicator) {
+                fileIndicator.textContent = '';
+            }
+        } else {
+            console.warn(`Modal not found: ${modalId}`);
+        }
     },
     
     // Save changes to a document
-    saveDocument: function(formData) {
-        // ... existing code ...
+    saveDocument: async function(formData) {
+        try {
+            const documentId = formData.get('document_id');
+            if (!documentId) {
+                throw new Error('Document ID is required');
+            }
+
+            console.log(`Saving document with ID: ${documentId}`);
+            
+            // Show loading state
+            const submitButton = document.querySelector('#edit-single-document-form button[type="submit"]');
+            if (submitButton) {
+                const originalButtonText = submitButton.innerHTML;
+                submitButton.disabled = true;
+                submitButton.innerHTML = '<span class="inline-block animate-spin mr-2">↻</span> Saving...';
+            }
+
+            // Step 1: Handle file upload first if a new file is selected
+            const fileInput = document.getElementById('edit-single-document-file');
+            let uploadedFilePath = null;
+            
+            if (fileInput && fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                console.log(`Uploading replacement file: ${file.name}`);
+                
+                try {
+                    const fileFormData = new FormData();
+                    fileFormData.append('file', file);
+                    fileFormData.append('document_id', documentId);
+                    fileFormData.append('is_replacement', 'true');
+                    
+                    // Get the original filename from the current file display
+                    const currentFileDiv = document.getElementById('edit-single-document-file-current');
+                    if (currentFileDiv && currentFileDiv.dataset.originalName) {
+                        fileFormData.append('original_name', currentFileDiv.dataset.originalName);
+                        console.log('Using original filename for replacement:', currentFileDiv.dataset.originalName);
+                    }
+
+                    // Add the original file path for proper replacement
+                    if (currentFileDiv && currentFileDiv.dataset.filePath) {
+                        fileFormData.append('original_path', currentFileDiv.dataset.filePath);
+                        console.log('Using original file path for replacement:', currentFileDiv.dataset.filePath);
+                    }
+
+                    // Add document type information
+                    const documentTypeSelect = document.getElementById('edit-single-document-type');
+                    if (documentTypeSelect && documentTypeSelect.value) {
+                        fileFormData.append('document_type', documentTypeSelect.value);
+                    }
+
+                    // Try multiple upload endpoints
+                    const uploadEndpoints = [
+                        '/api/upload',
+                        '/api/documents/upload',
+                        '/api/files/upload'
+                    ];
+
+                    let uploadSuccess = false;
+                    for (const endpoint of uploadEndpoints) {
+                        try {
+                            console.log(`Attempting file upload to ${endpoint}`);
+                            const uploadResponse = await fetch(endpoint, {
+                                method: 'POST',
+                                body: fileFormData
+                            });
+
+                            if (uploadResponse.ok) {
+                                const uploadResult = await uploadResponse.json();
+                                uploadedFilePath = uploadResult.filePath || uploadResult.file_path;
+                                
+                                // Display success indicator
+                                const fileStatusContainer = document.querySelector('.file-status-indicator');
+                                if (fileStatusContainer) {
+                                    fileStatusContainer.innerHTML = `<i class="fas fa-check-circle"></i> File uploaded successfully`;
+                                    fileStatusContainer.style.backgroundColor = '#d4edda';
+                                    fileStatusContainer.style.color = '#155724';
+                                } else {
+                                    // Create new status indicator if it doesn't exist
+                                    const successIndicator = document.createElement('div');
+                                    successIndicator.className = 'file-status-indicator success';
+                                    successIndicator.innerHTML = '<i class="fas fa-check-circle"></i> File uploaded successfully';
+                                    successIndicator.style.backgroundColor = '#d4edda';
+                                    successIndicator.style.color = '#155724';
+                                    successIndicator.style.padding = '8px 12px';
+                                    successIndicator.style.borderRadius = '4px';
+                                    successIndicator.style.marginTop = '8px';
+                                    successIndicator.style.display = 'flex';
+                                    successIndicator.style.alignItems = 'center';
+                                    successIndicator.style.gap = '6px';
+                                    
+                                    const insertTarget = document.getElementById('edit-single-document-file-current');
+                                    if (insertTarget && insertTarget.parentNode) {
+                                        insertTarget.parentNode.appendChild(successIndicator);
+                                    }
+                                }
+                                
+                                // Update the file path in the UI element for later use
+                                if (currentFileDiv) {
+                                    currentFileDiv.dataset.filePath = uploadedFilePath;
+                                    currentFileDiv.dataset.originalPath = uploadedFilePath;
+                                }
+                                
+                                console.log(`File uploaded successfully, path: ${uploadedFilePath}`);
+                                uploadSuccess = true;
+                                break;
+                            } else {
+                                console.warn(`Upload failed at ${endpoint}: ${uploadResponse.status}`);
+                                const errorData = await uploadResponse.json().catch(() => ({ error: 'Unknown error' }));
+                                throw new Error(errorData.error || `Server responded with status: ${uploadResponse.status}`);
+                            }
+                        } catch (endpointError) {
+                            console.warn(`Error with upload endpoint ${endpoint}:`, endpointError);
+                        }
+                    }
+
+                    if (!uploadSuccess) {
+                        throw new Error('Failed to upload file to any endpoint');
+                    }
+                } catch (fileError) {
+                    console.error('File upload failed:', fileError);
+                    showToast('File upload failed. Please try again.', 'error');
+                    
+                    // Create error indicator
+                    const errorIndicator = document.createElement('div');
+                    errorIndicator.className = 'file-status-indicator error';
+                    errorIndicator.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${fileError.message || 'Error uploading file'}`;
+                    errorIndicator.style.backgroundColor = '#f8d7da';
+                    errorIndicator.style.color = '#721c24';
+                    errorIndicator.style.padding = '8px 12px';
+                    errorIndicator.style.borderRadius = '4px';
+                    errorIndicator.style.marginTop = '8px';
+                    errorIndicator.style.display = 'flex';
+                    errorIndicator.style.alignItems = 'center';
+                    errorIndicator.style.gap = '6px';
+                    
+                    // Remove any existing status indicators
+                    const existingIndicator = document.querySelector('.file-status-indicator');
+                    if (existingIndicator) {
+                        existingIndicator.remove();
+                    }
+                    
+                    const insertTarget = document.getElementById('edit-single-document-file-current');
+                    if (insertTarget && insertTarget.parentNode) {
+                        insertTarget.parentNode.appendChild(errorIndicator);
+                    }
+                    
+                    throw fileError;
+                }
+            } else {
+                // Check if we have a replaced file that hasn't been uploaded yet
+                const currentFileDiv = document.getElementById('edit-single-document-file-current');
+                if (currentFileDiv && currentFileDiv.style.display !== 'none' && currentFileDiv.dataset.filePath) {
+                    uploadedFilePath = currentFileDiv.dataset.filePath;
+                    console.log('Using already replaced file path:', uploadedFilePath);
+                }
+            }
+
+            // Step 2: Prepare document data
+            const documentData = {
+                id: documentId,
+                title: formData.get('title'),
+                document_type: formData.get('document_type'),
+                publication_date: formData.get('date_published'),
+                category_id: formData.get('category_id') || null
+            };
+
+            // Add file path if we uploaded a new file
+            if (uploadedFilePath) {
+                documentData.file_path = uploadedFilePath;
+                console.log('Updating document with new file path:', uploadedFilePath);
+            } else {
+                // If no new file was uploaded, but there is an existing file
+                const currentFileDiv = document.getElementById('edit-single-document-file-current');
+                if (currentFileDiv && currentFileDiv.dataset.filePath) {
+                    // Make sure we still include the current file path
+                    documentData.file_path = currentFileDiv.dataset.filePath;
+                    console.log('Using existing file path:', documentData.file_path);
+                }
+            }
+            
+            console.log('Document data to save:', documentData);
+
+            // Step 3: Collect author IDs
+            const selectedAuthors = document.getElementById('edit-single-document-selected-authors');
+            const authorIds = [];
+            if (selectedAuthors) {
+                const authorElements = selectedAuthors.querySelectorAll('.selected-author');
+                authorElements.forEach(authorElement => {
+                    if (authorElement.dataset.id) {
+                        authorIds.push(authorElement.dataset.id);
+                    }
+                });
+            }
+            console.log('Selected author IDs:', authorIds);
+        
+            // Step 4: Collect topic IDs
+            const selectedTopics = document.getElementById('edit-single-document-selected-topics');
+            const topicIds = [];
+            if (selectedTopics) {
+                const topicElements = selectedTopics.querySelectorAll('.selected-topic');
+                topicElements.forEach(topicElement => {
+                    if (topicElement.dataset.id) {
+                        topicIds.push(topicElement.dataset.id);
+                    }
+                });
+            }
+            console.log('Selected topic IDs:', topicIds);
+        
+            // Step 5: Save document with all data
+            console.log('Saving document with document-edit API');
+            const requestData = {
+                document: documentData,
+                authorIds: authorIds,
+                topicIds: topicIds
+            };
+
+            // Try multiple save endpoints
+            const saveEndpoints = [
+                `/api/document-edit/${documentId}`,
+                `/api/documents/${documentId}`,
+                `/documents/${documentId}`
+            ];
+
+            let saveSuccess = false;
+            let saveError = null;
+
+            for (const endpoint of saveEndpoints) {
+                try {
+                    console.log(`Attempting to save document to ${endpoint}`);
+                    const saveResponse = await fetch(endpoint, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(requestData)
+                    });
+
+                    if (saveResponse.ok) {
+                        const saveResult = await saveResponse.json();
+                        console.log('Document saved successfully:', saveResult);
+                        saveSuccess = true;
+                        break;
+                    } else {
+                        const errorData = await saveResponse.json().catch(() => ({ error: 'Unknown error' }));
+                        console.warn(`Save failed at ${endpoint}:`, errorData);
+                        saveError = new Error(errorData.error || `Failed to save document: ${saveResponse.status}`);
+                    }
+                } catch (endpointError) {
+                    console.warn(`Error with save endpoint ${endpoint}:`, endpointError);
+                    saveError = endpointError;
+                }
+            }
+
+            if (!saveSuccess) {
+                throw saveError || new Error('Failed to save document to any endpoint');
+            }
+
+            // Show success message and clean up
+            this.showSaveSuccess();
+            
+            // Restore save button
+            if (submitButton) {
+                submitButton.disabled = false;
+                submitButton.innerHTML = 'Save Changes';
+            }
+            
+        } catch (error) {
+            console.error('Error saving document:', error);
+            this.showSaveError(error);
+            
+            // Restore save button
+            const submitButton = document.querySelector('#edit-single-document-form button[type="submit"]');
+            if (submitButton) {
+                submitButton.disabled = false;
+                submitButton.innerHTML = 'Save Changes';
+            }
+        }
     },
     
-    // Save changes to a compiled document
-    saveCompiledDocument: function(formData) {
-        // ... existing code ...
-    },
-    
-    // Get document type icon URL
-    getDocumentTypeIcon: function(documentType) {
-        // Map document types to icon paths
-        const iconMap = {
-            'THESIS': '/admin/Components/icons/Category-icons/thesis.png',
-            'DISSERTATION': '/admin/Components/icons/Category-icons/dissertation.png',
-            'CONFLUENCE': '/admin/Components/icons/Category-icons/confluence.png',
-            'SYNERGY': '/admin/Components/icons/Category-icons/synergy.png'
+    // Helper function to try creating a new author via API
+    createNewAuthor: async function(name) {
+        console.log(`Attempting to create new author: "${name}"`);
+        
+        // First check if author already exists to prevent duplicates
+        try {
+            console.log(`Checking if author "${name}" already exists before creating`);
+            const searchEndpoints = [
+                `/api/authors/search?q=${encodeURIComponent(name)}`,
+                `/api/authors?search=${encodeURIComponent(name)}`,
+                `/api/authors?q=${encodeURIComponent(name)}`,
+                `/authors/search?q=${encodeURIComponent(name)}`
+            ];
+            
+            for (const endpoint of searchEndpoints) {
+            try {
+                    const response = await fetch(endpoint);
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log(`Search results from ${endpoint}:`, data);
+                        
+                        // Extract authors depending on response format
+                        let authors = [];
+                        if (data.authors && Array.isArray(data.authors)) {
+                            authors = data.authors;
+                        } else if (Array.isArray(data)) {
+                            authors = data;
+                        } else if (data.results && Array.isArray(data.results)) {
+                            authors = data.results;
+                        }
+                        
+                        // Check for exact name match
+                        const exactMatch = authors.find(author => 
+                            author.full_name?.toLowerCase() === name.toLowerCase() ||
+                            author.name?.toLowerCase() === name.toLowerCase()
+                        );
+                        
+                        if (exactMatch) {
+                            console.log(`Author "${name}" already exists, using existing record:`, exactMatch);
+                            return exactMatch;
+                        }
+                    }
+                } catch (err) {
+                    console.warn(`Error checking existing authors via ${endpoint}:`, err);
+                }
+            }
+            } catch (error) {
+            console.warn('Error checking existing authors:', error);
+        }
+        
+        // If we get here, the author doesn't exist yet or couldn't be found
+        // Try different endpoints for creating authors
+        const endpoints = [
+            '/api/authors',
+            '/authors'
+        ];
+        
+        // Parse name into components (simple logic)
+        let firstName = '';
+        let lastName = '';
+        
+        const nameParts = name.trim().split(' ');
+        if (nameParts.length > 1) {
+            lastName = nameParts.pop();
+            firstName = nameParts.join(' ');
+        } else {
+            // If only one word, assume it's the last name
+            lastName = name.trim();
+        }
+        
+        // Ensure we send ALL possible name fields to avoid API confusion
+        const authorData = {
+            name: name.trim(),
+            full_name: name.trim(),
+            first_name: firstName,
+            last_name: lastName,
+            // Don't send ID to avoid creating with an ID that's not from database
+            spud_id: null
         };
         
-        // Get the normalized document type
-        const normType = documentType ? documentType.toUpperCase() : '';
+        console.log('Creating new author with data:', authorData);
         
-        // Check for all possible case variations
-        for (const [key, path] of Object.entries(iconMap)) {
-            if (normType === key || normType === key.toLowerCase()) {
-                return path;
+        // Try each endpoint
+        for (const endpoint of endpoints) {
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(authorData)
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log(`Successfully created author via ${endpoint}:`, result);
+                    
+                    // Handle different API response formats
+                    if (result.id || result.author_id) {
+                        return {
+                            id: result.id || result.author_id,
+                            full_name: name,
+                            name: name
+                        };
+                    } else if (result.author && result.author.id) {
+                        return result.author;
+                    }
+                    
+                    return result;
+                } else {
+                    console.warn(`Failed to create author via ${endpoint}: ${response.status}`);
+                    try {
+                        const errorText = await response.text();
+                        console.warn(`Server response: ${errorText}`);
+                    } catch(e) {
+                        // Ignore error text read failures
+                    }
+                }
+            } catch (error) {
+                console.error(`Error creating author via ${endpoint}:`, error);
             }
         }
         
-        // Return the default icon path
-        return '/admin/Components/icons/Category-icons/default_category_icon.png';
+        // If we didn't create via API, return a basic object with a flag for frontend handling
+        console.warn("Couldn't create author via API, using temporary ID");
+        return {
+            id: 'temp_' + Date.now(),
+            name: name,
+            full_name: name,
+            is_temporary: true
+        };
+    },
+    
+    // A dummy function for the fallback implementation
+    dummyAuthorSearchInit: function(inputElement) {
+        console.log('Using fallback author search implementation');
+    },
+    
+    // Select an author and add to the selected list
+    selectAuthor: function(authorId, authorName, containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        console.log(`Selecting author: ID=${authorId}, Name=${authorName}`);
+        
+        // Check if author already selected
+        const existingAuthor = container.querySelector(`.selected-author[data-id="${authorId}"]`);
+        if (existingAuthor) {
+            console.log(`Author ${authorId} already selected, skipping`);
+            return;
+        }
+        
+        // Create author element - without showing the ID
+        const authorElement = document.createElement('div');
+        authorElement.className = 'selected-author';
+        authorElement.dataset.id = authorId;
+        
+        // Only display the name, not the ID
+        authorElement.innerHTML = `
+            ${authorName}
+            <span class="remove-author">&times;</span>
+        `;
+        
+        // Add to container
+        container.appendChild(authorElement);
+        console.log(`Added author element with ID=${authorId}, data-id attribute=${authorElement.dataset.id}`);
+        
+        // Add click handler to remove button
+        const removeBtn = authorElement.querySelector('.remove-author');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', () => {
+                authorElement.remove();
+            });
+        }
     },
     
     // Initialize Author Search
@@ -1913,20 +2850,6 @@ window.documentEdit = {
         if (!inputElement) return;
         
         console.log('Initializing author search input:', inputElement.id);
-        
-        // Try to use the global function first if available
-        if (typeof window.initAuthorSearchInput === 'function' && window.initAuthorSearchInput !== this.dummyAuthorSearchInit) {
-            try {
-                console.log('Using global author search initialization');
-                window.initAuthorSearchInput(inputElement);
-                return;
-            } catch (error) {
-                console.error('Error using global author search function, falling back to internal implementation:', error);
-                // Continue with internal implementation
-            }
-        } else {
-            console.log('Using internal author search implementation');
-        }
         
         // Create author dropdown container
         const dropdownId = `${inputElement.id}-dropdown`;
@@ -1980,79 +2903,91 @@ window.documentEdit = {
             dropdown.style.display = 'block';
             
             try {
-                // Try multiple potential author search endpoints
-                let response;
-                let authorsData;
-                let authors = [];
+                console.log(`Searching authors with query: "${query}"`);
                 
-                // First try the search endpoints
-                let endpoints = [
+                // Try multiple potential author search endpoints
+                const endpoints = [
                     `/api/authors/search?q=${encodeURIComponent(query)}`,
+                    `/api/authors?search=${encodeURIComponent(query)}`,
+                    `/api/authors?q=${encodeURIComponent(query)}`,
                     `/authors/search?q=${encodeURIComponent(query)}`,
-                    `/api/authors?name=${encodeURIComponent(query)}`
+                    `/authors?search=${encodeURIComponent(query)}`
                 ];
                 
-                // Try each endpoint until one works
+                let authors = [];
+                let lastError = null;
+                
+                // Try each endpoint until we get results
                 for (const endpoint of endpoints) {
                     try {
                         console.log(`Trying author search endpoint: ${endpoint}`);
-                        response = await fetch(endpoint);
+                        const response = await fetch(endpoint);
                         
                         if (response.ok) {
-                            authorsData = await response.json();
-                            console.log(`Found working author endpoint: ${endpoint}`, authorsData);
+                            const data = await response.json();
+                            console.log(`Response from ${endpoint}:`, data);
                             
-                            // Format the data based on response structure
-                            if (authorsData.authors) {
-                                authors = authorsData.authors;
-                            } else if (Array.isArray(authorsData)) {
-                                authors = authorsData;
-                            }
-                            
-                            if (authors.length > 0) {
-                                break; // We found results, stop trying endpoints
+                            // Handle different response formats
+                            if (data.authors && Array.isArray(data.authors)) {
+                                authors = data.authors;
+                                console.log(`Found ${authors.length} authors in authors array`);
+                                break;
+                            } else if (Array.isArray(data)) {
+                                authors = data;
+                                console.log(`Found ${authors.length} authors in array response`);
+                                break;
+                            } else if (data.results && Array.isArray(data.results)) {
+                                authors = data.results;
+                                console.log(`Found ${authors.length} authors in results array`);
+                                break;
                             } else {
-                                console.log('Endpoint returned 0 authors, trying next endpoint');
+                                console.warn(`Unexpected response format from ${endpoint}:`, data);
                             }
                         } else {
                             console.warn(`Endpoint ${endpoint} failed with status ${response.status}`);
+                            lastError = new Error(`Failed to fetch authors: ${response.status}`);
                         }
-                    } catch (err) {
-                        console.warn(`Error with endpoint ${endpoint}:`, err);
+                    } catch (error) {
+                        console.warn(`Error with endpoint ${endpoint}:`, error);
+                        lastError = error;
                     }
                 }
                 
-                // If no search endpoints worked or returned results, try getting all authors as fallback
+                // If no authors found, try getting all authors and filtering
                 if (authors.length === 0) {
                     console.log('No authors found via search endpoints, trying to fetch all authors');
                     try {
-                        const allAuthorsResponse = await fetch('/api/authors/all');
-                        
+                        const allAuthorsResponse = await fetch('/api/authors');
                         if (allAuthorsResponse.ok) {
                             const allAuthorsData = await allAuthorsResponse.json();
+                            console.log('All authors data:', allAuthorsData);
                             
-                            // Filter authors by the search query manually
+                            // Handle different response formats for all authors
+                            let allAuthors = [];
                             if (allAuthorsData.authors && Array.isArray(allAuthorsData.authors)) {
+                                allAuthors = allAuthorsData.authors;
+                            } else if (Array.isArray(allAuthorsData)) {
+                                allAuthors = allAuthorsData;
+                            }
+                            
+                            // Filter authors by the search query
                                 const lowerQuery = query.toLowerCase();
-                                authors = allAuthorsData.authors.filter(author => {
+                            authors = allAuthors.filter(author => {
                                     const fullName = (author.full_name || '').toLowerCase();
                                     const firstName = (author.first_name || '').toLowerCase();
                                     const lastName = (author.last_name || '').toLowerCase();
-                                    const affiliation = (author.affiliation || '').toLowerCase();
-                                    const spudId = (author.spud_id || '').toLowerCase();
+                                const name = (author.name || '').toLowerCase();
                                     
                                     return fullName.includes(lowerQuery) || 
                                            firstName.includes(lowerQuery) ||
                                            lastName.includes(lowerQuery) ||
-                                           affiliation.includes(lowerQuery) ||
-                                           spudId.includes(lowerQuery);
+                                       name.includes(lowerQuery);
                                 });
-                            }
                             
                             console.log(`Found ${authors.length} authors by filtering all authors`);
                         }
-                    } catch (err) {
-                        console.warn('Error fetching all authors:', err);
+                    } catch (error) {
+                        console.warn('Error fetching all authors:', error);
                     }
                 }
                 
@@ -2062,28 +2997,22 @@ window.documentEdit = {
                 if (authors.length === 0) {
                     dropdown.innerHTML = '<div class="dropdown-item no-results">No authors found</div>';
                     
-                    // Add option to create new author
+                    // Add option to create new author if query is long enough
                     if (query.length >= 3) {
                         const createItem = document.createElement('div');
                         createItem.className = 'dropdown-item create-new';
                         createItem.innerHTML = `<div class="item-name"><i class="fas fa-plus"></i> Create "${query}"</div>`;
                         
-                        // Add click handler to create and select new author
                         createItem.addEventListener('click', async () => {
-                            // Try to create a new author if possible
                             try {
-                                // First check if we should try to create via API or just select as new
                                 const newAuthor = await this.createNewAuthor(query);
                                 if (newAuthor && newAuthor.id) {
-                                    // Successfully created via API
                                     this.selectAuthor(newAuthor.id, newAuthor.full_name || newAuthor.name || query, selectedContainerId);
                                 } else {
-                                    // Fallback to just marking as new
                             this.selectAuthor('new', query, selectedContainerId);
                                 }
                             } catch (error) {
                                 console.error('Error creating new author:', error);
-                                // Fallback to just marking as new
                                 this.selectAuthor('new', query, selectedContainerId);
                             }
                             
@@ -2094,11 +3023,6 @@ window.documentEdit = {
                         dropdown.appendChild(createItem);
                     }
                 } else {
-                    // Check if there's an exact match
-                    const exactMatch = authors.some(author => 
-                        (author.full_name || author.name || '').toLowerCase() === query.toLowerCase()
-                    );
-                    
                     // Add authors to dropdown
                     authors.forEach(author => {
                         const item = document.createElement('div');
@@ -2126,38 +3050,6 @@ window.documentEdit = {
                         
                         dropdown.appendChild(item);
                     });
-                    
-                    // Add option to create new if no exact match
-                    if (!exactMatch && query.length >= 3) {
-                        const createItem = document.createElement('div');
-                        createItem.className = 'dropdown-item create-new';
-                        createItem.innerHTML = `<div class="item-name"><i class="fas fa-plus"></i> Create "${query}"</div>`;
-                        
-                        // Add click handler to create and select new author
-                        createItem.addEventListener('click', async () => {
-                            // Try to create a new author if possible
-                            try {
-                                // First check if we should try to create via API or just select as new
-                                const newAuthor = await this.createNewAuthor(query);
-                                if (newAuthor && newAuthor.id) {
-                                    // Successfully created via API
-                                    this.selectAuthor(newAuthor.id, newAuthor.full_name || newAuthor.name || query, selectedContainerId);
-                                } else {
-                                    // Fallback to just marking as new
-                                    this.selectAuthor('new', query, selectedContainerId);
-                                }
-                            } catch (error) {
-                                console.error('Error creating new author:', error);
-                                // Fallback to just marking as new
-                                this.selectAuthor('new', query, selectedContainerId);
-                            }
-                            
-                            dropdown.style.display = 'none';
-                            inputElement.value = '';
-                        });
-                        
-                        dropdown.appendChild(createItem);
-                    }
                 }
                 
                 // Position dropdown directly under the input field
@@ -2186,115 +3078,6 @@ window.documentEdit = {
                 dropdown.style.display = 'none';
             }
         });
-    },
-    
-    // Helper function to try creating a new author via API
-    createNewAuthor: async function(name) {
-        console.log(`Attempting to create new author: "${name}"`);
-        
-        // Try different endpoints for creating authors
-        const endpoints = [
-            '/api/authors',
-            '/authors'
-        ];
-        
-        // Parse name into components (simple logic)
-        let firstName = '';
-        let lastName = '';
-        
-        const nameParts = name.trim().split(' ');
-        if (nameParts.length > 1) {
-            lastName = nameParts.pop();
-            firstName = nameParts.join(' ');
-        } else {
-            // If only one word, assume it's the last name
-            lastName = name.trim();
-        }
-        
-        // Prepare author data
-        const authorData = {
-            name: name,
-            full_name: name,
-            first_name: firstName,
-            last_name: lastName
-        };
-        
-        // Try each endpoint
-        for (const endpoint of endpoints) {
-            try {
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(authorData)
-                });
-                
-                if (response.ok) {
-                    const result = await response.json();
-                    console.log(`Successfully created author via ${endpoint}:`, result);
-                    
-                    // Handle different API response formats
-                    if (result.id || result.author_id) {
-                        return {
-                            id: result.id || result.author_id,
-                            full_name: name,
-                            name: name
-                        };
-                    } else if (result.author && result.author.id) {
-                        return result.author;
-                    }
-                    
-                    return result;
-                } else {
-                    console.warn(`Failed to create author via ${endpoint}: ${response.status}`);
-                }
-            } catch (error) {
-                console.error(`Error creating author via ${endpoint}:`, error);
-            }
-        }
-        
-        // If we didn't create via API, return a basic object
-        return {
-            id: 'new',
-            name: name,
-            full_name: name
-        };
-    },
-    
-    // A dummy function for the fallback implementation
-    dummyAuthorSearchInit: function(inputElement) {
-        console.log('Using fallback author search implementation');
-    },
-    
-    // Select an author and add to the selected list
-    selectAuthor: function(authorId, authorName, containerId) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-        
-        // Check if author already selected
-        const existingAuthor = container.querySelector(`.selected-author[data-id="${authorId}"]`);
-        if (existingAuthor) return;
-        
-        // Create author element
-        const authorElement = document.createElement('div');
-        authorElement.className = 'selected-author';
-        authorElement.dataset.id = authorId;
-        authorElement.innerHTML = `
-            ${authorName}
-            <span class="remove-author" data-id="${authorId}">&times;</span>
-        `;
-        
-        // Add to container
-        container.appendChild(authorElement);
-        
-        // Add click handler to remove button
-        const removeBtn = authorElement.querySelector('.remove-author');
-        if (removeBtn) {
-            removeBtn.addEventListener('click', () => {
-                authorElement.remove();
-            });
-        }
     },
     
     // Initialize Research Agenda Search
@@ -2558,6 +3341,100 @@ window.documentEdit = {
     createNewResearchAgendaItem: async function(name) {
         console.log(`Attempting to create new research agenda item: "${name}"`);
         
+        // First check if item already exists to prevent duplicates
+        try {
+            console.log(`Checking if research agenda item "${name}" already exists before creating`);
+            const searchEndpoints = [
+                `/research-agenda-items/search?q=${encodeURIComponent(name)}`,
+                `/api/research-agenda-items/search?q=${encodeURIComponent(name)}`,
+                `/api/topics/search?q=${encodeURIComponent(name)}`
+            ];
+            
+            for (const endpoint of searchEndpoints) {
+                try {
+                    const response = await fetch(endpoint);
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log(`Search results from ${endpoint}:`, data);
+                        
+                        // Extract items depending on response format
+                        let items = [];
+                        if (data.items) {
+                            items = data.items;
+                        } else if (Array.isArray(data)) {
+                            items = data;
+                        } else if (data.agendaItems) {
+                            items = data.agendaItems;
+                        } else if (data.topics) {
+                            items = data.topics;
+                        } else if (data.results) {
+                            items = data.results;
+                        }
+                        
+                        // Check for exact name match
+                        const exactMatch = items.find(item => 
+                            item.name?.toLowerCase() === name.toLowerCase() ||
+                            item.title?.toLowerCase() === name.toLowerCase()
+                        );
+                        
+                        if (exactMatch) {
+                            console.log(`Research agenda item "${name}" already exists, using existing record:`, exactMatch);
+                            return exactMatch;
+                        }
+                    }
+                } catch (err) {
+                    console.warn(`Error checking existing research agenda items via ${endpoint}:`, err);
+                }
+            }
+            
+            // Try to get all items as fallback
+            const allEndpoints = [
+                '/research-agenda-items/all',
+                '/research-agenda-items',
+                '/api/research-agenda-items',
+                '/api/topics'
+            ];
+            
+            for (const endpoint of allEndpoints) {
+                try {
+                    const response = await fetch(endpoint);
+                    if (response.ok) {
+                        const data = await response.json();
+                        
+                        // Extract items depending on response format
+                        let allItems = [];
+                        if (data.items) {
+                            allItems = data.items;
+                        } else if (Array.isArray(data)) {
+                            allItems = data;
+                        } else if (data.agendaItems) {
+                            allItems = data.agendaItems;
+                        } else if (data.topics) {
+                            allItems = data.topics;
+                        } else if (data.results) {
+                            allItems = data.results;
+                        }
+                        
+                        // Filter for exact match
+                        const exactMatch = allItems.find(item => 
+                            item.name?.toLowerCase() === name.toLowerCase() ||
+                            item.title?.toLowerCase() === name.toLowerCase()
+                        );
+                        
+                        if (exactMatch) {
+                            console.log(`Found existing research agenda item "${name}" in all items:`, exactMatch);
+                            return exactMatch;
+                        }
+                    }
+                } catch(err) {
+                    console.warn(`Error checking all research agenda items via ${endpoint}:`, err);
+                }
+            }
+        } catch (error) {
+            console.warn('Error checking existing research agenda items:', error);
+        }
+        
+        // If we get here, the item doesn't exist yet or couldn't be found
         // Try different endpoints for creating items
         const endpoints = [
             '/api/research-agenda-items',
@@ -2565,11 +3442,14 @@ window.documentEdit = {
             '/api/topics'
         ];
         
+        // Ensure we send all possible name fields
         const itemData = {
-            name: name,
-            title: name,
+            name: name.trim(),
+            title: name.trim(),
             description: ''
         };
+        
+        console.log('Creating new research agenda item with data:', itemData);
         
         // Try each endpoint
         for (const endpoint of endpoints) {
@@ -2604,16 +3484,24 @@ window.documentEdit = {
                     return result;
                 } else {
                     console.warn(`Failed to create research agenda item via ${endpoint}: ${response.status}`);
+                    try {
+                        const errorText = await response.text();
+                        console.warn(`Server response: ${errorText}`);
+                    } catch(e) {
+                        // Ignore error text read failures
+                    }
                 }
             } catch (error) {
                 console.error(`Error creating research agenda item via ${endpoint}:`, error);
             }
         }
         
-        // If we didn't create via API, return a basic object
+        // If we didn't create via API, return a basic object with a temporary ID
+        console.warn("Couldn't create research agenda item via API, using temporary ID");
         return {
-            id: 'new',
-            name: name
+            id: 'temp_' + Date.now(),
+            name: name,
+            is_temporary: true
         };
     },
     
@@ -2622,21 +3510,29 @@ window.documentEdit = {
         const container = document.getElementById(containerId);
         if (!container) return;
         
+        console.log(`Selecting research agenda item: ID=${itemId}, Name=${itemName}`);
+        
         // Check if item already selected
         const existingItem = container.querySelector(`.selected-topic[data-id="${itemId}"]`);
-        if (existingItem) return;
+        if (existingItem) {
+            console.log(`Topic ${itemId} already selected, skipping`);
+            return;
+        }
         
-        // Create item element
+        // Create item element - without showing the ID
         const itemElement = document.createElement('div');
         itemElement.className = 'selected-topic';
         itemElement.dataset.id = itemId;
+        
+        // Only display the name, not the ID
         itemElement.innerHTML = `
             ${itemName}
-            <span class="remove-topic" data-id="${itemId}">&times;</span>
+            <span class="remove-topic">&times;</span>
         `;
         
         // Add to container
         container.appendChild(itemElement);
+        console.log(`Added topic element with ID=${itemId}, data-id attribute=${itemElement.dataset.id}`);
         
         // Add click handler to remove button
         const removeBtn = itemElement.querySelector('.remove-topic');

@@ -361,17 +361,32 @@ async function handleSingleDocumentSubmit(e) {
         }
         
         // Ensure the directory exists before uploading
-        await ensureDirectoriesExist('storage/single/');
+        const documentType = mapCategoryToDocumentType(categoryValue);
+        // Use only the allowed directories (thesis, dissertation, confluence, synergy, hello)
+        let validStorageType = documentType.toLowerCase();
+        
+        // If documentType would create a directory we've removed, use hello instead
+        if (validStorageType !== 'thesis' && 
+            validStorageType !== 'dissertation' && 
+            validStorageType !== 'confluence' && 
+            validStorageType !== 'synergy') {
+            validStorageType = 'hello';
+        }
+        
+        const storagePath = `storage/${validStorageType}/`;
+        await ensureDirectoriesExist(storagePath);
         
         // First upload the file
         const file = fileInput.files[0];
         const fileData = new FormData();
         fileData.append('file', file, file.name); // Add filename explicitly
+        fileData.append('storagePath', storagePath);
         
-        // Add storage path to the form data
-        fileData.append('storagePath', 'storage/single/');
+        // Add document type and category information
+        fileData.append('document_type', documentType.toUpperCase());
+        fileData.append('category', categoryValue);
         
-        console.log('Uploading single document file:', file.name, 'Size:', file.size, 'bytes', 'Path:', 'storage/single/');
+        console.log('Uploading single document file:', file.name, 'Size:', file.size, 'bytes', 'Path:', storagePath);
         
         // Upload file first
         const fileUploadResponse = await fetch('/api/upload', {
@@ -812,7 +827,18 @@ async function handleCompiledDocumentSubmit(e) {
         const documentType = mapCategoryToDocumentType(category);
         
         // Create storage path for compiled document
-        const compiledStoragePath = `storage/compiled/${category.toLowerCase()}/`;
+        // Use only the allowed directories (thesis, dissertation, confluence, synergy, hello)
+        let validStorageType = documentType.toLowerCase();
+        
+        // If documentType would create a directory we've removed, use hello instead
+        if (validStorageType !== 'thesis' && 
+            validStorageType !== 'dissertation' && 
+            validStorageType !== 'confluence' && 
+            validStorageType !== 'synergy') {
+            validStorageType = 'hello';
+        }
+        
+        const compiledStoragePath = `storage/${validStorageType}/`;
         
         // Process the foreword file if it exists
         const forewordFileInput = document.getElementById('foreword-file-upload');
@@ -821,14 +847,15 @@ async function handleCompiledDocumentSubmit(e) {
         if (forewordFileInput && forewordFileInput.files && forewordFileInput.files.length > 0) {
             console.log('Found foreword file:', forewordFileInput.files[0].name);
             
-            // Create foreword path based on category
-            const forewordPath = `storage/foreword/${category.toLowerCase()}/`;
-            console.log(`Creating foreword storage path for ${category}: ${forewordPath}`);
+            // Use the same path for foreword files
+            const forewordPath = compiledStoragePath;
+            console.log(`Using foreword storage path: ${forewordPath}`);
             
             // Create foreword-specific form data
             const forewordFormData = new FormData();
             forewordFormData.append('file', forewordFileInput.files[0]);
             forewordFormData.append('storagePath', forewordPath);
+            forewordFormData.append('document_type', documentType);
             
             // Create the foreword directory
             await ensureDirectoriesExist(forewordPath);
@@ -873,7 +900,7 @@ async function handleCompiledDocumentSubmit(e) {
         
         // Ensure the directory exists
         await ensureDirectoriesExist(compiledStoragePath);
-        await ensureDirectoriesExist(compiledStoragePath + 'studies/');
+        // No longer need separate studies subdirectory
         
         // Set department_id if it's a Synergy document
         let departmentId = null;
@@ -968,7 +995,8 @@ async function handleCompiledDocumentSubmit(e) {
             // Create study-specific file upload
             const studyFormData = new FormData();
             studyFormData.append('file', file);
-            studyFormData.append('storagePath', `${compiledStoragePath}studies/`);
+            studyFormData.append('storagePath', compiledStoragePath);
+            studyFormData.append('document_type', documentType);
             
             // Upload the study file
             const studyFileResponse = await fetch('/api/upload', {
@@ -1554,7 +1582,12 @@ function updateDocumentPreview(file) {
         readDocumentBtn.disabled = true;
         readDocumentBtn.onclick = function(e) {
             e.preventDefault();
-            alert('Please upload a document first');
+            Swal.fire({
+                icon: 'info',
+                title: 'No Document',
+                text: 'Please upload a document first',
+                confirmButtonColor: '#10B981'
+            });
             return false;
         };
         
@@ -2372,15 +2405,30 @@ function addResearchSection() {
 function checkFileInput(sectionId) {
     const fileInput = document.getElementById(`file-upload-${sectionId}`);
     if (!fileInput) {
-        alert(`File input #file-upload-${sectionId} not found!`);
+        Swal.fire({
+            icon: 'error',
+            title: 'Element Not Found',
+            text: `File input #file-upload-${sectionId} not found!`,
+            confirmButtonColor: '#10B981'
+        });
         return;
     }
     
     if (fileInput.files && fileInput.files.length > 0) {
         const file = fileInput.files[0];
-        alert(`File selected: ${file.name} (${(file.size/1024).toFixed(1)} KB)`);
+        Swal.fire({
+            icon: 'info',
+            title: 'File Selected',
+            text: `File selected: ${file.name} (${(file.size/1024).toFixed(1)} KB)`,
+            confirmButtonColor: '#10B981'
+        });
     } else {
-        alert('No file selected yet!');
+        Swal.fire({
+            icon: 'warning',
+            title: 'No File Selected',
+            text: 'No file selected yet!',
+            confirmButtonColor: '#10B981'
+        });
         
         // Try to help the user identify the file input
         fileInput.classList.remove('sr-only');
@@ -2391,7 +2439,7 @@ function checkFileInput(sectionId) {
             fileInput.classList.remove('border', 'border-red-500', 'p-2', 'block', 'mt-2');
         }, 5000);
     }
-} 
+}
 
 /**
  * Validate all research sections before submission
@@ -2520,7 +2568,7 @@ function getDepartmentCode() {
  * @returns {string} - A valid document_type value
  */
 function mapCategoryToDocumentType(category) {
-    // Map category to one of the valid types: THESIS, DISSERTATION, CONFLUENCE, SYNERGY, RESEARCH_STUDY
+    // Map category to one of the valid types: THESIS, DISSERTATION, CONFLUENCE, SYNERGY, HELLO
     switch(category) {
         case 'Thesis':
             return 'THESIS';
@@ -2531,6 +2579,6 @@ function mapCategoryToDocumentType(category) {
         case 'Synergy':
             return 'SYNERGY';
         default:
-            return 'RESEARCH_STUDY'; // Default fallback
+            return 'HELLO'; // Default fallback
     }
 }

@@ -93,8 +93,8 @@ const searchResearchAgendaItems = async (ctx: any) => {
     console.log("Research agenda search handler hit:", ctx.request.url.toString());
     console.log("Search query:", query);
     
-    // Convert context to Request - Changed to use the same URL that client is calling
-    const request = new Request(`${ctx.request.url.origin}/research-agenda-items/search?q=${encodeURIComponent(query)}`, {
+    // Convert context to Request
+    const request = new Request(`${ctx.request.url.origin}/api/research-agenda-items/search?q=${encodeURIComponent(query)}`, {
         method: "GET",
         headers: ctx.request.headers
     });

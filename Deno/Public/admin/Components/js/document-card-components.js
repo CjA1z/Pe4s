@@ -304,6 +304,20 @@ function createChildDocumentCard(child) {
                     // Ensure we have a fully qualified URL by adding protocol and host if missing
                     let pdfPath = document.file_path;
                     
+                    // Remove absolute path if present (starting with drive letter like C:/)
+                    if (pdfPath.match(/^[A-Za-z]:\//)) {
+                        // Extract just the part after the workspace root
+                        const parts = pdfPath.split('/');
+                        const storageIndex = parts.findIndex(part => part === 'storage');
+                        
+                        if (storageIndex !== -1) {
+                            // Reconstruct the path starting from 'storage'
+                            pdfPath = '/' + parts.slice(storageIndex).join('/');
+                        } else {
+                            console.error('Could not find storage directory in path:', pdfPath);
+                        }
+                    }
+                    
                     // If the path doesn't start with http or /, add the leading /
                     if (!pdfPath.startsWith('http') && !pdfPath.startsWith('/')) {
                         pdfPath = '/' + pdfPath;
@@ -490,8 +504,21 @@ function setupDocumentCardEventListeners(card, doc) {
             .then(document => {
                 if (document && document.file_path) {
                     // Open the PDF in a new tab
-                    // Ensure we have a fully qualified URL by adding protocol and host if missing
                     let pdfPath = document.file_path;
+                    
+                    // Remove absolute path if present (starting with drive letter like C:/)
+                    if (pdfPath.match(/^[A-Za-z]:\//)) {
+                        // Extract just the part after the workspace root
+                        const parts = pdfPath.split('/');
+                        const storageIndex = parts.findIndex(part => part === 'storage');
+                        
+                        if (storageIndex !== -1) {
+                            // Reconstruct the path starting from 'storage'
+                            pdfPath = '/' + parts.slice(storageIndex).join('/');
+                        } else {
+                            console.error('Could not find storage directory in path:', pdfPath);
+                        }
+                    }
                     
                     // If the path doesn't start with http or /, add the leading /
                     if (!pdfPath.startsWith('http') && !pdfPath.startsWith('/')) {

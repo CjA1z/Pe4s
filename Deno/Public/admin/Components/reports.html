@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generate Reports - Archive System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif; /* Default Tailwind font */
+            background-color: #f3f4f6; /* Light gray background */
+        }
+        .report-card {
+            background-color: white;
+            border-radius: 0.75rem; /* md:rounded-xl */
+            padding: 1.5rem; /* p-6 */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: transform 0.2s ease-in-out;
+        }
+        .report-card:hover {
+            transform: translateY(-5px);
+        }
+        .export-button {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: background-color 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .export-button i {
+            font-size: 1.1rem;
+        }
+        .export-pdf {
+            background-color: #ef4444; /* red-500 */
+            color: white;
+        }
+        .export-pdf:hover {
+            background-color: #dc2626; /* red-600 */
+        }
+        .export-csv {
+            background-color: #22c55e; /* green-500 */
+            color: white;
+        }
+        .export-csv:hover {
+            background-color: #16a34a; /* green-600 */
+        }
+        #statusChartContainer {
+            max-width: 400px; /* Limit pie chart size */
+            margin: 2rem auto; /* Center the chart */
+        }
+        @media (max-width: 768px) {
+            #statusChartContainer {
+                max-width: 90%;
+            }
+            .export-buttons-container {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .export-button {
+                width: 100%;
+                margin-bottom: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body >
+       <!-- Navbar container -->
+  <div id="navbar-header"></div>
+  <!-- Sidebar container -->
+  <div id="sidebar-container"></div>
+  
+    <div class="max-w-5xl mx-auto">
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-800">Archive System Reports</h1>
+            <p class="text-gray-600 mt-2">Overview of document statistics and status.</p>
+        </header>
+
+        <section id="documentStats" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+            <div class="report-card text-center">
+                <h2 class="text-xl font-semibold text-gray-700 mb-2">Uploaded Documents</h2>
+                <p id="uploadedCount" class="text-4xl font-bold text-blue-600">0</p>
+                <p class="text-sm text-gray-500 mt-1">Total documents introduced to the system.</p>
+            </div>
+            <div class="report-card text-center">
+                <h2 class="text-xl font-semibold text-gray-700 mb-2">Active Documents</h2>
+                <p id="activeCount" class="text-4xl font-bold text-green-600">0</p>
+                <p class="text-sm text-gray-500 mt-1">Documents currently in active use.</p>
+            </div>
+            <div class="report-card text-center">
+                <h2 class="text-xl font-semibold text-gray-700 mb-2">Archived Documents</h2>
+                <p id="archivedCount" class="text-4xl font-bold text-yellow-600">0</p>
+                <p class="text-sm text-gray-500 mt-1">Documents moved to long-term storage.</p>
+            </div>
+        </section>
+
+        <section id="visualSummary" class="bg-white p-6 rounded-xl shadow-lg mb-10">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4 text-center">Document Status Summary</h2>
+            <div id="statusChartContainer">
+                <canvas id="documentStatusChart"></canvas>
+            </div>
+            <div id="chartLegend" class="text-center mt-4 text-gray-600">
+                </div>
+        </section>
+
+        <section id="exportOptions" class="text-center">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-6">Export Report</h2>
+            <div class="flex flex-col sm:flex-row justify-center items-center gap-4 export-buttons-container">
+                <button onclick="exportToPDF()" class="export-button export-pdf">
+                    <i class="fas fa-file-pdf"></i> Export to PDF
+                </button>
+                <button onclick="exportToCSV()" class="export-button export-csv">
+                    <i class="fas fa-file-csv"></i> Export to CSV
+                </button>
+            </div>
+        </section>
+
+        <div id="messageBox" class="fixed bottom-5 right-5 bg-gray-800 text-white p-4 rounded-lg shadow-md hidden transition-opacity duration-300">
+            <p id="messageText"></p>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Mock Data ---
+        // In a real application, you would fetch this data from your backend.
+        const mockData = {
+            uploaded: 1250,
+            active: 800,
+            archived: 450
+        };
+
+        // --- DOM Elements ---
+        const uploadedCountEl = document.getElementById('uploadedCount');
+        const activeCountEl = document.getElementById('activeCount');
+        const archivedCountEl = document.getElementById('archivedCount');
+        const chartLegendEl = document.getElementById('chartLegend');
+        const messageBox = document.getElementById('messageBox');
+        const messageText = document.getElementById('messageText');
+
+        let statusChart = null; // To hold the chart instance
+
+        // --- Functions ---
+
+        /**
+         * Updates the count displays on the page.
+         */
+        function updateCounts() {
+            uploadedCountEl.textContent = mockData.uploaded.toLocaleString();
+            activeCountEl.textContent = mockData.active.toLocaleString();
+            archivedCountEl.textContent = mockData.archived.toLocaleString();
+        }
+
+        /**
+         * Creates or updates the document status pie chart.
+         */
+        function renderStatusChart() {
+            const ctx = document.getElementById('documentStatusChart').getContext('2d');
+            const totalDocsForChart = mockData.active + mockData.archived;
+            
+            // Calculate percentages
+            const activePercentage = totalDocsForChart > 0 ? ((mockData.active / totalDocsForChart) * 100).toFixed(1) : 0;
+            const archivedPercentage = totalDocsForChart > 0 ? ((mockData.archived / totalDocsForChart) * 100).toFixed(1) : 0;
+
+            const data = {
+                labels: [
+                    `Active (${activePercentage}%)`,
+                    `Archived (${archivedPercentage}%)`
+                ],
+                datasets: [{
+                    label: 'Document Status',
+                    data: [mockData.active, mockData.archived],
+                    backgroundColor: [
+                        'rgba(34, 197, 94, 0.7)',  // green-500 with opacity
+                        'rgba(234, 179, 8, 0.7)'   // yellow-500 with opacity
+                    ],
+                    borderColor: [
+                        'rgba(22, 163, 74, 1)',  // green-600
+                        'rgba(202, 138, 4, 1)'   // yellow-600
+                    ],
+                    borderWidth: 1,
+                    hoverOffset: 8
+                }]
+            };
+
+            const config = {
+                type: 'pie', // Changed to pie chart
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false, // Allows better control with container size
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 20,
+                                font: {
+                                    size: 14
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed !== null) {
+                                        label += context.parsed.toLocaleString() + ' documents';
+                                    }
+                                    return label;
+                                }
+                            }
+                        },
+                        title: {
+                            display: false, // Title is already in the section header
+                            text: 'Active vs. Archived Documents'
+                        }
+                    }
+                }
+            };
+
+            // If chart already exists, destroy it before creating a new one
+            if (statusChart) {
+                statusChart.destroy();
+            }
+            statusChart = new Chart(ctx, config);
+
+            // Update legend text (optional, as Chart.js legend is good)
+            chartLegendEl.innerHTML = `
+                <span class="inline-flex items-center mr-4"><span class="w-3 h-3 bg-green-500 rounded-full mr-2"></span>Active: ${mockData.active.toLocaleString()}</span>
+                <span class="inline-flex items-center"><span class="w-3 h-3 bg-yellow-500 rounded-full mr-2"></span>Archived: ${mockData.archived.toLocaleString()}</span>
+            `;
+        }
+
+        /**
+         * Shows a notification message.
+         * @param {string} message - The message to display.
+         * @param {string} type - 'success' or 'error' (affects styling, not implemented here but could be).
+         */
+        function showMessage(message, type = 'info') {
+            messageText.textContent = message;
+            messageBox.classList.remove('hidden');
+            messageBox.classList.add('opacity-100');
+
+            // Hide after 3 seconds
+            setTimeout(() => {
+                messageBox.classList.add('hidden');
+                messageBox.classList.remove('opacity-100');
+            }, 3000);
+        }
+
+        /**
+         * Mock function for PDF export.
+         */
+        function exportToPDF() {
+            // In a real application, this would trigger a PDF generation process.
+            // This could involve:
+            // 1. Client-side libraries like jsPDF (for simple content)
+            // 2. Server-side generation (for complex reports, recommended)
+            console.log("Attempting to export to PDF...");
+            showMessage("PDF export functionality is a placeholder. In a real app, this would generate a PDF.", "info");
+            // Example with jsPDF (if you were to implement basic client-side):
+            // const { jsPDF } = window.jspdf; // Assuming jsPDF is loaded
+            // const doc = new jsPDF();
+            // doc.text("Archive System Report", 10, 10);
+            // doc.text(`Uploaded Documents: ${mockData.uploaded}`, 10, 20);
+            // doc.text(`Active Documents: ${mockData.active}`, 10, 30);
+            // doc.text(`Archived Documents: ${mockData.archived}`, 10, 40);
+            // // Add chart image (requires converting canvas to image)
+            // // const chartImage = document.getElementById('documentStatusChart').toDataURL('image/png');
+            // // doc.addImage(chartImage, 'PNG', 10, 50, 180, 90);
+            // doc.save("archive_report.pdf");
+        }
+
+        /**
+         * Mock function for CSV export.
+         */
+        function exportToCSV() {
+            // In a real application, this would trigger a CSV generation process.
+            console.log("Attempting to export to CSV...");
+            
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Category,Count\r\n";
+            csvContent += `Uploaded Documents,${mockData.uploaded}\r\n`;
+            csvContent += `Active Documents,${mockData.active}\r\n`;
+            csvContent += `Archived Documents,${mockData.archived}\r\n`;
+            
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "archive_report.csv");
+            document.body.appendChild(link); // Required for Firefox
+            link.click();
+            document.body.removeChild(link);
+            
+            showMessage("CSV report downloaded (mock data).", "success");
+        }
+        
+        // --- Initialization ---
+        window.onload = () => {
+            updateCounts();
+            renderStatusChart();
+
+            // Example: Simulate data update after a few seconds (for demonstration)
+            // setTimeout(() => {
+            //     mockData.active += 50;
+            //     mockData.uploaded += 50;
+            //     mockData.archived -= 20; // if possible
+            //     updateCounts();
+            //     renderStatusChart();
+            //     showMessage("Report data updated!", "info");
+            // }, 5000);
+        };
+
+        // Handle window resize to redraw chart if necessary (Chart.js handles most of this)
+        window.onresize = () => {
+            // Chart.js is generally responsive, but if you have specific needs:
+            // if (statusChart) {
+            //    statusChart.resize();
+            // }
+        };
+
+    </script>
+    <script>
+        fetch('side_bar.html')
+          .then(response => response.text())
+          .then(data => {
+            document.getElementById('side-bar').innerHTML = data;
+          })
+          .catch(error => console.error('Error loading header:', error));
+      </script>
+    
+    <script>
+        fetch('navbar_header.html')
+          .then(response => response.text())
+          .then(data => {
+            document.getElementById('navbar-header').innerHTML = data;
+          })
+          .catch(error => console.error('Error loading header:', error));
+      </script>
+</body>
+</html>

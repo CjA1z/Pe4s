@@ -26,8 +26,8 @@
             abstractElement.textContent = 'Extracting abstract...';
             console.log('Starting abstract extraction for file:', file.name);
             
-            // Check file size, limit to 10MB to prevent browser hanging
-            if (file.size > 10 * 1024 * 1024) {
+            // Check file size, limit to 50MB to prevent browser hanging
+            if (file.size > 50 * 1024 * 1024) {
                 abstractElement.textContent = 'File too large for preview. Abstract will be extracted during submission.';
                 console.log('PDF file too large for browser extraction');
                 return;
@@ -274,6 +274,120 @@
             opacity: 0.7;
         }
     </style>
+
+    <!-- New CSS for the file upload UI -->
+    <style>
+        /* Styles for the new file upload UI */
+        .file-input-container {
+            text-align: center;
+            width: 100%;
+        }
+        
+        .file-input-label {
+            display: inline-block;
+            padding: 12px 25px;
+            background-color: #10B981; /* Primary color */
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: background-color 0.3s ease;
+            margin-bottom: 15px;
+        }
+        
+        .file-input-label:hover {
+            background-color: #047857; /* Primary dark color */
+        }
+        
+        /* Hide the default file input element */
+        .hidden-file-input {
+            display: none;
+        }
+        
+        /* Label showing file name */
+        .file-name-display {
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #555;
+            min-height: 20px;
+            word-break: break-all;
+        }
+        
+        /* Button to start upload (replaces the Choose File label) */
+        .upload-button {
+            padding: 12px 25px;
+            font-size: 16px;
+            font-weight: 500;
+            color: white;
+            background-color: #10B981;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, opacity 0.3s ease;
+            margin-bottom: 15px;
+            display: inline-block;
+        }
+        
+        .upload-button:hover {
+            background-color: #047857;
+        }
+        
+        .upload-button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        /* Container for the progress bar and its text */
+        .progress-indicator {
+            margin-top: 20px;
+            width: 100%;
+            display: none; /* We'll control visibility via JavaScript */
+        }
+        
+        /* Text accompanying the progress bar */
+        .progress-text {
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #333;
+        }
+        
+        /* The outer container of the progress bar */
+        .progress-bar-container {
+            width: 100%;
+            background-color: #e9ecef;
+            border-radius: 25px;
+            height: 20px;
+            overflow: hidden;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        /* The actual filling part of the progress bar */
+        .progress-bar {
+            width: 0%;
+            height: 100%;
+            background-color: #10B981;
+            background-image: linear-gradient(45deg, rgba(255,255,255,.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.15) 50%, rgba(255,255,255,.15) 75%, transparent 75%, transparent);
+            background-size: 1rem 1rem;
+            border-radius: 25px;
+            text-align: center;
+            line-height: 20px;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+            transition: width 0.4s ease-in-out;
+        }
+        
+        /* Status message displayed after completion */
+        .status-message {
+            margin-top: 15px;
+            color: #10B981;
+            font-weight: bold;
+            font-size: 15px;
+            display: none;
+        }
+    </style>
 </head>
 
 <body>
@@ -400,21 +514,19 @@
 
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Attach File <span class="text-red-500">*</span></label>
-                            <div id="single-dropZone" class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-primary transition-colors duration-200 ease-in-out">
-                                <div class="space-y-1 text-center">
-                                    <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
-                                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                                    </svg>
-                                    <div class="flex text-sm text-gray-600 justify-center">
-                                        <label for="single-file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-primary-dark">
-                                            <span>Upload a file</span>
-                                            <input id="single-file-upload" name="file-upload" type="file" class="hidden-file-input" required accept=".pdf">
-                                        </label>
-                                        <p class="pl-1">or drag and drop</p>
+                            <div id="single-dropZone" class="file-input-container">
+                                <label for="single-file-upload" id="single-file-label" class="file-input-label">Choose File</label>
+                                <input id="single-file-upload" name="file-upload" type="file" class="hidden-file-input" required accept=".pdf">
+                                <div id="single-fileNameDisplay" class="file-name-display">No file selected</div>
+                                
+                                <div id="single-progress-indicator" class="progress-indicator">
+                                    <div id="single-progress-text" class="progress-text">Preparing file...</div>
+                                    <div class="progress-bar-container">
+                                        <div id="single-progress-bar" class="progress-bar">0%</div>
                                     </div>
-                                    <p class="text-xs text-gray-500">PDF up to 10MB</p>
-                                    <p id="single-fileNameDisplay" class="text-sm text-gray-900 font-medium pt-2"></p>
                                 </div>
+                                
+                                <div id="single-status-message" class="status-message"></div>
                             </div>
                         </div>
 
@@ -511,21 +623,19 @@
 
                         <div class="mt-6 mb-6">
                             <label class="block text-sm font-medium text-gray-700 mb-2">Attach Foreword Document <span class="text-red-500">*</span></label>
-                            <div id="foreword-dropZone" class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-primary transition-colors duration-200 ease-in-out">
-                                <div class="space-y-1 text-center">
-                                    <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
-                                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                                    </svg>
-                                    <div class="flex text-sm text-gray-600 justify-center">
-                                        <label for="foreword-file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-primary-dark">
-                                            <span>Upload a file</span>
-                                            <input id="foreword-file-upload" name="foreword" type="file" class="hidden-file-input" required accept=".pdf">
-                                        </label>
-                                        <p class="pl-1">or drag and drop</p>
+                            <div id="foreword-dropZone" class="file-input-container">
+                                <label for="foreword-file-upload" id="foreword-file-label" class="file-input-label">Choose File</label>
+                                <input id="foreword-file-upload" name="foreword" type="file" class="hidden-file-input" required accept=".pdf">
+                                <div id="foreword-fileNameDisplay" class="file-name-display">No file selected</div>
+                                
+                                <div id="foreword-progress-indicator" class="progress-indicator">
+                                    <div id="foreword-progress-text" class="progress-text">Preparing file...</div>
+                                    <div class="progress-bar-container">
+                                        <div id="foreword-progress-bar" class="progress-bar">0%</div>
                                     </div>
-                                    <p class="text-xs text-gray-500">PDF up to 10MB</p>
-                                    <p id="foreword-fileNameDisplay" class="text-sm text-gray-900 font-medium pt-2"></p>
                                 </div>
+                                
+                                <div id="foreword-status-message" class="status-message"></div>
                             </div>
                             <p class="mt-2 text-xs text-gray-500">Upload the foreword document that will be included at the beginning of the compiled document.</p>
                         </div>
@@ -568,21 +678,19 @@
                                         </div>
                                         <div>
                                             <label for="attach-file-1" class="block text-sm font-medium text-gray-700 mb-1">Attach File</label>
-                                            <div id="file-upload-container-1" class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-primary transition-colors duration-200 ease-in-out">
-                                                <div class="space-y-1 text-center">
-                                                    <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
-                                                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                                                    </svg>
-                                                    <div class="flex text-sm text-gray-600 justify-center">
-                                                        <label for="file-upload-1" class="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-primary-dark">
-                                                            <span>Upload a file</span>
-                                                            <input id="file-upload-1" name="research[1][file]" type="file" class="hidden-file-input" required accept=".pdf">
-                                                        </label>
-                                                        <p class="pl-1">or drag and drop</p>
+                                            <div id="file-upload-container-1" class="file-input-container">
+                                                <label for="file-upload-1" id="file-label-1" class="file-input-label">Choose File</label>
+                                                <input id="file-upload-1" name="research[1][file]" type="file" class="hidden-file-input" required accept=".pdf">
+                                                <div class="file-name-display">No file selected</div>
+                                                
+                                                <div id="research-progress-indicator-1" class="progress-indicator">
+                                                    <div id="research-progress-text-1" class="progress-text">Preparing file...</div>
+                                                    <div class="progress-bar-container">
+                                                        <div id="research-progress-bar-1" class="progress-bar">0%</div>
                                                     </div>
-                                                    <p class="text-xs text-gray-500">PDF up to 10MB</p>
-                                                    <p class="file-name-display text-sm text-gray-900 font-medium pt-2"></p>
                                                 </div>
+                                                
+                                                <div id="research-status-message-1" class="status-message"></div>
                                             </div>
                                         </div>
                                         <div class="abstract-preview-section mt-2 hidden">
@@ -907,21 +1015,19 @@
                         </div>
                         <div>
                             <label for="attach-file-${sectionCounter}" class="block text-sm font-medium text-gray-700 mb-1">Attach File</label>
-                            <div id="file-upload-container-${sectionCounter}" class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-primary transition-colors duration-200 ease-in-out">
-                                <div class="space-y-1 text-center">
-                                    <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
-                                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                                    </svg>
-                                    <div class="flex text-sm text-gray-600 justify-center">
-                                        <label for="file-upload-${sectionCounter}" class="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-primary-dark">
-                                            <span>Upload a file</span>
-                                            <input id="file-upload-${sectionCounter}" name="research[${sectionCounter}][file]" type="file" class="hidden-file-input" required accept=".pdf">
-                                        </label>
-                                        <p class="pl-1">or drag and drop</p>
+                            <div id="file-upload-container-${sectionCounter}" class="file-input-container">
+                                <label for="file-upload-${sectionCounter}" id="file-label-${sectionCounter}" class="file-input-label">Choose File</label>
+                                <input id="file-upload-${sectionCounter}" name="research[${sectionCounter}][file]" type="file" class="hidden-file-input" required accept=".pdf">
+                                <div class="file-name-display">No file selected</div>
+                                
+                                <div id="research-progress-indicator-${sectionCounter}" class="progress-indicator">
+                                    <div id="research-progress-text-${sectionCounter}" class="progress-text">Preparing file...</div>
+                                    <div class="progress-bar-container">
+                                        <div id="research-progress-bar-${sectionCounter}" class="progress-bar">0%</div>
                                     </div>
-                                    <p class="text-xs text-gray-500">PDF up to 10MB</p>
-                                    <p class="file-name-display text-sm text-gray-900 font-medium pt-2"></p>
                                 </div>
+                                
+                                <div id="research-status-message-${sectionCounter}" class="status-message"></div>
                             </div>
                         </div>
                         <div class="abstract-preview-section mt-2 hidden">
@@ -1138,14 +1244,14 @@
             // Handle form submissions (placeholder)
             document.getElementById('uploadSingleForm').addEventListener('submit', function(e) {
                 e.preventDefault();
-                // Add actual form submission logic here
-                alert('Single document form submitted!');
+                // The actual form submission is handled by handleSingleDocumentSubmit function
+                // No need for additional alerts here
             });
             
             document.getElementById('uploadCompiledForm').addEventListener('submit', function(e) {
                 e.preventDefault();
-                // Add actual form submission logic here
-                alert('Compiled document form submitted!');
+                // The actual form submission is handled by handleCompiledDocumentSubmit function
+                // No need for additional alerts here
             });
         });
     </script>
@@ -1177,13 +1283,17 @@
             
             // Add functionality to the Read Document button
             if (readDocBtn) {
-                readDocBtn.addEventListener('click', function() {
-                    // Only open document if a file is selected
-                    if (fileInput && fileInput.files && fileInput.files[0]) {
-                        const url = URL.createObjectURL(fileInput.files[0]);
-                        window.open(url, '_blank');
-                    } else {
-                        alert('Please upload a document first');
+                readDocBtn.addEventListener('click', function(e) {
+                    // If button is disabled, prevent default action and show message
+                    if (this.disabled) {
+                        e.preventDefault();
+                        Swal.fire({
+                            icon: 'info',
+                            title: 'No Document',
+                            text: 'Please upload a document first',
+                            confirmButtonColor: '#10B981'
+                        });
+                        return false;
                     }
                 });
             }
@@ -2102,6 +2212,224 @@
                         if (issuedNoLabel) issuedNoLabel.textContent = 'Issued No.';
                     }
                 });
+            }
+        });
+    </script>
+
+    <!-- Add JavaScript for the enhanced file upload UI -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Setup file upload UI for single document
+            setupFileUpload(
+                'single-file-upload', 
+                'single-file-label',
+                'single-fileNameDisplay', 
+                'single-progress-indicator', 
+                'single-progress-bar',
+                'single-progress-text',
+                'single-status-message'
+            );
+            
+            // Setup file upload UI for foreword document
+            setupFileUpload(
+                'foreword-file-upload', 
+                'foreword-file-label',
+                'foreword-fileNameDisplay', 
+                'foreword-progress-indicator', 
+                'foreword-progress-bar',
+                'foreword-progress-text',
+                'foreword-status-message'
+            );
+            
+            // Setup file upload UI for initial research section
+            setupFileUpload(
+                'file-upload-1', 
+                'file-label-1',
+                null, // Will find the nearest .file-name-display
+                'research-progress-indicator-1', 
+                'research-progress-bar-1',
+                'research-progress-text-1',
+                'research-status-message-1'
+            );
+            
+            // Function to set up file upload UI components
+            function setupFileUpload(fileInputId, fileLabelId, fileNameDisplayId, progressIndicatorId, progressBarId, progressTextId, statusMessageId) {
+                const fileInput = document.getElementById(fileInputId);
+                const fileLabel = document.getElementById(fileLabelId);
+                const fileNameDisplay = fileNameDisplayId ? document.getElementById(fileNameDisplayId) : 
+                                       fileInput.closest('.file-input-container').querySelector('.file-name-display');
+                const progressIndicator = document.getElementById(progressIndicatorId);
+                const progressBar = document.getElementById(progressBarId);
+                const progressText = document.getElementById(progressTextId);
+                const statusMessage = document.getElementById(statusMessageId);
+                
+                let selectedFile = null;
+                
+                // Handle file selection
+                fileInput.addEventListener('change', function(e) {
+                    if (e.target.files.length > 0) {
+                        selectedFile = e.target.files[0];
+                        fileNameDisplay.textContent = `Selected: ${selectedFile.name}`;
+                        
+                        // Hide the label as we'll show progress bar instead
+                        fileLabel.style.display = 'none';
+                        
+                        // Show progress indicator immediately
+                        progressIndicator.style.display = 'block';
+                        progressBar.style.width = '0%';
+                        progressBar.textContent = '0%';
+                        progressText.textContent = 'Preparing file...';
+                        
+                        // Automatically start upload process
+                        startUpload(selectedFile);
+                        
+                        // For research sections, update the abstract preview if applicable
+                        if (fileInputId.startsWith('file-upload-') && selectedFile.type === 'application/pdf') {
+                            const section = fileInput.closest('.research-section');
+                            if (section) {
+                                const abstractContent = section.querySelector('.abstract-content');
+                                const abstractPreviewSection = section.querySelector('.abstract-preview-section');
+                                
+                                if (abstractContent && abstractPreviewSection) {
+                                    abstractContent.textContent = 'Abstract will be extracted after upload...';
+                                    abstractPreviewSection.classList.remove('hidden');
+                                }
+                            }
+                        }
+                        
+                        // Update studies list if applicable
+                        if (typeof updateStudiesList === 'function' && document.getElementById('compiledDocPreview').classList.contains('active')) {
+                            setTimeout(updateStudiesList, 10);
+                        }
+                    } else {
+                        fileNameDisplay.textContent = 'No file selected';
+                        resetFileLabel();
+                    }
+                });
+                
+                // Function to reset the file label to "Choose File"
+                function resetFileLabel() {
+                    fileLabel.textContent = 'Choose File';
+                    fileLabel.classList.remove('upload-button');
+                    fileLabel.classList.add('file-input-label');
+                    fileLabel.onclick = null; // Remove the custom click handler
+                    selectedFile = null;
+                }
+                
+                // Function to handle the upload process
+                function startUpload(file) {
+                    if (!file) return;
+                    
+                    // Hide the upload button
+                    fileLabel.style.display = 'none';
+                    progressIndicator.style.display = 'block';
+                    
+                    let progress = 10; // Start at 10% immediately
+                    progressBar.style.width = progress + '%';
+                    progressBar.textContent = progress + '%';
+                    progressText.textContent = 'Initializing preparation...';
+                    
+                    // Simulate file preparation progress
+                    const interval = setInterval(() => {
+                        progress += 10;
+                        if (progress <= 100) {
+                            progressBar.style.width = progress + '%';
+                            progressBar.textContent = progress + '%';
+                            
+                            // Update progress text based on current progress
+                            if (progress < 30) {
+                                progressText.textContent = 'Initializing preparation...';
+                            } else if (progress < 70) {
+                                progressText.textContent = 'Processing metadata...';
+                            } else {
+                                progressText.textContent = 'Finalizing preparation...';
+                            }
+                        } else {
+                            // Preparation is complete
+                            clearInterval(interval);
+                            progressBar.style.width = '100%';
+                            progressBar.textContent = '100%';
+                            progressText.textContent = 'File preparation complete!';
+                            statusMessage.textContent = `"${file.name}" is ready for submission.`;
+                            statusMessage.style.display = 'block';
+                            
+                            // No longer show the Choose File button again
+                            // Just keep the progress bar visible to show completion status
+                            
+                            // Extract PDF abstract for research sections
+                            if (fileInputId.startsWith('file-upload-') && file.type === 'application/pdf') {
+                                const section = fileInput.closest('.research-section');
+                                if (section) {
+                                    const abstractContent = section.querySelector('.abstract-content');
+                                    if (abstractContent && window.extractPDFAbstractForCompiledDoc) {
+                                        window.extractPDFAbstractForCompiledDoc(file, abstractContent);
+                                    }
+                                }
+                            }
+                            
+                            // Update studies list if applicable
+                            if (typeof updateStudiesList === 'function') {
+                                setTimeout(updateStudiesList, 10);
+                            }
+                        }
+                    }, 300);
+                }
+            }
+            
+            // Modify the addSectionBtn event handler to setup file upload UI for new sections
+            const addSectionBtn = document.getElementById('add-research-section-btn');
+            if (addSectionBtn) {
+                const originalClickHandler = addSectionBtn.onclick;
+                
+                addSectionBtn.onclick = function() {
+                    if (originalClickHandler) {
+                        // Call the original handler first
+                        originalClickHandler.apply(this, arguments);
+                    }
+                    
+                    // Get the newly added section and setup file upload UI
+                    setTimeout(() => {
+                        const sections = document.querySelectorAll('.research-section');
+                        const newSection = sections[sections.length - 1];
+                        if (newSection) {
+                            const sectionId = newSection.dataset.sectionId;
+                            const fileInput = newSection.querySelector(`#file-upload-${sectionId}`);
+                            
+                            if (fileInput) {
+                                // Update the file input container HTML
+                                const fileContainer = fileInput.closest('div');
+                                if (fileContainer) {
+                                    fileContainer.className = 'file-input-container';
+                                    fileContainer.innerHTML = `
+                                        <label for="file-upload-${sectionId}" id="file-label-${sectionId}" class="file-input-label">Choose File</label>
+                                        <input id="file-upload-${sectionId}" name="research[${sectionId}][file]" type="file" class="hidden-file-input" required accept=".pdf">
+                                        <div class="file-name-display">No file selected</div>
+                                        
+                                        <div id="research-progress-indicator-${sectionId}" class="progress-indicator">
+                                            <div id="research-progress-text-${sectionId}" class="progress-text">Preparing file...</div>
+                                            <div class="progress-bar-container">
+                                                <div id="research-progress-bar-${sectionId}" class="progress-bar">0%</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div id="research-status-message-${sectionId}" class="status-message"></div>
+                                    `;
+                                    
+                                    // Setup the file upload UI for this new section
+                                    setupFileUpload(
+                                        `file-upload-${sectionId}`,
+                                        `file-label-${sectionId}`,
+                                        null,
+                                        `research-progress-indicator-${sectionId}`, 
+                                        `research-progress-bar-${sectionId}`,
+                                        `research-progress-text-${sectionId}`,
+                                        `research-status-message-${sectionId}`
+                                    );
+                                }
+                            }
+                        }
+                    }, 100);
+                };
             }
         });
     </script>

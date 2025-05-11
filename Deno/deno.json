@@ -1,16 +1,8 @@
 {
   "tasks": {
-    "dev": "deno run --watch --allow-net main.ts"
-  },
-  "imports": {
-    "@std/assert": "jsr:@std/assert@1",
-    "@/components/": "./components/",
-    "@/lib/": "./lib/"
-  },
-  "compilerOptions": {
-    "lib": ["deno.window"],
-    "jsx": "react-jsx",
-    "jsxImportSource": "https://esm.sh/react"
+    "dev": "deno run --allow-net --allow-read --allow-write --allow-env --unstable server.ts",
+    "start": "deno run --allow-net --allow-read --allow-write --allow-env server.ts",
+    "watch": "deno run --watch --allow-net --allow-read --allow-write --allow-env server.ts",
+    "debug": "deno run --inspect-brk --allow-net --allow-read --allow-write --allow-env server.ts"
   }
-  
-}
+} 

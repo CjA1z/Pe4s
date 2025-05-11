@@ -16,6 +16,7 @@ console.log("SMTP Password set:", Deno.env.get("SMTP_PASSWORD") ? "Yes" : "No");
 // -----------------------------
 import { Application, Router, FormDataReader } from "./deps.ts";
 import { ensureDir } from "https://deno.land/std@0.190.0/fs/ensure_dir.ts";
+import { join } from "https://deno.land/std@0.190.0/path/mod.ts";
 import { connectToDb, diagnoseDatabaseIssues } from "./db/denopost_conn.ts"; // Using connectToDb from conn.ts
 import { client } from "./db/denopost_conn.ts"; // Client for database queries
 import { routes } from "./routes/index.ts"; // All route handlers in one file
@@ -124,12 +125,15 @@ app.use(async (ctx, next) => {
   // Check if the request is for a file in the storage directory
   if (ctx.request.url.pathname.startsWith('/storage/')) {
     try {
-      // Remove leading slash
+      // Get the workspace root directory (parent of Deno directory)
+      const workspaceRoot = Deno.cwd().replace(/[\\/]Deno$/, '');
+      
+      // Remove leading slash and create path relative to workspace root
       const path = ctx.request.url.pathname.substring(1);
-      console.log(`Attempting to serve file: ${path}`);
+      console.log(`Attempting to serve file: ${path} from workspace root: ${workspaceRoot}`);
       
       await ctx.send({
-        root: Deno.cwd(),
+        root: workspaceRoot,  // Use the workspace root to find the file
         path,
       });
     } catch (err) {
@@ -871,6 +875,8 @@ console.log("Unified Archive API routes registered");
 // Add a route for file uploads
 router.post("/api/upload", async (ctx) => {
   try {
+    console.log("[UPLOAD_DEBUG] Starting upload request processing");
+    
     // Check if content type is multipart/form-data
     const contentType = ctx.request.headers.get("content-type");
     if (!contentType || !contentType.includes("multipart/form-data")) {
@@ -882,8 +888,8 @@ router.post("/api/upload", async (ctx) => {
     // Get form data with increased size limits for larger files
     const form = await ctx.request.body({ type: "form-data" }).value;
     const data = await form.read({ 
-      maxFileSize: 100_000_000, // 100MB limit
-      maxSize: 120_000_000 // 120MB total form limit
+      maxFileSize: 500_000_000, // 500MB limit
+      maxSize: 550_000_000 // 550MB total form limit
     });
     
     // Get file from form data
@@ -901,10 +907,10 @@ router.post("/api/upload", async (ctx) => {
         }
       }
       
-    if (!file) {
-      ctx.response.status = 400;
+      if (!file) {
+        ctx.response.status = 400;
         ctx.response.body = { error: "No file provided in the request" };
-      return;
+        return;
       }
     }
     
@@ -913,37 +919,91 @@ router.post("/api/upload", async (ctx) => {
       file.name = "unnamed_file";
     }
     
-    // Get storage path from form data
-    const storagePath = data.fields.storagePath || "storage/uploads";
+    // Get storage path from form data or original path for replacements
+    let storagePath = data.fields.storagePath;
+    const isReplacement = data.fields.is_replacement === "true";
+    const originalName = data.fields.original_name;
+    let originalPath = data.fields.original_path;
     
-    // Log detailed information for debugging
-    console.log("Upload request details:");
-    console.log("- File name:", file.name || file.filename);
-    console.log("- File size:", file.size, "bytes");
-    console.log("- Storage path:", storagePath);
-    console.log("- Temporary path:", file.path);
+    // Get document type and category information
+    const documentType = data.fields.document_type || "GENERAL";
+    const category = data.fields.category;
     
-    // Ensure the path has a trailing slash
-    const normalizedPath = storagePath.endsWith("/") ? storagePath : `${storagePath}/`;
-    
-    // Make sure the directory exists before saving
-    try {
-      await ensureDir(normalizedPath);
-      console.log(`- Directory ${normalizedPath} ensured`);
-    } catch (dirError) {
-      console.error(`- Failed to create directory ${normalizedPath}:`, dirError);
-      throw new Error(`Could not create storage directory: ${dirError.message}`);
+    // Validate document type
+    const validDocumentTypes = ["THESIS", "DISSERTATION", "CONFLUENCE", "SYNERGY", "HELLO"];
+    if (!validDocumentTypes.includes(documentType.toUpperCase())) {
+      ctx.response.status = 400;
+      ctx.response.body = { error: `Invalid document type. Must be one of: ${validDocumentTypes.join(", ")}` };
+      return;
     }
     
+    console.log("[UPLOAD_DEBUG] Request details:");
+    console.log("- File name:", file.name || file.filename);
+    console.log("- File size:", file.size, "bytes");
+    console.log("- Is replacement:", isReplacement);
+    console.log("- Original name:", originalName);
+    console.log("- Original path:", originalPath);
+    
+    // Normalize path separators to forward slashes and remove leading/trailing slashes
+    if (originalPath) {
+      originalPath = originalPath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+    }
+    
+    // For replacements, use the directory from the original path
+    if (isReplacement && originalPath) {
+      const lastSlashIndex = originalPath.lastIndexOf('/');
+      if (lastSlashIndex !== -1) {
+        storagePath = originalPath.substring(0, lastSlashIndex);
+        console.log("[UPLOAD_DEBUG] Using storage path from original:", storagePath);
+      }
+    }
+    
+    // Default to hello directory if no path specified
+    if (!storagePath) {
+      storagePath = "storage/hello";
+    }
+    
+    // Normalize storage path
+    storagePath = storagePath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+    
+    // Get the workspace root directory (parent of Deno directory)
+    const workspaceRoot = Deno.cwd().replace(/[\\/]Deno$/, '');
+    
+    // Make sure the storage path is for the workspace level, not inside the Deno directory
+    if (storagePath.includes("Deno/storage")) {
+      storagePath = storagePath.replace("Deno/storage", "storage");
+      console.log("[UPLOAD_DEBUG] Fixed storage path to be at workspace level:", storagePath);
+    }
+    
+    console.log("[UPLOAD_DEBUG] Final storage path:", storagePath);
+    console.log("[UPLOAD_DEBUG] Workspace root:", workspaceRoot);
+    
+    // Save file with replacement options if needed
+    const saveOptions = isReplacement && originalName ? {
+      keepOriginalName: true,
+      originalName: originalName,
+      originalPath: originalPath, // Pass the full original path to the upload service
+      documentType,
+      category
+    } : {
+      documentType,
+      category
+    };
+    
+    console.log("[UPLOAD_DEBUG] Saving file with options:", saveOptions);
+    
     // Save file
-    const fileResult = await saveFile(file, normalizedPath);
+    const fileResult = await saveFile(file, storagePath, saveOptions);
+    console.log("[UPLOAD_DEBUG] File saved successfully:", fileResult);
     
     // Verify file was saved
+    const fullFilePath = join(workspaceRoot, fileResult.path).replace(/\\/g, '/');
     try {
-      const stat = await Deno.stat(fileResult.path);
-      console.log(`- File successfully verified at ${fileResult.path} (${stat.size} bytes)`);
-    } catch (statError) {
-      console.error(`- Warning: Could not verify file at ${fileResult.path}:`, statError);
+      const stat = await Deno.stat(fullFilePath);
+      console.log("[UPLOAD_DEBUG] File verified at", fullFilePath, "size:", stat.size, "bytes");
+    } catch (statError: unknown) {
+      const errorMessage = statError instanceof Error ? statError.message : String(statError);
+      console.error("[UPLOAD_DEBUG] Could not verify saved file:", errorMessage);
     }
     
     // Extract metadata if it's a PDF file
@@ -951,32 +1011,68 @@ router.post("/api/upload", async (ctx) => {
     const isPdf = (file.name || file.filename || "").toLowerCase().endsWith('.pdf');
     
     if (isPdf) {
-      console.log("- Extracting PDF metadata...");
+      console.log("[UPLOAD_DEBUG] Extracting PDF metadata");
       try {
-        metadata = await extractPdfMetadata(fileResult.path);
-        console.log("- PDF metadata extracted:", metadata);
-      } catch (metadataError) {
-        console.error("- Error extracting PDF metadata:", metadataError);
-        // Continue even if metadata extraction fails
+        metadata = await extractPdfMetadata(fullFilePath);
+        console.log("[UPLOAD_DEBUG] PDF metadata extracted:", metadata);
+      } catch (metadataError: unknown) {
+        const errorMessage = metadataError instanceof Error ? metadataError.message : String(metadataError);
+        console.error("[UPLOAD_DEBUG] Error extracting PDF metadata:", errorMessage);
       }
     }
     
     // Return response with file path and metadata
-    ctx.response.status = 200;
-    ctx.response.body = {
-      message: "File uploaded successfully",
+    const response = {
+      message: isReplacement ? "File replaced successfully" : "File uploaded successfully",
       filePath: "/" + fileResult.path.replace(/\\/g, "/"),
       originalName: fileResult.name,
       size: fileResult.size,
       metadata: metadata || null,
-      fileType: isPdf ? "pdf" : "other"
+      fileType: isPdf ? "pdf" : "other",
+      isReplacement: isReplacement,
+      status: "success",
+      timestamp: new Date().toISOString(),
+      details: {
+        fullPath: fileResult.path,
+        storagePath: storagePath,
+        originalFileName: file.name || file.filename,
+        documentType: documentType
+      }
     };
-  } catch (error) {
-    console.error("Error uploading file:", error);
+    
+    // Ensure the file path starts with /storage/ and does not contain absolute paths
+    if (response.filePath.match(/^\/[A-Za-z]:\//)) {
+      // Extract just the storage path part
+      const parts = response.filePath.split('/');
+      const storageIndex = parts.findIndex(part => part === 'storage');
+      
+      if (storageIndex !== -1) {
+        // Reconstruct the path starting from 'storage'
+        response.filePath = '/' + parts.slice(storageIndex).join('/');
+      }
+    }
+    
+    console.log("[UPLOAD_DEBUG] - Sending response:", response);
+    
+    ctx.response.status = 200;
+    ctx.response.body = response;
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("[UPLOAD_DEBUG] Upload error:", errorMessage);
     ctx.response.status = 500;
     ctx.response.body = {
       error: "Failed to upload file",
-      details: error.message
+      status: "error",
+      details: errorMessage,
+      timestamp: new Date().toISOString(),
+      debug: {
+        errorType: error instanceof Error ? error.name : typeof error,
+        requestInfo: {
+          method: ctx.request.method,
+          url: ctx.request.url.pathname,
+          contentType: ctx.request.headers.get("content-type") || "unknown"
+        }
+      }
     };
   }
 });
@@ -1049,20 +1145,48 @@ router.post("/api/ensure-directory", async (ctx) => {
     
     console.log(`Ensuring directory exists: ${path}`);
     
+    // Get the workspace root directory (parent of Deno directory)
+    const workspaceRoot = Deno.cwd().replace(/[\\/]Deno$/, '');
+    
+    // Make sure path is relative to workspace root, not inside Deno directory
+    let fullPath = path;
+    if (path.includes("Deno/storage/")) {
+      fullPath = path.replace("Deno/storage/", "storage/");
+      console.log(`Fixed path: ${fullPath}`);
+    }
+    
+    // Create absolute path from workspace root
+    const absolutePath = join(workspaceRoot, fullPath);
+    console.log(`Creating directory at absolute path: ${absolutePath}`);
+    
     // Create the directory
-    await ensureDir(path);
+    await ensureDir(absolutePath);
+    
+    // Verify directory was created
+    try {
+      const stat = await Deno.stat(absolutePath);
+      if (!stat.isDirectory) {
+        throw new Error(`Path exists but is not a directory: ${absolutePath}`);
+      }
+      console.log(`Directory verified at: ${absolutePath}`);
+    } catch (verifyError: unknown) {
+      const errorMessage = verifyError instanceof Error ? verifyError.message : String(verifyError);
+      console.error(`Error verifying directory: ${errorMessage}`);
+      throw new Error(`Failed to verify directory: ${errorMessage}`);
+    }
     
     ctx.response.status = 200;
     ctx.response.body = { 
       message: "Directory created successfully",
-      path
+      path: fullPath
     };
-  } catch (error) {
-    console.error("Error creating directory:", error);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("Error creating directory:", errorMessage);
     ctx.response.status = 500;
     ctx.response.body = { 
       error: "Failed to create directory",
-      details: error.message
+      details: errorMessage
     };
   }
 });
@@ -1075,22 +1199,47 @@ async function setupDirectories() {
   console.log("Setting up storage directories...");
   
   try {
-    // Create main storage directory
-    await ensureDir("./storage");
+    // Get the workspace root directory (parent of Deno directory)
+    const workspaceRoot = Deno.cwd().replace(/[\\/]Deno$/, '');
+    console.log("Workspace root:", workspaceRoot);
     
-    // Create subdirectories for different document types
-    await ensureDir("./storage/uploads");
-    await ensureDir("./storage/documents");
-    await ensureDir("./storage/single/thesis");
-    await ensureDir("./storage/single/dissertation");
-    await ensureDir("./storage/compiled/confluence");
-    await ensureDir("./storage/compiled/synergy");
-    await ensureDir("./storage/research_studies");
+    // Create main storage directory at the workspace root level
+    const storageBase = join(workspaceRoot, 'storage');
+    await ensureDir(storageBase);
+    console.log("Created main storage directory at:", storageBase);
     
-    console.log("Storage directories created successfully");
-  } catch (error) {
-    console.error("Error creating storage directories:", error);
-    throw new Error(`Failed to create storage directories: ${error.message}`);
+    // Create only the necessary document type directories
+    const directories = [
+      join(storageBase, 'thesis'),
+      join(storageBase, 'dissertation'),
+      join(storageBase, 'confluence'),
+      join(storageBase, 'synergy'),
+      join(storageBase, 'hello')
+    ];
+    
+    // Create all directories
+    for (const dir of directories) {
+      await ensureDir(dir);
+      console.log("Created directory:", dir);
+    }
+    
+    console.log("Storage directories created successfully at workspace root level");
+    
+    // List the directories that were created to verify
+    try {
+      console.log("\nVerifying storage directories:");
+      for await (const entry of Deno.readDir(storageBase)) {
+        if (entry.isDirectory) {
+          console.log(`- ${entry.name}`);
+        }
+      }
+    } catch (listError) {
+      console.error("Error listing directories:", listError);
+    }
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("Error creating storage directories:", errorMessage);
+    throw new Error(`Failed to create storage directories: ${errorMessage}`);
   }
 }
 

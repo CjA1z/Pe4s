@@ -227,6 +227,13 @@ export async function handleSearchResearchAgendaItems(request: Request): Promise
     const url = new URL(request.url);
     const query = url.searchParams.get("q") || "";
     
+    if (!query || query.length < 2) {
+      return new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    
     const items = await ResearchAgendaModel.searchAgendaItems(query);
     
     return new Response(JSON.stringify(items), {

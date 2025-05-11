@@ -1168,10 +1168,5 @@
     "https://esm.sh/react@19.0.0/denonext/jsx-runtime.mjs": "643b749fa9666fbf73619a99fd708722edb4acaa34c8cea7be783a3432367780",
     "https://esm.sh/react@19.0.0/jsx-runtime": "491d2a6b0632208ebc307680e900d5c3246bf6738f3b1ef028a72c94e8b53a62",
     "https://raw.githubusercontent.com/jshttp/mime-db/v1.52.0/db.json": "85c8e1ba609079947c8df83c092900ab0226e1d7b60e5e7105fb7dd701833263"
-  },
-  "workspace": {
-    "dependencies": [
-      "jsr:@std/assert@1"
-    ]
   }
 }
