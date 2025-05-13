@@ -27,6 +27,7 @@ import { extractPdfMetadata } from "./services/pdfService.ts"; // Import PDF ser
 import { fetchDocuments, fetchChildDocuments } from "./services/documentService.ts"; // Import document service
 import documentAuthorRoutes from "./routes/documentAuthorRoutes.ts";
 import fileRoutes from "./routes/fileRoutes.ts"; // Import file routes
+import { uploadRoutes, uploadRoutesAllowedMethods } from "./routes/uploadRoutes.ts"; // Import upload routes
 import { handler as categoryHandler } from "./api/category.ts"; // Import category handler
 import { getDepartments } from "./api/departments.ts";
 import { handleCreateDocument } from "./api/document.ts"; // Import document creation handler
@@ -43,6 +44,7 @@ import { DocumentRequestModel } from "./models/documentRequestModel.ts";
 import { DocumentRequestController } from "./controllers/documentRequestController.ts";
 import { emailRoutes } from "./routes/emailRoutes.ts"; // Import email routes
 import { authorVisitsRoutes, authorVisitsAllowedMethods } from "./routes/authorVisitsRoutes.ts"; // Import author visits routes
+import { pageVisitsRoutes, pageVisitsAllowedMethods } from "./routes/pageVisitsRoutes.ts"; // Import page visits routes
 import { getCompiledDocument } from "./api/compiledDocument.ts";
 import { handleGetUserProfileForNavbar } from "./api/user.ts"; // Import user profile handler
 import { handleLogout } from "./routes/logout.ts"; // Import logout handler
@@ -120,6 +122,57 @@ app.use(async (ctx, next) => {
   }
 });
 
+// Add static file serving middleware for admin directory
+app.use(async (ctx, next) => {
+  if (ctx.request.url.pathname.startsWith('/admin/')) {
+    try {
+      await ctx.send({
+        root: `${Deno.cwd()}`,
+        path: ctx.request.url.pathname,
+      });
+    } catch {
+      await next();
+    }
+  } else {
+    await next();
+  }
+});
+
+// Add special middleware for profile pictures
+app.use(async (ctx, next) => {
+  // Check if the request is for a profile picture (handle both relative and absolute paths)
+  if (ctx.request.url.pathname.match(/\/storage\/authors\/profile-pictures\//) || 
+      ctx.request.url.pathname.match(/\/C:\/Users\/.*\/storage\/authors\/profile-pictures\//)) {
+    try {
+      // Get the workspace root directory (parent of Deno directory)
+      const workspaceRoot = Deno.cwd().replace(/[\\/]Deno$/, '');
+      
+      // Extract just the filename from the path
+      const matches = ctx.request.url.pathname.match(/([^/\\]+)$/);
+      const filename = matches ? matches[1] : null;
+      
+      if (!filename) {
+        throw new Error("Could not extract filename from path");
+      }
+      
+      // Create the correct path directly
+      const correctPath = `storage/authors/profile-pictures/${filename}`;
+      
+      console.log(`Serving profile picture: ${filename} from path: ${correctPath}`);
+      
+      await ctx.send({
+        root: workspaceRoot,
+        path: correctPath,
+      });
+    } catch (err) {
+      console.error(`Error serving profile picture: ${err instanceof Error ? err.message : String(err)}`);
+      await next();
+    }
+  } else {
+    await next();
+  }
+});
+
 // Add static file serving middleware for storage directory
 app.use(async (ctx, next) => {
   // Check if the request is for a file in the storage directory
@@ -130,11 +183,14 @@ app.use(async (ctx, next) => {
       
       // Remove leading slash and create path relative to workspace root
       const path = ctx.request.url.pathname.substring(1);
-      console.log(`Attempting to serve file: ${path} from workspace root: ${workspaceRoot}`);
+      
+      // Normalize the path to handle Windows-style paths
+      const normalizedPath = path.replace(/^[A-Z]:\//, '');
+      console.log(`Attempting to serve file: ${normalizedPath} from workspace root: ${workspaceRoot}`);
       
       await ctx.send({
         root: workspaceRoot,  // Use the workspace root to find the file
-        path,
+        path: normalizedPath,
       });
     } catch (err) {
       console.error(`Error serving file from storage: ${err.message}`);
@@ -852,6 +908,10 @@ app.use(documentAuthorRoutes.allowedMethods());
 app.use(fileRoutes.routes());
 app.use(fileRoutes.allowedMethods());
 
+// Register upload routes
+app.use(uploadRoutes.routes());
+app.use(uploadRoutesAllowedMethods);
+
 // Add router to app
 app.use(router.routes());
 app.use(router.allowedMethods());
@@ -868,214 +928,6 @@ app.use(unifiedArchiveAllowedMethods);
 
 // Log that unified archive API is available
 console.log("Unified Archive API routes registered");
-
-// -----------------------------
-// SECTION: File Upload Route
-// -----------------------------
-// Add a route for file uploads
-router.post("/api/upload", async (ctx) => {
-  try {
-    console.log("[UPLOAD_DEBUG] Starting upload request processing");
-    
-    // Check if content type is multipart/form-data
-    const contentType = ctx.request.headers.get("content-type");
-    if (!contentType || !contentType.includes("multipart/form-data")) {
-      ctx.response.status = 400;
-      ctx.response.body = { error: "Content-Type must be multipart/form-data" };
-      return;
-    }
-    
-    // Get form data with increased size limits for larger files
-    const form = await ctx.request.body({ type: "form-data" }).value;
-    const data = await form.read({ 
-      maxFileSize: 500_000_000, // 500MB limit
-      maxSize: 550_000_000 // 550MB total form limit
-    });
-    
-    // Get file from form data
-    let file = data.files?.[0];
-    
-    if (!file) {
-      // Look for the file in a field named "file" if no files array is found
-      for (const [key, value] of Object.entries(data.fields)) {
-        if (key === "file" && value) {
-          // If the value is a file-like object
-          if (typeof value === "object" && (value.name || value.filename)) {
-            file = value;
-            break;
-          }
-        }
-      }
-      
-      if (!file) {
-        ctx.response.status = 400;
-        ctx.response.body = { error: "No file provided in the request" };
-        return;
-      }
-    }
-    
-    // Check if file has required properties
-    if (!file.name && !file.filename) {
-      file.name = "unnamed_file";
-    }
-    
-    // Get storage path from form data or original path for replacements
-    let storagePath = data.fields.storagePath;
-    const isReplacement = data.fields.is_replacement === "true";
-    const originalName = data.fields.original_name;
-    let originalPath = data.fields.original_path;
-    
-    // Get document type and category information
-    const documentType = data.fields.document_type || "GENERAL";
-    const category = data.fields.category;
-    
-    // Validate document type
-    const validDocumentTypes = ["THESIS", "DISSERTATION", "CONFLUENCE", "SYNERGY", "HELLO"];
-    if (!validDocumentTypes.includes(documentType.toUpperCase())) {
-      ctx.response.status = 400;
-      ctx.response.body = { error: `Invalid document type. Must be one of: ${validDocumentTypes.join(", ")}` };
-      return;
-    }
-    
-    console.log("[UPLOAD_DEBUG] Request details:");
-    console.log("- File name:", file.name || file.filename);
-    console.log("- File size:", file.size, "bytes");
-    console.log("- Is replacement:", isReplacement);
-    console.log("- Original name:", originalName);
-    console.log("- Original path:", originalPath);
-    
-    // Normalize path separators to forward slashes and remove leading/trailing slashes
-    if (originalPath) {
-      originalPath = originalPath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-    }
-    
-    // For replacements, use the directory from the original path
-    if (isReplacement && originalPath) {
-      const lastSlashIndex = originalPath.lastIndexOf('/');
-      if (lastSlashIndex !== -1) {
-        storagePath = originalPath.substring(0, lastSlashIndex);
-        console.log("[UPLOAD_DEBUG] Using storage path from original:", storagePath);
-      }
-    }
-    
-    // Default to hello directory if no path specified
-    if (!storagePath) {
-      storagePath = "storage/hello";
-    }
-    
-    // Normalize storage path
-    storagePath = storagePath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-    
-    // Get the workspace root directory (parent of Deno directory)
-    const workspaceRoot = Deno.cwd().replace(/[\\/]Deno$/, '');
-    
-    // Make sure the storage path is for the workspace level, not inside the Deno directory
-    if (storagePath.includes("Deno/storage")) {
-      storagePath = storagePath.replace("Deno/storage", "storage");
-      console.log("[UPLOAD_DEBUG] Fixed storage path to be at workspace level:", storagePath);
-    }
-    
-    console.log("[UPLOAD_DEBUG] Final storage path:", storagePath);
-    console.log("[UPLOAD_DEBUG] Workspace root:", workspaceRoot);
-    
-    // Save file with replacement options if needed
-    const saveOptions = isReplacement && originalName ? {
-      keepOriginalName: true,
-      originalName: originalName,
-      originalPath: originalPath, // Pass the full original path to the upload service
-      documentType,
-      category
-    } : {
-      documentType,
-      category
-    };
-    
-    console.log("[UPLOAD_DEBUG] Saving file with options:", saveOptions);
-    
-    // Save file
-    const fileResult = await saveFile(file, storagePath, saveOptions);
-    console.log("[UPLOAD_DEBUG] File saved successfully:", fileResult);
-    
-    // Verify file was saved
-    const fullFilePath = join(workspaceRoot, fileResult.path).replace(/\\/g, '/');
-    try {
-      const stat = await Deno.stat(fullFilePath);
-      console.log("[UPLOAD_DEBUG] File verified at", fullFilePath, "size:", stat.size, "bytes");
-    } catch (statError: unknown) {
-      const errorMessage = statError instanceof Error ? statError.message : String(statError);
-      console.error("[UPLOAD_DEBUG] Could not verify saved file:", errorMessage);
-    }
-    
-    // Extract metadata if it's a PDF file
-    let metadata = null;
-    const isPdf = (file.name || file.filename || "").toLowerCase().endsWith('.pdf');
-    
-    if (isPdf) {
-      console.log("[UPLOAD_DEBUG] Extracting PDF metadata");
-      try {
-        metadata = await extractPdfMetadata(fullFilePath);
-        console.log("[UPLOAD_DEBUG] PDF metadata extracted:", metadata);
-      } catch (metadataError: unknown) {
-        const errorMessage = metadataError instanceof Error ? metadataError.message : String(metadataError);
-        console.error("[UPLOAD_DEBUG] Error extracting PDF metadata:", errorMessage);
-      }
-    }
-    
-    // Return response with file path and metadata
-    const response = {
-      message: isReplacement ? "File replaced successfully" : "File uploaded successfully",
-      filePath: "/" + fileResult.path.replace(/\\/g, "/"),
-      originalName: fileResult.name,
-      size: fileResult.size,
-      metadata: metadata || null,
-      fileType: isPdf ? "pdf" : "other",
-      isReplacement: isReplacement,
-      status: "success",
-      timestamp: new Date().toISOString(),
-      details: {
-        fullPath: fileResult.path,
-        storagePath: storagePath,
-        originalFileName: file.name || file.filename,
-        documentType: documentType
-      }
-    };
-    
-    // Ensure the file path starts with /storage/ and does not contain absolute paths
-    if (response.filePath.match(/^\/[A-Za-z]:\//)) {
-      // Extract just the storage path part
-      const parts = response.filePath.split('/');
-      const storageIndex = parts.findIndex(part => part === 'storage');
-      
-      if (storageIndex !== -1) {
-        // Reconstruct the path starting from 'storage'
-        response.filePath = '/' + parts.slice(storageIndex).join('/');
-      }
-    }
-    
-    console.log("[UPLOAD_DEBUG] - Sending response:", response);
-    
-    ctx.response.status = 200;
-    ctx.response.body = response;
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error("[UPLOAD_DEBUG] Upload error:", errorMessage);
-    ctx.response.status = 500;
-    ctx.response.body = {
-      error: "Failed to upload file",
-      status: "error",
-      details: errorMessage,
-      timestamp: new Date().toISOString(),
-      debug: {
-        errorType: error instanceof Error ? error.name : typeof error,
-        requestInfo: {
-          method: ctx.request.method,
-          url: ctx.request.url.pathname,
-          contentType: ctx.request.headers.get("content-type") || "unknown"
-        }
-      }
-    };
-  }
-});
 
 // -----------------------------
 // SECTION: Document Metadata Update Route
@@ -1214,7 +1066,8 @@ async function setupDirectories() {
       join(storageBase, 'dissertation'),
       join(storageBase, 'confluence'),
       join(storageBase, 'synergy'),
-      join(storageBase, 'hello')
+      join(storageBase, 'hello'),
+      join(storageBase, 'authors', 'profile-pictures') // Updated path to match existing structure
     ];
     
     // Create all directories
@@ -1293,6 +1146,11 @@ async function startServer() {
     console.log("Registering author visits routes...");
     app.use(authorVisitsRoutes);
     app.use(authorVisitsAllowedMethods);
+    
+    // Register page visits routes
+    console.log("Registering page visits routes...");
+    app.use(pageVisitsRoutes);
+    app.use(pageVisitsAllowedMethods);
     
     // Start the server
     console.log(`🌐 Server running on http://localhost:${PORT}`);
@@ -1496,6 +1354,118 @@ router.get("/api/compiled-documents/:id", async (ctx) => {
   }
 });
 
+// Add a new endpoint specifically for compiled document children
+router.get("/api/compiled-documents/:id/children", async (ctx) => {
+  try {
+    const id = ctx.params.id;
+    console.log(`Handling request for children of compiled document ID: ${id}`);
+    
+    if (!id) {
+      ctx.response.status = 400;
+      ctx.response.body = { error: "Compiled document ID is required" };
+      return;
+    }
+    
+    // Get the category parameter if specified in the request
+    const url = new URL(ctx.request.url);
+    const categoryParam = url.searchParams.get('category');
+    console.log(`Category parameter for document ${id}: ${categoryParam || 'none'}`);
+    
+    // Fetch child documents
+    const childDocumentsResponse = await fetchChildDocuments(id);
+    let childDocuments = childDocumentsResponse.documents || [];
+    
+    // If we have a category parameter and child documents, filter by category
+    if (categoryParam && childDocuments.length > 0) {
+      console.log(`Filtering ${childDocuments.length} documents by category: ${categoryParam}`);
+      const originalCount = childDocuments.length;
+      
+      // Convert category param to uppercase for case-insensitive comparison
+      const targetCategory = categoryParam.toUpperCase();
+      
+      childDocuments = childDocuments.filter(doc => {
+        const docType = (doc.document_type || '').toUpperCase();
+        // Keep documents matching the target category
+        return docType === targetCategory;
+      });
+      
+      console.log(`Filtered to ${childDocuments.length} documents (removed ${originalCount - childDocuments.length})`);
+    }
+    
+    // Process and enhance child documents if needed
+    const enhancedChildren = await Promise.all(childDocuments.map(async (doc) => {
+      try {
+        // If authors aren't included, try to fetch them
+        if (!doc.authors || doc.authors.length === 0) {
+          try {
+            const authors = await getDocumentAuthors(String(doc.id));
+            doc.authors = authors || [];
+          } catch (err) {
+            console.warn(`Error fetching authors for child document ${doc.id}:`, err);
+          }
+        }
+        
+        // Return enhanced document with file path format fixed if needed
+        return {
+          ...doc,
+          file_path: doc.file_path && !doc.file_path.startsWith('/') ? `/${doc.file_path}` : doc.file_path,
+          document_type: doc.document_type || categoryParam // Use category param as fallback if document_type is missing
+        };
+      } catch (docError) {
+        console.warn(`Error enhancing child document ${doc.id}:`, docError);
+        return doc;
+      }
+    }));
+    
+    console.log(`Returning ${enhancedChildren.length} child documents for compiled document ${id}`);
+    
+    ctx.response.status = 200;
+    ctx.response.body = { 
+      parent_id: id,
+      category: categoryParam,
+      children: enhancedChildren,
+      count: enhancedChildren.length
+    };
+  } catch (error) {
+    console.error(`Error fetching child documents for compiled document ${ctx.params.id}:`, error);
+    ctx.response.status = 500;
+    ctx.response.body = {
+      error: "Failed to fetch child documents",
+      details: error instanceof Error ? error.message : String(error)
+    };
+  }
+});
+
+// Also add an alias to support the /compiled-documents/:id/children endpoint that the frontend tries
+router.get("/compiled-documents/:id/children", async (ctx) => {
+  // Redirect to the API version of the endpoint
+  const id = ctx.params.id;
+  console.log(`Redirecting /compiled-documents/${id}/children to /api/compiled-documents/${id}/children`);
+  
+  try {
+    // Reuse the same handler as the API endpoint
+    const apiRequest = new Request(`${ctx.request.url.origin}/api/compiled-documents/${id}/children`, {
+      method: "GET",
+      headers: ctx.request.headers
+    });
+    
+    // Forward to the main handler
+    const apiResponse = await fetch(apiRequest);
+    
+    // Return the response data
+    ctx.response.status = apiResponse.status;
+    ctx.response.headers = apiResponse.headers;
+    ctx.response.body = await apiResponse.json();
+  } catch (error) {
+    console.error(`Error in compiled documents redirect handler:`, error);
+    ctx.response.status = 500;
+    ctx.response.body = {
+      error: "Failed to fetch child documents", 
+      details: error instanceof Error ? error.message : String(error)
+    };
+  }
+});
+
 // Register user profile endpoint for the navbar
 router.get("/api/user/profile", async (ctx) => {
   const request = new Request(ctx.request.url.toString(), {
@@ -1640,6 +1610,86 @@ router.get("/api/document-views/stats", async (ctx) => {
     console.error("[SERVER] Error fetching document view statistics:", error);
     ctx.response.status = 500;
     ctx.response.body = { error: "Internal server error" };
+  }
+});
+
+// Add endpoint to fetch the foreword specifically for a category type of compiled document
+router.get("/api/compiled-documents/:id/foreword", async (ctx) => {
+  const id = ctx.params.id;
+  
+  if (!id) {
+    ctx.response.status = 400;
+    ctx.response.body = { error: "Compiled document ID is required" };
+    return;
+  }
+  
+  try {
+    // Parse the URL to check for the category query parameter
+    const url = new URL(ctx.request.url);
+    const categoryParam = url.searchParams.get('category');
+    
+    console.log(`Fetching foreword for document ID: ${id}, category param: ${categoryParam || 'none'}`);
+    
+    // First, get the category of the compiled document from the database
+    const categoryQuery = `
+      SELECT category 
+      FROM compiled_documents 
+      WHERE id = $1
+    `;
+    
+    const categoryResult = await client.queryObject(categoryQuery, [id]);
+    
+    if (!categoryResult.rowCount || categoryResult.rowCount === 0) {
+      ctx.response.status = 404;
+      ctx.response.body = { error: `Compiled document with ID ${id} not found` };
+      return;
+    }
+    
+    // Get the category from the database result
+    const dbCategory = (categoryResult.rows[0] as any).category;
+    
+    // Use the explicitly provided category parameter if available, otherwise use the database value
+    const category = categoryParam || dbCategory;
+    console.log(`Using category ${category} for foreword lookup (DB: ${dbCategory}, Param: ${categoryParam || 'none'})`);
+    
+    // Fetch the foreword file path from the compiled_documents table
+    const forewordQuery = `
+      SELECT foreword
+      FROM compiled_documents
+      WHERE id = $1
+    `;
+    
+    const forewordResult = await client.queryObject(forewordQuery, [id]);
+    
+    if (!forewordResult.rowCount || forewordResult.rowCount === 0) {
+      ctx.response.status = 404;
+      ctx.response.body = { error: `Foreword not found for document with ID ${id}` };
+      return;
+    }
+    
+    const forewordPath = (forewordResult.rows[0] as any).foreword;
+    
+    if (!forewordPath) {
+      ctx.response.status = 404;
+      ctx.response.body = { error: `No foreword file path found for document with ID ${id}` };
+      return;
+    }
+    
+    console.log(`Found foreword at path: ${forewordPath} for ${category} document ID: ${id}`);
+    
+    ctx.response.status = 200;
+    ctx.response.body = { 
+      id,
+      category,
+      foreword: forewordPath
+    };
+  } catch (error) {
+    console.error(`Error fetching foreword for compiled document ${id}:`, error);
+    ctx.response.status = 500;
+    ctx.response.body = { 
+      error: "Failed to fetch foreword", 
+      details: error instanceof Error ? error.message : String(error) 
+    };
   }
 });
 

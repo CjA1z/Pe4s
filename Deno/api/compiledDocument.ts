@@ -1,4 +1,4 @@
-import { createCompiledDocument as createCompiledDocumentService, getCompiledDocument as getCompiledDocumentService, addDocumentToCompilation as addDocumentToCompilationService, removeDocumentFromCompilation as removeDocumentFromCompilationService, softDeleteCompiledDocument as softDeleteCompiledDocumentService } from "../services/documentService.ts";
+import { createCompiledDocument as createCompiledDocumentService, getCompiledDocument as getCompiledDocumentService, addDocumentToCompilation as addDocumentToCompilationService, removeDocumentFromCompilation as removeDocumentFromCompilationService, softDeleteCompiledDocument as softDeleteCompiledDocumentService, updateCompiledDocument as updateCompiledDocumentService } from "../services/documentService.ts";
 
 /**
  * Creates a new compiled document
@@ -270,6 +270,112 @@ export async function handleSoftDeleteCompiledDocument(request: Request): Promis
     if (errorMessage.includes('already archived')) {
       return new Response(JSON.stringify({ error: errorMessage }), {
         status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    return new Response(JSON.stringify({ error: errorMessage }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+/**
+ * Updates an existing compiled document
+ * @param compiledDocId The compiled document ID
+ * @param compiledDoc The updated compiled document data
+ * @returns The updated compiled document data
+ */
+export async function updateCompiledDocument(
+  compiledDocId: number,
+  compiledDoc: {
+    start_year?: number;
+    end_year?: number;
+    volume?: number;
+    issue_number?: number;
+    department?: string;
+    category?: string;
+    foreword?: string;
+    title?: string;
+    authors?: any[];
+    topics?: any[];
+    research_agenda?: any[];
+  }
+): Promise<any> {
+  try {
+    // Get the current document to make sure it exists
+    const existingDoc = await getCompiledDocumentService(compiledDocId);
+    
+    if (!existingDoc) {
+      throw new Error(`Compiled document with ID ${compiledDocId} not found`);
+    }
+    
+    console.log(`Compiled document data for ID ${compiledDocId}:`, existingDoc);
+    
+    // Update the document
+    const updatedDoc = await updateCompiledDocumentService(compiledDocId, compiledDoc);
+    return updatedDoc;
+  } catch (error) {
+    console.error(`Error in updateCompiledDocument(${compiledDocId}):`, error);
+    throw error;
+  }
+}
+
+/**
+ * HTTP handler for updating a compiled document
+ * @param request The HTTP request
+ * @returns The HTTP response
+ */
+export async function handleUpdateCompiledDocument(request: Request): Promise<Response> {
+  if (request.method !== 'PUT') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  const url = new URL(request.url);
+  const pathParts = url.pathname.split('/');
+  const id = parseInt(pathParts[pathParts.length - 1], 10);
+
+  if (isNaN(id)) {
+    return new Response(JSON.stringify({ error: 'Invalid ID' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  try {
+    // Parse the request body
+    let body;
+    try {
+      body = await request.json();
+    } catch (e) {
+      return new Response(JSON.stringify({ error: 'Invalid JSON in request body' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Update the document
+    const updatedDoc = await updateCompiledDocument(id, body);
+    
+    return new Response(JSON.stringify({
+      success: true,
+      document: updatedDoc
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error: unknown) {
+    console.error(`Error updating compiled document with ID ${id}:`, error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update compiled document';
+    
+    // Special handling for document not found
+    if (errorMessage.includes('not found')) {
+      return new Response(JSON.stringify({ error: errorMessage }), {
+        status: 404,
         headers: { 'Content-Type': 'application/json' }
       });
     }

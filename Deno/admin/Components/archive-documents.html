@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Archived Documents</title>
+   
+    <link rel="stylesheet" href="/admin/Components/css/archive_documents.css">
+    <link rel="stylesheet" href="/admin/Components/css/side_bar.css">
+    <link rel="stylesheet" href="/admin/Components/css/navbar_header.css">
+ 
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+</head>
+
+<body>
+     <!-- Navbar container -->
+  <div id="navbar-header"></div>
+
+  <!-- Sidebar container -->
+  <div id="sidebar-container"></div>
+  
+ 
+  <!-- Rest of your HTML content -->
+    <div class="docs-container">
+        <div class="category-container">
+            <div class="category-header">
+                <div class="label">
+                    Archives
+                </div>
+                
+                <div class="search-container">
+                    <div class="search-input-wrapper">
+                        <i class="fas fa-search search-icon"></i>
+                        <input type="text" id="search-documents" class="search-input" placeholder="Search archived documents...">
+                    </div>
+                
+                    <div class="sort-container">
+                        <select id="sort-order" class="sort-dropdown">
+                            <option value="latest">Latest to Earliest</option>
+                            <option value="earliest">Earliest to Latest</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Redesigned category section with card layout -->
+            <div class="category-cards-wrapper">
+                <!-- All category -->
+                <div class="category-card" data-category="All">
+                    <div class="category-icon">
+                        <img src="icons/Category-icons/default_category_icon.png" alt="All Icon">
+                    </div>
+                    <div class="category-info">
+                        <div class="category-name">All</div>
+                        <div class="category-count">0 files</div>
+                    </div>
+                </div>
+                
+                <!-- Confluence category -->
+                <div class="category-card" data-category="CONFLUENCE">
+                    <div class="category-icon">
+                        <img src="icons/Category-icons/confluence.png" alt="Confluence Icon">
+                    </div>
+                    <div class="category-info">
+                        <div class="category-name">Confluence</div>
+                        <div class="category-count">0 files</div>
+                    </div>
+                </div>
+
+                <!-- Synergy category -->
+                <div class="category-card" data-category="SYNERGY">
+                    <div class="category-icon">
+                        <img src="icons/Category-icons/synergy.png" alt="Synergy Icon">
+                    </div>
+                    <div class="category-info">
+                        <div class="category-name">Synergy</div>
+                        <div class="category-count">0 files</div>
+                    </div>
+                </div>
+
+                <!-- Dissertation category -->
+                <div class="category-card" data-category="DISSERTATION">
+                    <div class="category-icon">
+                        <img src="icons/Category-icons/dissertation.png" alt="Dissertation Icon">
+                    </div>
+                    <div class="category-info">
+                        <div class="category-name">Dissertation</div>
+                        <div class="category-count">0 files</div>
+                    </div>
+                </div>
+
+                <!-- Thesis category -->
+                <div class="category-card" data-category="THESIS">
+                    <div class="category-icon">
+                        <img src="icons/Category-icons/thesis.png" alt="Thesis Icon">
+                    </div>
+                    <div class="category-info">
+                        <div class="category-name">Thesis</div>
+                        <div class="category-count">0 files</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div id="documents-container" class="document-cards-container">
+            <div id="no-docs-message" class="no-docs">No archived documents found</div>
+        </div>
+
+        <div class="pagination">
+            <div id="entries-info" class="entries-info"></div>
+            <div id="page-links" class="page-links"></div>
+        </div>
+    </div>
+
+    <!-- Add the success and error modals for notifications -->
+    <div id="success-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.3); z-index: 9999; justify-content: center; align-items: flex-start; padding-top: 80px;">
+        <div class="modal-content" style="background-color: #f1f8e9; border-left: 4px solid #4caf50; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 15px 20px; max-width: 400px; width: 100%;">
+            <div style="display: flex; align-items: center;">
+                <div style="margin-right: 15px; color: #4caf50; font-size: 24px;">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <p style="margin: 0; color: #333; font-size: 16px;">Operation completed successfully.</p>
+            </div>
+        </div>
+    </div>
+    
+    <div id="error-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.3); z-index: 9999; justify-content: center; align-items: flex-start; padding-top: 80px;">
+        <div class="modal-content" style="background-color: #fbe9e7; border-left: 4px solid #d32f2f; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 15px 20px; max-width: 400px; width: 100%;">
+            <div style="display: flex; align-items: center;">
+                <div style="margin-right: 15px; color: #d32f2f; font-size: 24px;">
+                    <i class="fas fa-exclamation-circle"></i>
+                </div>
+                <p style="margin: 0; color: #333; font-size: 16px;">An error occurred. Please try again.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        // Use absolute paths for HTML includes
+        fetch('/admin/Components/side_bar.html')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Failed to load sidebar: ${response.status}`);
+                }
+                return response.text();
+            })
+            .then(data => {
+                document.getElementById('sidebar-container').innerHTML = data;
+                
+                // Initialize sidebar functionality after loading
+                if (typeof highlightActiveSidebarLink === 'function') {
+                  highlightActiveSidebarLink();
+                }
+                
+                // Setup logout if it exists
+                if (typeof setupLogout === 'function') {
+                  setupLogout();
+                }
+            })
+            .catch(error => console.error('Error loading sidebar:', error));
+
+        fetch('/admin/Components/navbar_header.html')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Failed to load navbar: ${response.status}`);
+                }
+                return response.text();
+            })
+            .then(data => {
+                document.getElementById('navbar-header').innerHTML = data;
+            })
+            .catch(error => console.error('Error loading navbar:', error));
+            
+        // Initialize archives functionality
+        console.log('Initializing archived document list functionality');
+        setTimeout(() => {
+          // Initialize archive document list functionality after everything has loaded
+          if (typeof initializeArchivedDocumentList === 'function') {
+            console.log('Calling initializeArchivedDocumentList()');
+            initializeArchivedDocumentList();
+          } else {
+            console.error('Archive document list initialization function not found');
+          }
+        }, 100); // Small delay to ensure scripts are fully loaded
+      });
+    </script>
+
+    <!-- Load JS files in the correct order -->
+    <!-- Load document-archive.js first since other scripts depend on its functions -->
+    <script src="/admin/Components/js/document-archive.js"></script>
+    
+    <!-- Debug script to verify documentArchive is loaded -->
+    <script>
+      console.log("DEBUG: Checking document-archive.js loaded correctly:");
+      console.log("window.documentArchive available:", !!window.documentArchive);
+      console.log("showRestoreConfirmation function available:", typeof window.documentArchive?.showRestoreConfirmation === 'function');
+      
+      // Always override the document-archive's function with our own implementation
+      // This ensures we have a working version regardless of initialization issues
+      
+      // Create namespace if it doesn't exist
+      if (!window.documentArchive) {
+        window.documentArchive = {};
+      }
+      
+      // Force override the showRestoreConfirmation function
+      window.documentArchive.showRestoreConfirmation = function(documentId, isCompiled, docTitle) {
+        console.log("Custom showRestoreConfirmation called for:", documentId, isCompiled, docTitle);
+        
+        try {
+          // Create the dialog as a standalone inline element (avoid any style conflicts)
+          const dialogHtml = `
+            <div id="restore-confirm-overlay" 
+                 style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); 
+                        z-index: 100000; display: flex; justify-content: center; align-items: center; animation: fadeIn 0.3s;">
+              <div id="restore-confirm-dialog" 
+                   style="background: white; border-radius: 8px; box-shadow: 0 5px 20px rgba(0,0,0,0.3); 
+                          width: 90%; max-width: 450px; animation: scaleIn 0.3s;">
+                <div style="padding: 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
+                  <h3 style="margin: 0; font-size: 18px; color: #333;">${isCompiled ? 'Restore Compilation' : 'Restore Document'}</h3>
+                  <button id="restore-close-btn" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #777;">&times;</button>
+                </div>
+                <div style="padding: 25px; text-align: center;">
+                  <div style="margin-bottom: 20px; color: #2196F3;">
+                    <i class="fas fa-history" style="font-size: 48px; background: rgba(33, 150, 243, 0.1); 
+                                                   padding: 15px; border-radius: 50%;"></i>
+                  </div>
+                  <p style="margin: 0 0 20px; line-height: 1.5; color: #555; font-size: 16px;">
+                    Are you sure you want to restore "${docTitle || (isCompiled ? 'this compilation' : 'this document')}"?<br>
+                    It will be available in the main document list${isCompiled ? ' along with all its child documents' : ''}.
+                  </p>
+                </div>
+                <div style="padding: 15px 20px; background: #f7f7f7; display: flex; justify-content: flex-end; border-top: 1px solid #eee; border-radius: 0 0 8px 8px;">
+                  <button id="restore-cancel-btn" 
+                          style="background: #f1f1f1; border: 1px solid #ddd; color: #555; padding: 8px 16px; 
+                                 border-radius: 4px; margin-right: 10px; cursor: pointer;">
+                    Cancel
+                  </button>
+                  <button id="restore-confirm-btn" 
+                          style="background: #2196F3; border: 1px solid #1976D2; color: white; padding: 8px 16px; 
+                                 border-radius: 4px; cursor: pointer;">
+                    Restore
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+          
+          // Add animation styles
+          const styleEl = document.createElement('style');
+          styleEl.id = 'restore-dialog-styles';
+          styleEl.textContent = `
+            @keyframes fadeIn {
+              from { opacity: 0; }
+              to { opacity: 1; }
+            }
+            @keyframes scaleIn {
+              from { transform: scale(0.8); opacity: 0; }
+              to { transform: scale(1); opacity: 1; }
+            }
+          `;
+          document.head.appendChild(styleEl);
+          
+          // Add dialog to body
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = dialogHtml;
+          const dialogEl = tempDiv.firstElementChild;
+          document.body.appendChild(dialogEl);
+          
+          console.log("New restore dialog added to document body");
+          
+          // Get elements
+          const overlay = document.getElementById('restore-confirm-overlay');
+          const closeBtn = document.getElementById('restore-close-btn');
+          const cancelBtn = document.getElementById('restore-cancel-btn');
+          const confirmBtn = document.getElementById('restore-confirm-btn');
+          
+          // Handle confirmation
+          function handleConfirm() {
+            console.log("Restoration confirmed for document:", documentId);
+            closeDialog();
+            restoreDocument(documentId, isCompiled, docTitle);
+          }
+          
+          // Handle cancel/close
+          function handleCancel() {
+            console.log("Restoration cancelled for document:", documentId);
+            closeDialog();
+          }
+          
+          // Close dialog and clean up
+          function closeDialog() {
+            if (overlay) {
+              // Fade out animation
+              overlay.style.animation = 'fadeOut 0.2s';
+              setTimeout(() => {
+                document.body.removeChild(overlay);
+                // Remove style element if it exists
+                const styleEl = document.getElementById('restore-dialog-styles');
+                if (styleEl) styleEl.remove();
+              }, 200);
+            }
+          }
+          
+          // Attach event listeners
+          confirmBtn.addEventListener('click', handleConfirm);
+          cancelBtn.addEventListener('click', handleCancel);
+          closeBtn.addEventListener('click', handleCancel);
+          
+          // Process the actual restoration
+          async function restoreDocument(docId, isCompiled, title) {
+            try {
+              console.log(`Restoring document with ID: ${docId}`);
+              
+              // Show loading state on the document card
+              const docCard = document.querySelector(`.document-card[data-id="${docId}"]`);
+              if (docCard) {
+                docCard.classList.add('loading');
+                const actionsElement = docCard.querySelector('.document-actions');
+                if (actionsElement) {
+                  actionsElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Restoring...';
+                }
+              }
+              
+              // Use the unified API endpoint for restoration
+              const response = await fetch(`/api/archives/${docId}`, {
+                method: 'DELETE',
+                headers: {
+                  'Content-Type': 'application/json'
+                }
+              });
+              
+              if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `Server returned ${response.status}: ${response.statusText}`);
+              }
+              
+              const result = await response.json();
+              console.log('Document restored successfully:', result);
+              
+              // Create a success message
+              const successMessage = `${isCompiled ? 'Compilation' : 'Document'} "${title}" has been restored successfully.`;
+              
+              // Show success message
+              const successModal = document.getElementById('success-modal');
+              if (successModal) {
+                const msgElement = successModal.querySelector('p');
+                if (msgElement) {
+                  msgElement.textContent = successMessage;
+                }
+                successModal.style.display = 'flex';
+                setTimeout(() => {
+                  successModal.style.display = 'none';
+                }, 3000);
+              }
+              
+              // Refresh the document list
+              setTimeout(() => {
+                if (typeof loadArchivedDocuments === 'function') {
+                  loadArchivedDocuments(currentPage || 1, false);
+                } else {
+                  // Just reload the page if function not available
+                  window.location.reload();
+                }
+              }, 1000);
+              
+            } catch (error) {
+              console.error('Error restoring document:', error);
+              
+              // Show error message
+              const errorModal = document.getElementById('error-modal');
+              if (errorModal) {
+                const msgElement = errorModal.querySelector('p');
+                if (msgElement) {
+                  msgElement.textContent = `Failed to restore document: ${error.message}`;
+                }
+                errorModal.style.display = 'flex';
+                setTimeout(() => {
+                  errorModal.style.display = 'none';
+                }, 4000);
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error showing confirmation dialog:", error);
+          
+          // As a last resort, show a browser confirm dialog and handle the restore directly
+          const confirmMessage = isCompiled 
+            ? `Are you sure you want to restore "${docTitle || 'this compilation'}"? It will be available in the main document list along with all its child documents.`
+            : `Are you sure you want to restore "${docTitle || 'this document'}"? It will be available in the main document list.`;
+            
+          if (confirm(confirmMessage)) {
+            console.log("Using browser confirm as fallback - user confirmed restoration");
+            
+            // Call the API directly
+            fetch(`/api/archives/${documentId}`, {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            })
+            .then(response => response.json())
+            .then(data => {
+              console.log("Document restored successfully via fallback method");
+              
+              // Show a basic alert for success
+              alert(`Document restored successfully!`);
+              
+              // Reload the page
+              window.location.reload();
+            })
+            .catch(err => {
+              console.error("Error in fallback restoration:", err);
+              alert(`Error restoring document: ${err.message}`);
+            });
+          }
+        }
+      };
+    </script>
+    
+    <script src="/admin/Components/js/archived-document-list.js"></script>
+    <script src="/admin/Components/js/side_bar.js"></script>
+    
+    <!-- Make sure to update title when page loads -->
+    <script>
+      document.title = "Archived Documents - PEAS";
+      
+      // Initialize the archived document list when the page is ready
+      document.addEventListener('DOMContentLoaded', function() {
+        // Initialize archive document list functionality after everything has loaded
+        if (typeof initializeArchivedDocumentList === 'function') {
+          initializeArchivedDocumentList();
+        } else {
+          console.error('Archive document list initialization function not found');
+        }
+      });
+    </script>
+</body>
+
+</html>

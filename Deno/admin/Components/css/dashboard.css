@@ -1,0 +1,569 @@
+.container {
+    max-width: 1200px;
+    
+    background-color: #fffff5;
+    
+    margin: 50px auto;
+}
+ 
+body {
+    height: 100%;
+    width: 100%;
+    overflow-x: hidden;
+    margin: 0;
+    padding: 0;
+    font-family: sans-serif;
+    transition: background-color 0.3s ease, color 0.3s ease;
+    background-color: #fffff5;
+}
+
+.row {
+    display: flex;
+    justify-content: space-between; 
+    gap: 10px;
+    padding: 0; 
+    margin: 10px 0;
+    width: 100%;
+}
+
+.column {
+    flex: 1;
+    width: auto;
+    border-radius: 15px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    padding: 10px;
+    box-sizing: border-box;
+    min-width: 0; /* Prevents flex items from overflowing */
+}
+
+/* Visits column takes 50% less space */
+.visits-column {
+    flex: 0.5;  /* Takes half the space of a regular column */
+}
+
+/*For Chart container*/
+
+
+.total-visits {
+    display: flex;               /* make it a flex container */
+    flex-direction: column;     /* stack children vertically */
+    justify-content: center;    /* vertical centering */
+    align-items: center;        /* horizontal centering */
+    
+    border-radius: 10px;
+    height: 110px;              /* or however tall you want it */
+    
+}
+
+.total-visits-number {
+    font-size: 3em;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.visits-row {
+    display: flex;
+    justify-content: center; /* center the whole row */
+    gap: 30px;               /* space between the two blocks */
+    
+}
+
+.visits-row > div {
+    text-align: center;      /* center text inside each block */
+}
+
+.visit-count {
+    font-size: 2em;
+    font-weight: bold;
+}
+
+.visit-label {
+    font-size: 1em;
+    color: #555;
+}
+
+/*for Top Authors*/
+.top-authors-container {
+    background-color: #fffff5;
+    border-radius: 15px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    flex: 1.5; /* Takes more space than before */
+    box-sizing: border-box;
+    overflow: hidden; /* Ensure contents don't overflow */
+}
+
+.top-authors-container h3 {
+    margin-bottom: 10px;
+}
+
+.authors-list {
+    display: flex;
+    justify-content: space-around;
+    gap: 15px; /* Increased gap for better spacing */
+    padding: 0 10px; /* Added padding for better appearance */
+    overflow-x: auto; 
+    white-space: nowrap;
+    min-height: 120px; /* Ensure minimum height to prevent layout shift */
+}
+
+.author {
+    padding: 0px;
+    border-radius: 5px;
+    text-align: center;
+    flex: 0 0 auto; 
+    box-sizing: border-box;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 150px;
+    transition: transform 0.2s ease;
+}
+
+.author:hover {
+    transform: translateY(-3px);
+}
+
+.author-image {
+    width: 80px;
+    height: 80px;
+    background-size: cover;
+    background-position: center;
+    border-radius: 50%;
+    margin-bottom: 10px;
+}
+
+.author-name {
+    font-weight: bold;
+    margin-bottom: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 145px; /* Slightly less than the author card width */
+    display: block;
+}
+
+.author-visits {
+    color: #777;
+    font-size: 0.9em;
+}
+
+@media (max-width: 768px) {
+    .authors-list {
+        /* Keep horizontal scrolling on smaller screens as well */
+    }
+
+    .author {
+        width: 150px; /* Adjust width for smaller screens if needed */
+    }
+}
+
+/* most visited work section with specific class names to prevent conflicts */
+.most-visited-table {
+    background-color: #fffff5;
+    padding: 10px;
+    border-collapse: separate; /* Important for row spacing */
+    border-spacing: 0 10px;
+    justify-content: center;
+    align-items: center;
+    margin: 0px 0px; 
+    width: 100%; 
+}
+
+.most-visited-table h3 {
+    margin: 0px;
+    background-color: #fffff5;
+}
+
+.most-visited-table h5.most-visited-title {
+    font-size: 15px;
+    padding: 5px;
+    margin: 0px;
+    background-color: #fffff5;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 300px;
+    display: block;
+}
+
+.most-visited-table th {
+    display: none;
+}
+
+.most-visited-table tr.most-visited-row {
+    margin: 0px;
+    padding: 0px auto;
+    background-color: #fffff5;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    width: 500px;
+}
+
+.most-visited-table th,
+.most-visited-table td {
+    padding: 13px; /* Add padding for better spacing inside cells */
+    text-align: left; /* Align text to the left */
+}
+
+.most-visited-heading { /* Targeting the class */
+    padding-top: 10px;
+    text-align: left;
+    font-weight: bold;
+    color: rgb(0, 0, 0);
+    margin: 0px;
+}
+
+/* Style for the cover cell in the most visited table */
+.most-visited-cover-cell {
+    width: 80px;
+    min-width: 80px;
+}
+
+.most-visited-table .most-visited-cover {
+    width: 50px; /*adjust cover width*/
+    height: 50px; /*adjust cover height*/
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f3f4f6;
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+/* Style for the cover icons */
+.most-visited-cover-icon {
+    max-width: 32px;
+    max-height: 32px;
+    object-fit: contain;
+}
+
+/* Highlight effect on hover */
+.most-visited-table tr.most-visited-row:hover .most-visited-cover {
+    background-color: #e5e7eb;
+}
+
+.most-visited-table tr.most-visited-row:hover .most-visited-cover-icon {
+    transform: scale(1.1);
+    transition: transform 0.2s ease;
+}
+
+/* Add styling for the details cell to maintain layout */
+.most-visited-details-cell {
+    max-width: 350px;
+    width: 60%;
+    overflow: hidden;
+}
+
+/* Specific styles for the tags in most visited works */
+.most-visited-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 5px;
+}
+
+.most-visited-doc-type {
+    background-color: #006a4e;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75em;
+}
+
+.most-visited-tag {
+    background-color: #FDB813;
+    color: #333;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75em;
+}
+
+/* Visits count styling */
+.most-visited-visits {
+    text-align: right;
+    white-space: nowrap;
+    font-weight: 400;
+    width: 100px; /* Fixed width for the visits column */
+    min-width: 100px; /* Ensure minimum width */
+}
+
+.most-visited-count {
+    font-weight: 700;
+    color: #006a4e;
+}
+
+/* Works Summary Section */
+.works-summary {
+    display: flex;
+    background-color: #fffff5;
+    box-sizing: border-box;
+    
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    align-items: center;
+    padding: 15px;
+    gap: 15px;
+    width: 100%;
+}
+
+.works-by-type {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    flex: 1;
+}
+
+.work-count {
+    text-align: center;
+    padding: 10px;
+    min-width: 50px;
+    max-width: 80px;
+    flex: 1;
+}
+
+.count {
+    font-size: 1.2em;
+    font-weight: bold;
+    display: block;
+    color: #333;
+}
+
+.label {
+    font-size: 0.8em;
+    color: #777;
+    display: block;
+    margin-bottom: 8px;
+}
+.work-icon {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 40px;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+}
+.work-icon img {
+    max-width: 25px;
+    max-height: 25px;
+    margin: 0 auto;
+    border-radius: 4px;
+    object-fit: cover;
+}
+.confluence{  
+    background-color: #FFF4D4;
+    
+    
+}
+.dissertation{
+    background-color: #DCFFDC;
+}
+.thesis{
+    background-color: #EFDDDD;
+    
+}
+.synergy{
+    background-color: #D2D6FF;
+}
+.work-type {
+    font-size: 0.75em;
+    color: #f5f5f5;
+    display: block;
+    width: 100%;
+    height: 25px;
+    text-align: center;
+    box-sizing: border-box;
+    padding: 5px 0;
+}
+.confluence-text {
+    padding: 5px 0px;
+    background-color: #EFBB29; /* Light yellow */
+    border-bottom-left-radius: 10px; /* Adjust the value as needed */
+    border-bottom-right-radius: 10px;
+}
+
+.dissertation-text {
+    background-color: #50AA5B; /* Light green */
+    padding: 5px 0px;
+    border-bottom-left-radius: 10px; /* Adjust the value as needed */
+    border-bottom-right-radius: 10px;
+}
+
+.thesis-text {
+    background-color: #E64B4B; /* Light red */
+    padding: 5px 0px;
+    border-bottom-left-radius: 10px; /* Adjust the value as needed */
+    border-bottom-right-radius: 10px;
+}
+
+.synergy-text {
+    background-color: #4D5BF7; /* Light blue */
+    padding: 5px 0px;
+    border-bottom-left-radius: 10px; /* Adjust the value as needed */
+    border-bottom-right-radius: 10px;
+}
+
+.total-works {
+    background-color: #3498db; 
+    color: white;
+    padding: 15px;
+    border-radius: 10px;
+    text-align: center;
+    min-width: 110px; 
+    margin: 10px;
+}
+
+.total-count {
+    font-size: 2em;
+    font-weight: bold;
+    display: block;
+}
+
+.total-label {
+    font-size: 1em;
+    display: block;
+}
+
+/* Trending Keywords Section */
+.trending-keywords {
+    background-color: #f8f8f8;
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    margin: 10px 0;
+    min-height: 120px; /* Ensure enough height for multiple rows of keywords */
+}
+
+.trending-keywords-heading {
+    font-size: 1.1em;
+    padding: 0 0 10px 0;
+    margin: 0;
+    text-align: left;
+    font-weight: bold;
+    color: rgb(0, 0, 0);
+}
+
+.keywords-list {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    max-height: 160px; /* Allow for scrolling if many keywords */
+    overflow-y: auto;
+}
+
+.keyword {
+    background-color: #e74c3c;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 15px;
+    font-size: 0.8em;
+    white-space: nowrap;
+    cursor: pointer; /* Indicate it's clickable */
+    transition: background-color 0.2s, transform 0.1s; /* Smooth hover effect */
+}
+
+.keyword:hover {
+    background-color: #c0392b; /* Darker shade on hover */
+    transform: scale(1.05); /* Slight grow effect */
+}
+
+/*graph section*/
+.view-graph{
+    height: 20vh;
+    background-color: #3498db;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .row {
+        flex-direction: column;
+    }
+    
+    .column {
+        width: 100%;
+    }
+    
+    .works-summary {
+        flex-direction: column;
+    }
+    
+    .works-by-type {
+        width: 100%;
+    }
+    
+    .work-count {
+        min-width: 50px;
+    }
+}
+
+/* Add styles for the most visited works filter */
+.most-visited-filter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.filter-label {
+  font-size: 0.85rem;
+  margin-right: 8px;
+  color: #4b5563;
+}
+
+.time-filter {
+  padding: 4px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background-color: #f9fafb;
+  font-size: 0.85rem;
+  color: #1f2937;
+  cursor: pointer;
+}
+
+.time-filter:hover {
+  border-color: #9ca3af;
+}
+
+.time-filter:focus {
+  outline: none;
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+}
+
+/* Loading, error, and no data states */
+.loading-data {
+  text-align: center;
+  padding: 20px;
+  color: #6b7280;
+}
+
+.loading-spinner {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(0, 106, 78, 0.2);
+  border-radius: 50%;
+  border-top-color: #006a4e;
+  animation: spin 1s linear infinite;
+  margin-bottom: 8px;
+}
+
+.error-message, .no-data-message {
+  text-align: center;
+  padding: 20px;
+  color: #6b7280;
+}
+
+.error-detail, .no-data-detail {
+  font-size: 0.85rem;
+  margin-top: 4px;
+  color: #9ca3af;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

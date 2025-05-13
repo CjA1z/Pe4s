@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Settings - Profile Picture</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* Apply a base font and background to the body */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Light gray background */
+            /* display: flex, justify-content, align-items, min-height, padding are removed
+               as Tailwind classes on body and new layout structure will handle this. */
+        }
+
+        /* Styles for the settings card itself (mostly unchanged) */
+        .settings-card {
+            background-color: white;
+            border-radius: 0.75rem; /* rounded-xl */
+            padding: 2rem; /* p-8 */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            width: 100%; /* Will be constrained by its parent's max-width */
+            max-width: 500px; /* Original max-width */
+            /* margin-top: 2rem; /* Add some space from the top of the main content area if needed */
+        }
+
+        /* Profile picture container styles (unchanged) */
+        .profile-pic-container {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background-color: #e5e7eb; /* gray-200 */
+            margin: 0 auto 1.5rem auto; /* mb-6 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            border: 4px solid #d1d5db; /* gray-300 */
+        }
+        .profile-pic-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .profile-pic-placeholder i { /* If you use a placeholder icon */
+            font-size: 4rem;
+            color: #9ca3af; /* gray-400 */
+        }
+
+        /* File input and button styles (unchanged) */
+        .file-input-label {
+            display: inline-block;
+            padding: 0.625rem 1.25rem; /* py-2.5 px-5 */
+            background-color: #3b82f6; /* blue-500 */
+            color: white;
+            border-radius: 0.375rem; /* rounded-md */
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            font-weight: 500;
+            text-align: center;
+        }
+        .file-input-label:hover {
+            background-color: #2563eb; /* blue-600 */
+        }
+        .file-input-label i {
+            margin-right: 0.5rem;
+        }
+        #profilePicInput {
+            display: none; /* Hide the actual file input */
+        }
+        .save-button {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: background-color 0.3s ease;
+            background-color: #16a34a; /* green-600 */
+            color: white;
+            width: 100%;
+            margin-top: 1.5rem; /* mt-6 */
+        }
+        .save-button:hover {
+            background-color: #15803d; /* green-700 */
+        }
+        .save-button:disabled {
+            background-color: #9ca3af; /* gray-400 */
+            cursor: not-allowed;
+        }
+        #fileName {
+            display: block;
+            text-align: center;
+            margin-top: 0.75rem; /* mt-3 */
+            font-size: 0.875rem; /* text-sm */
+            color: #6b7280; /* gray-500 */
+        }
+
+        /* Message Box for notifications (unchanged, already fixed positioned) */
+        #messageBox {
+            position: fixed;
+            bottom: 1.25rem; /* bottom-5 */
+            right: 1.25rem; /* right-5 */
+            background-color: #1f2937; /* gray-800 */
+            color: white;
+            padding: 1rem; /* p-4 */
+            border-radius: 0.5rem; /* rounded-lg */
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+            z-index: 1000; /* High z-index to appear above other content */
+        }
+        #messageBox.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body> <div id="navbar-header" >
+        </div>
+<div id="sidebar-container" ></div>
+    <div>
+
+        
+            </div>
+
+        <main class="flex-1 ml-64 p-4 sm:p-6 md:p-8">
+            <div class="max-w-lg mx-auto mt-4 sm:mt-6"> <div class="settings-card">
+                    <header class="mb-6 text-center">
+                        <h1 class="text-2xl md:text-3xl font-bold text-gray-800">Admin Settings</h1>
+                        <p class="text-gray-600 mt-1">Manage your profile picture.</p>
+                    </header>
+
+                    <div class="profile-pic-container" id="profilePicPreviewContainer">
+                        <img id="profilePicPreview" src="https://placehold.co/150x150/e5e7eb/9ca3af?text=Admin" alt="Admin Profile Picture">
+                    </div>
+
+                    <form id="profilePicForm">
+                        <div class="text-center">
+                            <label for="profilePicInput" class="file-input-label">
+                                <i class="fas fa-upload"></i> Choose New Picture
+                            </label>
+                            <input type="file" id="profilePicInput" accept="image/png, image/jpeg, image/gif">
+                            <span id="fileName">No file chosen</span>
+                        </div>
+
+                        <button type="submit" id="saveProfilePicButton" class="save-button" disabled>
+                            <i class="fas fa-save"></i> Save Changes
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="messageBox">
+        <p id="messageText"></p>
+    </div>
+
+    <script>
+        // DOM Elements (script for profile picture functionality - unchanged)
+        const profilePicInput = document.getElementById('profilePicInput');
+        const profilePicPreview = document.getElementById('profilePicPreview');
+        const fileNameDisplay = document.getElementById('fileName');
+        const saveButton = document.getElementById('saveProfilePicButton');
+        const profilePicForm = document.getElementById('profilePicForm');
+        const messageBox = document.getElementById('messageBox'); // Already defined
+        const messageText = document.getElementById('messageText'); // Already defined
+
+        let selectedFile = null;
+
+        profilePicInput.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                selectedFile = file;
+                const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+                if (!allowedTypes.includes(file.type)) {
+                    showMessage('Invalid file type. Please select a JPG, PNG, or GIF image.', 'error');
+                    profilePicInput.value = '';
+                    fileNameDisplay.textContent = 'No file chosen';
+                    saveButton.disabled = true;
+                    selectedFile = null;
+                    return;
+                }
+                const maxSizeInBytes = 2 * 1024 * 1024; // 2MB
+                if (file.size > maxSizeInBytes) {
+                    showMessage('File is too large. Maximum size is 2MB.', 'error');
+                    profilePicInput.value = '';
+                    fileNameDisplay.textContent = 'No file chosen';
+                    saveButton.disabled = true;
+                    selectedFile = null;
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    profilePicPreview.src = e.target.result;
+                }
+                reader.readAsDataURL(file);
+                fileNameDisplay.textContent = file.name;
+                saveButton.disabled = false;
+            } else {
+                fileNameDisplay.textContent = 'No file chosen';
+                saveButton.disabled = true;
+                selectedFile = null;
+            }
+        });
+
+        profilePicForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            if (!selectedFile) {
+                showMessage('Please select a picture to upload.', 'error');
+                return;
+            }
+            saveButton.disabled = true;
+            saveButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+            console.log('Uploading file:', selectedFile.name);
+            setTimeout(() => {
+                showMessage('Profile picture updated successfully!', 'success');
+                profilePicInput.value = '';
+                fileNameDisplay.textContent = 'No file chosen';
+                saveButton.disabled = true;
+                saveButton.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+                selectedFile = null;
+            }, 2000);
+        });
+
+        function showMessage(message, type = 'info') {
+            messageText.textContent = message;
+            messageBox.classList.remove('bg-red-500', 'bg-green-500', 'bg-blue-500', 'bg-gray-800');
+            if (type === 'success') {
+                messageBox.classList.add('bg-green-500');
+            } else if (type === 'error') {
+                messageBox.classList.add('bg-red-500');
+            } else {
+                messageBox.classList.add('bg-blue-500');
+            }
+            messageBox.classList.add('show');
+            setTimeout(() => {
+                messageBox.classList.remove('show');
+            }, 3000);
+        }
+    </script>
+    <script>
+        // Script for loading navbar and sidebar (from your provided code, with minor improvements)
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebarContainer = document.getElementById('sidebar-container');
+            const navbarHeader = document.getElementById('navbar-header');
+
+            // Load Navbar
+            if (navbarHeader) {
+                fetch('/admin/Components/navbar_header.html')
+                    .then(response => {
+                        if (!response.ok) {
+                            // If navbar fails to load, log error but don't necessarily break the page.
+                            // The placeholder div might have some basic styling.
+                            console.error('Navbar fetch failed:', response.status, response.statusText);
+                            return Promise.reject(`Navbar fetch failed: ${response.status}`);
+                        }
+                        return response.text();
+                    })
+                    .then(data => {
+                        navbarHeader.innerHTML = data;
+                        // Any post-load initialization for navbar can go here
+                    })
+                    .catch(error => console.error('Error processing navbar:', error));
+            } else {
+                console.error("Navbar container 'navbar-header' not found in the DOM.");
+            }
+
+            // Load Sidebar
+            if (sidebarContainer) {
+                fetch('/admin/Components/side_bar.html')
+                    .then(response => {
+                        if (!response.ok) {
+                             console.error('Sidebar fetch failed:', response.status, response.statusText);
+                            return Promise.reject(`Sidebar fetch failed: ${response.status}`);
+                        }
+                        return response.text();
+                    })
+                    .then(data => {
+                        sidebarContainer.innerHTML = data;
+                        // Initialize sidebar functionality after loading
+                        if (typeof highlightActiveSidebarLink === 'function') {
+                            highlightActiveSidebarLink();
+                        }
+                        if (typeof setupLogout === 'function') {
+                            setupLogout();
+                        }
+                        // Any post-load initialization for sidebar can go here
+                    })
+                    .catch(error => console.error('Error processing sidebar:', error));
+            } else {
+                console.error("Sidebar container 'sidebar-container' not found in the DOM.");
+            }
+        });
+    </script>
+</body>
+</html>

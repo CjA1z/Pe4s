@@ -82,8 +82,7 @@ router.get("/api/archived-docs", async (ctx) => {
     // Add pagination parameters
     queryParams.push(limit, offset);
     
-    console.log("Executing query:", query);
-    console.log("With parameters:", queryParams);
+    
     
     // Execute the query
     const documents = await db.query(query, queryParams);
@@ -120,8 +119,7 @@ router.get("/api/archived-docs", async (ctx) => {
       countParams.push(searchTerm, searchTerm, searchTerm);
     }
     
-    console.log("Executing count query:", countQuery);
-    console.log("With count parameters:", countParams);
+    
     
     // Execute count query
     const countResult = await db.query(countQuery, countParams);

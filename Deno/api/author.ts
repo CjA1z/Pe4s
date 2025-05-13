@@ -7,7 +7,7 @@ import {
 import { client } from "../db/denopost_conn.ts";
 
 // Debug log to indicate this module is loaded
-console.log("Author API module loaded");
+
 
 const router = new Router();
 

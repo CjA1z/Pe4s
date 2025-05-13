@@ -310,5 +310,19 @@
             });
         });
     </script>
+
+    <!-- Document Visit Tracking -->
+    <script src="/Components/js/document-visit-tracker.js"></script>
+    <script>
+        // Initialize document visit tracking when the page is fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize document visit tracking for compiled documents
+            if (window.DocumentTracker) {
+                window.DocumentTracker.initCompiledDocumentTracking();
+            } else {
+                console.error('DocumentTracker not found! Make sure document-visit-tracker.js is loaded correctly.');
+            }
+        });
+    </script>
 </body>
 </html>

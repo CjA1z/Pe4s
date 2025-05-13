@@ -416,70 +416,103 @@ export async function fetchChildDocuments(compiledDocId: number | string): Promi
   try {
     console.log(`Fetching child documents for compiled document ID: ${compiledDocId}`);
     
-    // First try to get child documents using the compiled_parent_id field (preferred method)
-    const primaryQuery = `
-      SELECT 
-        d.id, 
-        d.title,
-        d.description,
-        d.publication_date, 
-        d.document_type,
-        d.volume,
-        d.issue,
-        d.compiled_parent_id as parent_compiled_id
-      FROM 
-        documents d
-      WHERE 
-        d.compiled_parent_id = $1
-        AND d.deleted_at IS NULL
-      ORDER BY
-        d.publication_date DESC, d.id ASC
+    // First, get the category of the compiled document to ensure type-specific fetching
+    const categoryQuery = `
+      SELECT category 
+      FROM compiled_documents 
+      WHERE id = $1
     `;
     
-    console.log(`Executing primary query using compiled_parent_id`);
-    const primaryResult = await client.queryObject(primaryQuery, [compiledDocId]);
-    console.log(`Primary query returned ${primaryResult.rowCount} rows`);
+    const categoryResult = await client.queryObject(categoryQuery, [compiledDocId]);
     
-    // If we find documents using the primary method, use them
-    if (primaryResult.rowCount && primaryResult.rowCount > 0) {
-      console.log(`Found ${primaryResult.rowCount} child documents using compiled_parent_id`);
-      
-      // Process these results
-      const documents = await processChildDocuments(primaryResult.rows as any[]);
-      return { documents };
+    if (!categoryResult.rowCount || categoryResult.rowCount === 0) {
+      console.warn(`Compiled document with ID ${compiledDocId} not found in compiled_documents table`);
+      return { documents: [] };
     }
     
-    // If no results from primary method, fall back to junction table
-    console.log(`No results using compiled_parent_id, falling back to junction table`);
+    const category = (categoryResult.rows[0] as any).category;
+    console.log(`Compiled document category: ${category}`);
     
-    // Query to get child documents for a compiled document using compiled_document_items
-    const fallbackQuery = `
-      SELECT 
-        d.id, 
-        d.title,
-        d.description,
-        d.publication_date, 
-        d.document_type,
-        d.volume,
-        d.issue,
-        cdi.compiled_document_id as parent_compiled_id
-      FROM 
-        documents d
-      JOIN
-        compiled_document_items cdi ON d.id = cdi.document_id
-      WHERE 
-        cdi.compiled_document_id = $1
-        AND d.deleted_at IS NULL
-      ORDER BY
-        d.publication_date DESC, d.id ASC
-    `;
+    // Build a type-specific query based on the category
+    let childQuery = '';
     
-    console.log(`Executing fallback query using junction table`);
-    const fallbackResult = await client.queryObject(fallbackQuery, [compiledDocId]);
-    console.log(`Fallback query returned ${fallbackResult.rowCount} rows`);
+    if (category === 'SYNERGY' || category === 'Synergy') {
+      console.log(`Using Synergy-specific query for document ID: ${compiledDocId}`);
+      childQuery = `
+        SELECT 
+          d.id, 
+          d.title,
+          d.description,
+          d.publication_date, 
+          d.document_type,
+          d.volume,
+          d.issue,
+          cdi.compiled_document_id as parent_compiled_id
+        FROM 
+          documents d
+        JOIN
+          compiled_document_items cdi ON d.id = cdi.document_id
+        WHERE 
+          cdi.compiled_document_id = $1
+          AND d.deleted_at IS NULL
+          AND d.document_type = 'SYNERGY'
+        ORDER BY
+          d.publication_date DESC, d.id ASC
+      `;
+    } else if (category === 'CONFLUENCE' || category === 'Confluence') {
+      console.log(`Using Confluence-specific query for document ID: ${compiledDocId}`);
+      childQuery = `
+        SELECT 
+          d.id, 
+          d.title,
+          d.description,
+          d.publication_date, 
+          d.document_type,
+          d.volume,
+          d.issue,
+          cdi.compiled_document_id as parent_compiled_id
+        FROM 
+          documents d
+        JOIN
+          compiled_document_items cdi ON d.id = cdi.document_id
+        WHERE 
+          cdi.compiled_document_id = $1
+          AND d.deleted_at IS NULL
+          AND d.document_type = 'CONFLUENCE'
+        ORDER BY
+          d.publication_date DESC, d.id ASC
+      `;
+    } else {
+      // Generic query as fallback
+      console.log(`Using generic query for document ID: ${compiledDocId}`);
+      childQuery = `
+        SELECT 
+          d.id, 
+          d.title,
+          d.description,
+          d.publication_date, 
+          d.document_type,
+          d.volume,
+          d.issue,
+          cdi.compiled_document_id as parent_compiled_id
+        FROM 
+          documents d
+        JOIN
+          compiled_document_items cdi ON d.id = cdi.document_id
+        WHERE 
+          cdi.compiled_document_id = $1
+          AND d.deleted_at IS NULL
+        ORDER BY
+          d.publication_date DESC, d.id ASC
+      `;
+    }
+    
+    console.log(`Executing category-specific query for ${category} documents`);
+    const childResult = await client.queryObject(childQuery, [compiledDocId]);
+    console.log(`Query returned ${childResult.rowCount} rows`);
     
     // Process documents to include authors and topics
-    const documents = await processChildDocuments(fallbackResult.rows as any[]);
+    const documents = await processChildDocuments(childResult.rows as any[]);
     return { documents };
   } catch (error) {
     console.error(`Error fetching child documents for compiled document ID ${compiledDocId}:`, error);
@@ -973,6 +1006,148 @@ export async function softDeleteCompiledDocument(compiledDocId: number): Promise
     }
     
     console.error(`Error soft deleting compiled document ${compiledDocId}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Updates a compiled document in the database
+ * @param compiledDocId The ID of the compiled document to update
+ * @param compiledDoc The updated data for the compiled document
+ * @returns The updated compiled document
+ */
+export async function updateCompiledDocument(
+  compiledDocId: number,
+  compiledDoc: {
+    start_year?: number;
+    end_year?: number;
+    volume?: number;
+    issue_number?: number;
+    department?: string;
+    category?: string;
+    foreword?: string;
+    title?: string;
+    authors?: any[];
+    topics?: any[];
+    research_agenda?: any[];
+  }
+): Promise<CompiledDocument | null> {
+  console.log(`Updating compiled document ${compiledDocId} with data:`, compiledDoc);
+  
+  try {
+    // Start a transaction
+    await client.queryArray('BEGIN');
+    
+    // Generate the update query based on provided fields
+    let updateQuery = 'UPDATE compiled_documents SET updated_at = CURRENT_TIMESTAMP';
+    const params = [];
+    let paramIndex = 1;
+    
+    // Only include fields that are provided in the update
+    if (compiledDoc.start_year !== undefined) {
+      updateQuery += `, start_year = $${paramIndex}`;
+      params.push(compiledDoc.start_year);
+      paramIndex++;
+    }
+    
+    if (compiledDoc.end_year !== undefined) {
+      updateQuery += `, end_year = $${paramIndex}`;
+      params.push(compiledDoc.end_year);
+      paramIndex++;
+    }
+    
+    if (compiledDoc.volume !== undefined) {
+      updateQuery += `, volume = $${paramIndex}`;
+      params.push(compiledDoc.volume);
+      paramIndex++;
+    }
+    
+    if (compiledDoc.issue_number !== undefined) {
+      updateQuery += `, issue_number = $${paramIndex}`;
+      params.push(compiledDoc.issue_number);
+      paramIndex++;
+    }
+    
+    if (compiledDoc.department !== undefined) {
+      updateQuery += `, department = $${paramIndex}`;
+      params.push(compiledDoc.department);
+      paramIndex++;
+    }
+    
+    if (compiledDoc.category !== undefined) {
+      updateQuery += `, category = $${paramIndex}`;
+      params.push(compiledDoc.category);
+      paramIndex++;
+    }
+    
+    if (compiledDoc.foreword !== undefined) {
+      updateQuery += `, foreword = $${paramIndex}`;
+      params.push(compiledDoc.foreword);
+      paramIndex++;
+    }
+    
+    // Add the WHERE clause
+    updateQuery += ` WHERE id = $${paramIndex} RETURNING *`;
+    params.push(compiledDocId);
+    
+    // Execute the update
+    const result = await client.queryObject(updateQuery, params);
+    
+    if (result.rows.length === 0) {
+      // No document was updated, roll back the transaction
+      await client.queryArray('ROLLBACK');
+      return null;
+    }
+    
+    // Update authors if provided
+    if (Array.isArray(compiledDoc.authors) && compiledDoc.authors.length > 0) {
+      // First delete existing author associations
+      await client.queryArray('DELETE FROM document_authors WHERE document_id = $1', [compiledDocId]);
+      
+      // Insert new author associations
+      for (const author of compiledDoc.authors) {
+        if (author && author.id) {
+          await client.queryArray(
+            'INSERT INTO document_authors (document_id, author_id) VALUES ($1, $2)',
+            [compiledDocId, author.id]
+          );
+        }
+      }
+    }
+    
+    // Update research agenda/topics if provided
+    if ((Array.isArray(compiledDoc.topics) && compiledDoc.topics.length > 0) ||
+        (Array.isArray(compiledDoc.research_agenda) && compiledDoc.research_agenda.length > 0)) {
+      // Use either topics or research_agenda, preferring topics
+      const topicsToUse = Array.isArray(compiledDoc.topics) ? compiledDoc.topics : 
+                         (Array.isArray(compiledDoc.research_agenda) ? compiledDoc.research_agenda : []);
+      
+      if (topicsToUse.length > 0) {
+        // First delete existing topic associations
+        await client.queryArray('DELETE FROM document_research_agenda WHERE document_id = $1', [compiledDocId]);
+        
+        // Insert new topic associations
+        for (const topic of topicsToUse) {
+          if (topic && topic.id) {
+            await client.queryArray(
+              'INSERT INTO document_research_agenda (document_id, research_agenda_id) VALUES ($1, $2)',
+              [compiledDocId, topic.id]
+            );
+          }
+        }
+      }
+    }
+    
+    // Commit the transaction
+    await client.queryArray('COMMIT');
+    
+    // Fetch the updated document with all its relations
+    return await getCompiledDocument(compiledDocId);
+    
+  } catch (error) {
+    // Roll back on error
+    await client.queryArray('ROLLBACK');
+    console.error('Error updating compiled document:', error);
     throw error;
   }
 }
