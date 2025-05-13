@@ -163,6 +163,62 @@ const updateCompiledDocument = async (ctx: RouterContext<any, any, any>) => {
     ctx.response.body = await response.json();
 };
 
+// Add hard delete handler for compiled documents
+const hardDeleteCompiledDocument = async (ctx: RouterContext<any, any, any>) => {
+    const id = ctx.params.id;
+    
+    // Convert context to Request
+    const request = new Request(`${ctx.request.url.origin}/api/compiled-documents/${id}/hard-delete`, {
+        method: "DELETE",
+        headers: ctx.request.headers
+    });
+    
+    try {
+        // First, check if the compiled document exists in the database
+        const checkResult = await ctx.state.client.queryObject(
+            "SELECT id FROM compiled_documents WHERE id = $1",
+            [id]
+        );
+        
+        if (checkResult.rows.length === 0) {
+            ctx.response.status = 404;
+            ctx.response.body = { 
+                error: "Compiled document not found",
+                success: false
+            };
+            return;
+        }
+        
+        // Execute a hard delete of the compiled document
+        const deleteResult = await ctx.state.client.queryObject(
+            "DELETE FROM compiled_documents WHERE id = $1 RETURNING id",
+            [id]
+        );
+        
+        if (deleteResult.rowCount > 0) {
+            ctx.response.status = 200;
+            ctx.response.body = { 
+                message: "Compiled document permanently deleted successfully",
+                id: id,
+                success: true
+            };
+        } else {
+            ctx.response.status = 404;
+            ctx.response.body = { 
+                error: "Compiled document could not be deleted",
+                success: false
+            };
+        }
+    } catch (error) {
+        console.error(`Error hard deleting compiled document ${id}:`, error);
+        ctx.response.status = 500;
+        ctx.response.body = { 
+            error: error instanceof Error ? error.message : "Unknown error occurred",
+            success: false
+        };
+    }
+};
+
 // Export an array of routes
 export const compiledDocumentRoutes: Route[] = [
     { method: "POST", path: "/compiled-documents", handler: createCompiledDocument },
@@ -170,4 +226,5 @@ export const compiledDocumentRoutes: Route[] = [
     { method: "POST", path: "/compiled-documents/add-documents", handler: addDocumentsToCompilation },
     { method: "DELETE", path: "/compiled-documents/:id/soft-delete", handler: softDeleteCompiledDocument },
     { method: "PUT", path: "/compiled-documents/:id", handler: updateCompiledDocument },
+    { method: "DELETE", path: "/compiled-documents/:id/hard-delete", handler: hardDeleteCompiledDocument },
 ]; 

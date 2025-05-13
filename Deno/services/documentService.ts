@@ -60,6 +60,7 @@ export interface CompiledDocument {
   department?: string;
   category?: string;
   foreword?: string;
+  abstract_foreword?: string;
   created_at: string;
   updated_at?: string;
   document_count?: number;
@@ -224,7 +225,29 @@ export async function fetchDocuments(
           cd.deleted_at IS NULL ${categoryCompWhereClause}
       ),
       count_query AS (
-        SELECT COUNT(*) as total_count FROM combined_docs
+        -- Count total documents, but count compiled documents as a single document
+        -- and exclude child documents that are part of compilations
+        SELECT 
+          (
+            -- Count regular documents that are NOT children of compilations
+            SELECT COUNT(*) 
+            FROM documents d
+            WHERE d.compiled_parent_id IS NULL
+              AND d.deleted_at IS NULL
+              ${category && category !== 'All' ? `AND LOWER((d.document_type)::TEXT) = LOWER('${category}')` : ''}
+              -- Exclude documents that are part of compilations
+              AND NOT EXISTS (
+                SELECT 1 
+                FROM compiled_document_items cdi 
+                WHERE cdi.document_id = d.id
+              )
+          ) + (
+            -- Count compiled documents from compiled_documents table
+            SELECT COUNT(*) 
+            FROM compiled_documents cd
+            WHERE cd.deleted_at IS NULL
+              ${category && category !== 'All' ? `AND (LOWER((cd.category)::TEXT) = LOWER('${category}') OR cd.category ILIKE '%${category}%')` : ''}
+          ) as total_count
       )
       -- Main query with sorting and pagination applied to the combined result
       SELECT 
@@ -608,6 +631,7 @@ export async function createCompiledDocument(
     department?: string;
     category?: string;
     foreword?: string;
+    abstract_foreword?: string;
   },
   documentIds: number[] = []
 ): Promise<number> {
@@ -631,9 +655,10 @@ export async function createCompiledDocument(
           department, 
           category,
           foreword,
+          abstract_foreword,
           created_at
         ) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
         RETURNING id
       `;
       
@@ -644,7 +669,8 @@ export async function createCompiledDocument(
         compiledDoc.issue_number || null,
         compiledDoc.department || null,
         compiledDoc.category || 'CONFLUENCE',
-        compiledDoc.foreword || null
+        compiledDoc.foreword || null,
+        compiledDoc.abstract_foreword || null
       ];
       
       const compiledResult = await client.queryObject(compiledQuery, compiledParams);
@@ -820,7 +846,7 @@ export async function getCompiledDocument(compiledDocId: number): Promise<Compil
     // Log all fields for debugging
     console.log(`Compiled document data for ID ${compiledDocId}:`, row);
     
-    // Create a complete CompiledDocument object including the foreword field
+    // Create a complete CompiledDocument object including all fields
     const compiledDoc: CompiledDocument = {
       id: typeof row.id === 'bigint' ? Number(row.id) : row.id as number,
       title: row.title as string,
@@ -831,6 +857,7 @@ export async function getCompiledDocument(compiledDocId: number): Promise<Compil
       department: row.department as string | undefined,
       category: row.category as string | undefined,
       foreword: row.foreword as string | undefined,
+      abstract_foreword: row.abstract_foreword as string | undefined,
       created_at: row.created_at as string,
       updated_at: row.updated_at as string | undefined,
       document_count: typeof row.document_count === 'bigint' ? Number(row.document_count) : row.document_count as number | undefined
@@ -841,6 +868,13 @@ export async function getCompiledDocument(compiledDocId: number): Promise<Compil
       console.log(`Retrieved foreword for document ${compiledDocId}: ${compiledDoc.foreword}`);
     } else {
       console.log(`No foreword found for compiled document ${compiledDocId}`);
+    }
+    
+    // Log the abstract_foreword field as well
+    if (compiledDoc.abstract_foreword) {
+      console.log(`Retrieved abstract_foreword for document ${compiledDocId}: ${compiledDoc.abstract_foreword.substring(0, 100)}...`);
+    } else {
+      console.log(`No abstract_foreword found for compiled document ${compiledDocId}`);
     }
     
     return compiledDoc;
@@ -857,21 +891,27 @@ export async function getCompiledDocument(compiledDocId: number): Promise<Compil
  * @returns Total count of documents
  */
 async function getTotalDocumentCount(whereClause: string, params: any[]): Promise<number> {
-  // Count regular documents
+  // Modified query to exclude child documents of compiled documents
   const docsCountQuery = `
     SELECT COUNT(*) 
     FROM documents d
     ${whereClause}
+    AND NOT EXISTS (
+      SELECT 1 
+      FROM compiled_document_items cdi 
+      WHERE cdi.document_id = d.id
+    )
   `;
   const docsCountResult = await client.queryObject(docsCountQuery, params);
   const docsCountRow = docsCountResult.rows[0] as Record<string, unknown>;
   const regularDocsCount = parseInt(String(docsCountRow?.count || '0'), 10);
   
-  // Count compiled documents that don't exist in documents table
+  // Count compiled documents separately
   const compiledCountQuery = `
     SELECT COUNT(*) 
     FROM compiled_documents cd
-    WHERE NOT EXISTS (SELECT 1 FROM documents d WHERE d.id = cd.id)
+    WHERE deleted_at IS NULL
+    AND NOT EXISTS (SELECT 1 FROM documents d WHERE d.id = cd.id AND d.deleted_at IS NOT NULL)
   `;
   const compiledCountResult = await client.queryObject(compiledCountQuery);
   const compiledCountRow = compiledCountResult.rows[0] as Record<string, unknown>;
@@ -1026,6 +1066,7 @@ export async function updateCompiledDocument(
     department?: string;
     category?: string;
     foreword?: string;
+    abstract_foreword?: string;
     title?: string;
     authors?: any[];
     topics?: any[];
@@ -1083,6 +1124,12 @@ export async function updateCompiledDocument(
     if (compiledDoc.foreword !== undefined) {
       updateQuery += `, foreword = $${paramIndex}`;
       params.push(compiledDoc.foreword);
+      paramIndex++;
+    }
+    
+    if (compiledDoc.abstract_foreword !== undefined) {
+      updateQuery += `, abstract_foreword = $${paramIndex}`;
+      params.push(compiledDoc.abstract_foreword);
       paramIndex++;
     }
     

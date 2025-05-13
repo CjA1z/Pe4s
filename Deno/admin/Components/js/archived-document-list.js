@@ -497,6 +497,9 @@ function createCompiledParentCard(doc, childCount) {
             <button class="action-btn restore-btn" data-id="${doc.id}" title="Restore compilation">
                 <i class="fas fa-trash-restore"></i>
             </button>
+            <button class="action-btn hard-delete-btn" data-id="${doc.id}" title="Permanently Delete">
+                <i class="fas fa-trash-alt"></i>
+            </button>
         </div>
     `;
     
@@ -504,6 +507,12 @@ function createCompiledParentCard(doc, childCount) {
     card.querySelector('.restore-btn').addEventListener('click', function(event) {
         event.stopPropagation(); // Prevent triggering parent card expansion
         restoreDocument(doc.id);
+    });
+    
+    // Add click event to hard delete button
+    card.querySelector('.hard-delete-btn').addEventListener('click', function(event) {
+        event.stopPropagation(); // Prevent triggering parent card expansion
+        showHardDeleteConfirmation(doc.id);
     });
     
     return card;
@@ -829,6 +838,9 @@ function createArchivedDocumentCard(doc) {
             <button class="action-btn restore-btn" data-id="${doc.id}" title="Restore document">
                 <i class="fas fa-trash-restore"></i>
             </button>
+            <button class="action-btn hard-delete-btn" data-id="${doc.id}" title="Permanently Delete">
+                <i class="fas fa-trash-alt"></i>
+            </button>
         </div>
     `;
     
@@ -844,6 +856,15 @@ function createArchivedDocumentCard(doc) {
         console.log("DEBUG: showRestoreConfirmation available:", typeof window.documentArchive?.showRestoreConfirmation === 'function');
         
         restoreDocument(doc.id);
+    });
+    
+    // Add click event to hard delete button
+    card.querySelector('.hard-delete-btn').addEventListener('click', function(event) {
+        // Prevent default and stop propagation
+        event.preventDefault();
+        event.stopPropagation();
+        
+        showHardDeleteConfirmation(doc.id);
     });
     
     // Track this document ID as displayed
@@ -1296,6 +1317,49 @@ function showToast(message, type = 'success') {
                 }
             }, 300);
         }
+    }
+}
+
+/**
+ * Shows a confirmation dialog for hard deleting a document
+ * @param {number} documentId - ID of the document to delete
+ */
+function showHardDeleteConfirmation(documentId) {
+    if (!documentId) {
+        console.error('Cannot delete document: No ID provided');
+        return;
+    }
+    
+    // Log to verify this function is being called
+    console.log("DEBUG: showHardDeleteConfirmation called for document ID:", documentId);
+    
+    // Get document information for the confirmation dialog
+    const docCard = document.querySelector(`.document-card[data-id="${documentId}"]`);
+    let docTitle = "Document";
+    let isCompiled = false;
+    
+    if (docCard) {
+        const titleEl = docCard.querySelector('.document-title');
+        if (titleEl) {
+            docTitle = titleEl.textContent.trim();
+            // Limit title length for notification
+            if (docTitle.length > 40) {
+                docTitle = docTitle.substring(0, 37) + '...';
+            }
+        }
+        
+        // Check if this is a compiled document
+        isCompiled = docCard.classList.contains('compiled') || docCard.classList.contains('compilation');
+    }
+    
+    console.log("DEBUG: Document info for hard delete:", { id: documentId, title: docTitle, isCompiled });
+    
+    // Use the global documentArchive function if available
+    if (window.documentArchive && typeof window.documentArchive.showHardDeleteConfirmation === 'function') {
+        window.documentArchive.showHardDeleteConfirmation(documentId, isCompiled, docTitle);
+    } else {
+        console.error('Hard delete confirmation function not available');
+        alert('Cannot perform permanent deletion. The required function is not available.');
     }
 }
 

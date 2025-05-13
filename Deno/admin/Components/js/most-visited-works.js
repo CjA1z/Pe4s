@@ -234,11 +234,11 @@ function updateWorksTable(documents) {
         visitsCell.appendChild(visitsStrong);
         visitsCell.appendChild(document.createTextNode(' Visits'));
         
-        // Make the row clickable to view the document
-        row.style.cursor = 'pointer';
-        row.addEventListener('click', () => {
-            window.location.href = `/document/${doc.document_id}`;
-        });
+        // Remove clickable behavior
+        // row.style.cursor = 'pointer';
+        // row.addEventListener('click', () => {
+        //     window.location.href = `/document/${doc.document_id}`;
+        // });
         
         // Add all cells to the row
         row.appendChild(coverCell);

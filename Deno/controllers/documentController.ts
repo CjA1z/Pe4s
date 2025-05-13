@@ -8,33 +8,86 @@ import { fetchDocuments as fetchDocumentsService, fetchChildDocuments as fetchCh
  */
 export async function fetchCategories(): Promise<Response> {
   try {
-    const result = await client.queryObject(
-      "SELECT id, category_name as name, (SELECT COUNT(*) FROM documents WHERE category_id = categories.id AND deleted_at IS NULL) as count FROM categories ORDER BY category_name"
+    console.log("Fetching categories with document counts including compiled documents");
+    
+    // Get basic category information
+    const categoriesResult = await client.queryObject(
+      "SELECT id, category_name as name FROM categories ORDER BY category_name"
     );
     
-    // Process the data to handle BigInt values before serialization
-    const processedRows = result.rows.map(row => {
-      // Create a new object with all properties from the original row
-      const processed = {...row};
-      
-      // Convert any BigInt values to regular numbers
-      if (typeof processed.count === 'bigint') {
-        processed.count = Number(processed.count);
-      }
-      if (typeof processed.id === 'bigint') {
-        processed.id = Number(processed.id);
-      }
-      
-      return processed;
+    // Process the categories data
+    const categories = categoriesResult.rows.map(row => {
+      return {
+        id: typeof (row as any).id === 'bigint' ? Number((row as any).id) : (row as any).id,
+        name: (row as any).name || '',
+        count: 0 // Initialize count to 0
+      };
     });
     
-    return new Response(JSON.stringify(processedRows), {
+    // Get counts for regular documents (excluding child documents of compilations)
+    const regularDocsQuery = `
+      SELECT category_id, COUNT(*) as count 
+      FROM documents 
+      WHERE deleted_at IS NULL 
+      AND compiled_parent_id IS NULL
+      GROUP BY category_id
+    `;
+    
+    const regularDocsResult = await client.queryObject(regularDocsQuery);
+    
+    // Update counts from regular documents
+    if (regularDocsResult.rows) {
+      for (const row of regularDocsResult.rows) {
+        const categoryId = typeof (row as any).category_id === 'bigint' ? 
+          Number((row as any).category_id) : (row as any).category_id;
+        const count = typeof (row as any).count === 'bigint' ? 
+          Number((row as any).count) : Number((row as any).count);
+        
+        // Find the matching category and update its count
+        const category = categories.find(c => c.id === categoryId);
+        if (category) {
+          category.count = count;
+        }
+      }
+    }
+    
+    // Get counts for compiled documents
+    const compiledDocsQuery = `
+      SELECT cd.category, COUNT(*) as count 
+      FROM compiled_documents cd
+      WHERE cd.deleted_at IS NULL
+      GROUP BY cd.category
+    `;
+    
+    const compiledDocsResult = await client.queryObject(compiledDocsQuery);
+    
+    // Update counts from compiled documents
+    if (compiledDocsResult.rows) {
+      for (const row of compiledDocsResult.rows) {
+        const categoryName = ((row as any).category || '').toUpperCase();
+        const count = typeof (row as any).count === 'bigint' ? 
+          Number((row as any).count) : Number((row as any).count);
+        
+        // Find categories that match this name (case insensitive)
+        for (const category of categories) {
+          if (category.name.toUpperCase() === categoryName || 
+              categoryName.includes(category.name.toUpperCase())) {
+            category.count += count;
+            console.log(`Added ${count} compiled documents to category "${category.name}", new total: ${category.count}`);
+            break;
+          }
+        }
+      }
+    }
+    
+    return new Response(JSON.stringify(categories), {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error fetching categories:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { "Content-Type": "application/json" }
     });

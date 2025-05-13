@@ -4,7 +4,8 @@ import {
   getArchivedDocumentById,
   archiveDocument,
   restoreDocument,
-  getArchivedChildDocuments
+  getArchivedChildDocuments,
+  hardDeleteArchivedDocument
 } from "../controllers/unifiedArchiveController.ts";
 
 const router = new Router();
@@ -17,7 +18,9 @@ router
   .delete("/api/archives/:id", restoreDocument)
   .get("/api/archives/:id/children", getArchivedChildDocuments)
   // Add a specific route for compiled documents to fix the archiving issue
-  .post("/api/archives/compiled/:id", archiveDocument);
+  .post("/api/archives/compiled/:id", archiveDocument)
+  // Add hard delete route for archived documents
+  .delete("/api/archives/:id/hard-delete", hardDeleteArchivedDocument);
 
 export const unifiedArchiveRoutes = router.routes();
 export const unifiedArchiveAllowedMethods = router.allowedMethods(); 

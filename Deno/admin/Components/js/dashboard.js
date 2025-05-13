@@ -1,26 +1,9 @@
 // Function to update the works summary section with dynamic counts
 async function updateWorksSummary() {
     try {
-        console.log('Fetching categories data...');
-        const response = await fetch('/api/categories');
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const categories = await response.json();
-        console.log('Categories data received:', categories);
+        console.log('Fetching documents data for category counts...');
         
-        // Calculate total works count
-        let totalWorks = 0;
-        
-        // Map API document_type to display names and CSS classes
-        const categoryTypeMap = {
-            'THESIS': 'thesis',
-            'DISSERTATION': 'dissertation',
-            'CONFLUENCE': 'confluence',
-            'SYNERGY': 'synergy'
-        };
-        
-        // Initialize with zeros in case some categories are missing
+        // Initialize counts
         const categoryCounts = {
             'thesis': 0,
             'dissertation': 0, 
@@ -28,56 +11,160 @@ async function updateWorksSummary() {
             'synergy': 0
         };
         
-        // Process each category
-        categories.forEach(category => {
-            const count = Number(category.count) || 0;
-            const name = category.name || '';
-            const displayKey = categoryTypeMap[name] || name.toLowerCase();
-            
-            if (categoryCounts.hasOwnProperty(displayKey)) {
-                categoryCounts[displayKey] = count;
-            }
-            
-            totalWorks += count;
-        });
+        // Track which document IDs we've already counted to prevent double-counting
+        const countedDocumentIds = new Set();
         
-        console.log('Processed category counts:', categoryCounts);
-        
-        // Update individual category counts - use a more compatible approach
-        document.querySelectorAll('.work-count').forEach(workCountEl => {
-            // Find which category this element represents
-            let categoryFound = false;
-            Object.keys(categoryCounts).forEach(category => {
-                if (workCountEl.querySelector(`.work-icon.${category}`)) {
-                    const countEl = workCountEl.querySelector('.count');
-                    if (countEl) {
-                        countEl.textContent = categoryCounts[category];
-                        categoryFound = true;
-                    }
-                }
-            });
-            
-            if (!categoryFound) {
-                // Try finding by text content as a fallback
-                Object.keys(categoryCounts).forEach(category => {
-                    const typeEl = workCountEl.querySelector(`.work-type.${category}-text`);
-                    if (typeEl) {
-                        const countEl = workCountEl.querySelector('.count');
-                        if (countEl) {
-                            countEl.textContent = categoryCounts[category];
+        // STEP 1: First try a direct API endpoint for counting documents by category
+        try {
+            const countResponse = await fetch('/api/documents/count-by-category');
+            if (countResponse.ok) {
+                const countData = await countResponse.json();
+                console.log('Category count data received directly:', countData);
+                
+                if (countData && countData.categories) {
+                    // If we have a dedicated endpoint that gives us complete counts, use it
+                    Object.keys(categoryCounts).forEach(category => {
+                        const upperCategory = category.toUpperCase();
+                        if (countData.categories[upperCategory]) {
+                            categoryCounts[category] = countData.categories[upperCategory];
                         }
-                    }
-                });
+                    });
+                    
+                    updateCategoryUI(categoryCounts);
+                    return;
+                }
+            }
+        } catch (countError) {
+            console.log('Direct count endpoint not available:', countError);
+        }
+        
+        // STEP 2: Fetch regular documents and compiled documents separately
+        
+        // Get regular documents
+        console.log('Fetching regular documents...');
+        let regularDocuments = [];
+        try {
+            const regularResponse = await fetch('/api/documents?limit=1000');
+            if (regularResponse.ok) {
+                const regularData = await regularResponse.json();
+                regularDocuments = regularData.documents || [];
+                console.log(`Found ${regularDocuments.length} regular documents`);
+            }
+        } catch (regularError) {
+            console.error('Error fetching regular documents:', regularError);
+        }
+        
+        // Count regular documents by category
+        regularDocuments.forEach(doc => {
+            // Skip if no ID
+            if (!doc.id) return;
+            
+            // Skip if it's marked as compiled
+            if (doc.is_compiled === true || doc.is_parent === true) {
+                console.log(`Skipping compiled doc in regular documents: ${doc.id}`);
+                return;
+            }
+            
+            // Skip if already counted
+            if (countedDocumentIds.has(doc.id)) {
+                console.log(`Skipping already counted document: ${doc.id}`);
+                return;
+            }
+            
+            const docType = (doc.document_type || '').toLowerCase();
+            if (categoryCounts.hasOwnProperty(docType)) {
+                categoryCounts[docType]++;
+                countedDocumentIds.add(doc.id);
+                console.log(`Counted regular document ${doc.id} as ${docType}`);
             }
         });
         
-        // Update total works count
-        const totalCountElement = document.querySelector('.total-count');
-        if (totalCountElement) {
-            totalCountElement.textContent = totalWorks;
-        } else {
-            console.warn('Could not find total count element');
+        // Get compiled documents
+        console.log('Directly fetching compiled documents from compiled_documents endpoint...');
+        let compiledDocuments = [];
+        try {
+            // Try a more specific compiled documents endpoint first
+            const compiledResponse = await fetch('/api/compiled-documents/all');
+            if (compiledResponse.ok) {
+                const compiledData = await compiledResponse.json();
+                compiledDocuments = compiledData.documents || [];
+                console.log(`Found ${compiledDocuments.length} compiled documents from direct endpoint`);
+            } else {
+                // Fallback to the documents endpoint with filter
+                console.log('Falling back to filtered documents endpoint...');
+                const filteredResponse = await fetch('/api/documents?is_compiled=true&limit=1000');
+                if (filteredResponse.ok) {
+                    const filteredData = await filteredResponse.json();
+                    compiledDocuments = filteredData.documents || [];
+                    console.log(`Found ${compiledDocuments.length} compiled documents from filtered endpoint`);
+                }
+            }
+        } catch (compiledError) {
+            console.error('Error fetching compiled documents:', compiledError);
         }
+        
+        // Process compiled documents
+        compiledDocuments.forEach(doc => {
+            // Skip if no ID
+            if (!doc.id) return;
+            
+            // Skip if already counted
+            if (countedDocumentIds.has(doc.id)) {
+                console.log(`Skipping already counted compiled document: ${doc.id}`);
+                return;
+            }
+            
+            // First check document_type, then check category which might be used in compiled docs
+            let docType = (doc.document_type || '').toLowerCase();
+            if (!docType && doc.category) {
+                docType = doc.category.toLowerCase();
+            }
+            
+            if (categoryCounts.hasOwnProperty(docType)) {
+                categoryCounts[docType]++;
+                countedDocumentIds.add(doc.id);
+                console.log(`Counted compiled document ${doc.id} as ${docType}`);
+            } else if (docType === 'confluence' || docType.includes('confluence')) {
+                categoryCounts.confluence++;
+                countedDocumentIds.add(doc.id);
+                console.log(`Counted compiled document ${doc.id} as confluence`);
+            } else if (docType === 'synergy' || docType.includes('synergy')) {
+                categoryCounts.synergy++;
+                countedDocumentIds.add(doc.id);
+                console.log(`Counted compiled document ${doc.id} as synergy`);
+            } else {
+                console.warn(`Unrecognized compiled document type: ${docType} for doc ${doc.id}`);
+            }
+        });
+        
+        // STEP 3: As a last resort, try the categories endpoint for total counts
+        // We'll only use this if we couldn't get any documents from the other methods
+        if (countedDocumentIds.size === 0) {
+            console.log('No documents counted, checking categories endpoint as fallback...');
+            try {
+                const categoriesResponse = await fetch('/api/categories');
+                if (categoriesResponse.ok) {
+                    const categories = await categoriesResponse.json();
+                    console.log('Categories data received:', categories);
+                    
+                    // Process each category
+                    categories.forEach(category => {
+                        const count = Number(category.count) || 0;
+                        const name = (category.name || '').toLowerCase();
+                        
+                        if (categoryCounts.hasOwnProperty(name)) {
+                            categoryCounts[name] = count;
+                            console.log(`Updated count for ${name} to ${count} from categories endpoint`);
+                        }
+                    });
+                }
+            } catch (categoriesError) {
+                console.error('Error fetching categories:', categoriesError);
+            }
+        }
+        
+        console.log(`Final document counts by category (counted ${countedDocumentIds.size} unique documents):`, categoryCounts);
+        updateCategoryUI(categoryCounts);
         
     } catch (error) {
         console.error('Error updating works summary:', error);
@@ -89,6 +176,33 @@ async function updateWorksSummary() {
         if (totalCountElement) {
             totalCountElement.textContent = 'Error';
         }
+    }
+}
+
+// Helper function to update the UI with category counts
+function updateCategoryUI(categoryCounts) {
+    // Update individual category counts
+    document.querySelectorAll('.work-count').forEach(workCountEl => {
+        // Find which category this element represents
+        Object.keys(categoryCounts).forEach(category => {
+            if (workCountEl.querySelector(`.work-type.${category}-text`)) {
+                const countEl = workCountEl.querySelector('.count');
+                if (countEl) {
+                    countEl.textContent = categoryCounts[category];
+                }
+            }
+        });
+    });
+    
+    // Calculate total works
+    const totalWorks = Object.values(categoryCounts).reduce((sum, count) => sum + count, 0);
+    
+    // Update total works count
+    const totalCountElement = document.querySelector('.total-count');
+    if (totalCountElement) {
+        totalCountElement.textContent = totalWorks;
+    } else {
+        console.warn('Could not find total count element');
     }
 }
 

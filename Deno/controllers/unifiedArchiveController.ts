@@ -940,7 +940,7 @@ async function getArchivedCategoryCounts() {
   try {
     const query = `
       WITH category_counts AS (
-        -- Counts from documents table
+        -- Counts from documents table (excluding compiled documents' children)
         SELECT 
           (document_type)::TEXT as category, 
           COUNT(*) as count
@@ -948,6 +948,7 @@ async function getArchivedCategoryCounts() {
           documents
         WHERE 
           deleted_at IS NOT NULL
+          AND compiled_parent_id IS NULL -- Exclude child documents of compilations
         GROUP BY 
           document_type
         
@@ -986,5 +987,197 @@ async function getArchivedCategoryCounts() {
   } catch (error) {
     console.error('Error getting archived category counts:', error);
     return [];
+  }
+}
+
+/**
+ * Permanently delete an archived document (hard delete)
+ * Works for both regular and compiled documents
+ */
+export async function hardDeleteArchivedDocument(ctx: any) {
+  try {
+    const id = parseInt(ctx.params.id, 10);
+    
+    if (isNaN(id) || id <= 0) {
+      ctx.response.status = 400;
+      ctx.response.body = { 
+        error: "Invalid document ID. ID must be a valid integer.", 
+        success: false 
+      };
+      return;
+    }
+    
+    console.log(`[UNIFIED ARCHIVE] Hard deleting document with ID: ${id}`);
+    
+    // First check if the document exists in the archives
+    const checkQuery = `
+      SELECT 
+        CASE 
+          WHEN EXISTS (SELECT 1 FROM documents WHERE id = $1 AND deleted_at IS NOT NULL) THEN 'documents'
+          WHEN EXISTS (SELECT 1 FROM compiled_documents WHERE id = $1 AND deleted_at IS NOT NULL) THEN 'compiled_documents'
+          ELSE NULL
+        END as source_table,
+        CASE 
+          WHEN EXISTS (SELECT 1 FROM compiled_document_items WHERE compiled_document_id = $1) THEN true
+          ELSE false
+        END as is_compilation
+    `;
+    
+    const checkResult = await client.queryObject(checkQuery, [id]);
+    
+    // Define the expected type and use type assertion
+    interface DocumentInfo {
+      source_table: string | null;
+      is_compilation: boolean;
+    }
+    
+    const documentInfo = checkResult.rows[0] as DocumentInfo;
+    
+    if (!documentInfo || !documentInfo.source_table) {
+      ctx.response.status = 404;
+      ctx.response.body = { 
+        error: "Document not found in archives", 
+        success: false 
+      };
+      return;
+    }
+    
+    // Begin transaction to ensure all operations are atomic
+    await client.queryObject("BEGIN");
+    
+    try {
+      let childDocumentsDeleted = 0;
+      
+      // Perform the appropriate delete operation based on the source table
+      if (documentInfo.source_table === 'documents') {
+        // First check if it's a compiled document with children
+        if (documentInfo.is_compilation) {
+          // Get all child document IDs
+          const childIdsQuery = `
+            SELECT document_id 
+            FROM compiled_document_items 
+            WHERE compiled_document_id = $1
+          `;
+          
+          const childIdsResult = await client.queryObject(childIdsQuery, [id]);
+          const childIds = childIdsResult.rows.map((row: any) => row.document_id);
+          
+          if (childIds.length > 0) {
+            // Delete all child documents
+            const deleteChildrenQuery = `
+              DELETE FROM documents 
+              WHERE id = ANY($1::int[]) 
+              AND deleted_at IS NOT NULL 
+              RETURNING id
+            `;
+            
+            const deleteChildrenResult = await client.queryObject(deleteChildrenQuery, [childIds]);
+            childDocumentsDeleted = deleteChildrenResult.rowCount || 0;
+            console.log(`[UNIFIED ARCHIVE] Deleted ${childDocumentsDeleted} child documents for compiled document ${id}`);
+          }
+        }
+        
+        // Handle hard delete of the document itself
+        const deleteResult = await client.queryObject(
+          "DELETE FROM documents WHERE id = $1 AND deleted_at IS NOT NULL RETURNING id",
+          [id]
+        );
+        
+        if (deleteResult.rowCount && deleteResult.rowCount > 0) {
+          // Also delete from compiled_documents if it exists there too
+          await client.queryObject(
+            "DELETE FROM compiled_documents WHERE id = $1",
+            [id]
+          );
+          
+          await client.queryObject("COMMIT");
+          
+          ctx.response.status = 200;
+          ctx.response.body = { 
+            message: "Document permanently deleted successfully", 
+            id, 
+            success: true,
+            child_documents_deleted: childDocumentsDeleted
+          };
+        } else {
+          await client.queryObject("ROLLBACK");
+          ctx.response.status = 404;
+          ctx.response.body = { 
+            error: "Document not found or already deleted", 
+            success: false 
+          };
+        }
+      } else if (documentInfo.source_table === 'compiled_documents') {
+        // If it's a compiled document, first get and delete all child documents
+        if (documentInfo.is_compilation) {
+          // Get all child document IDs
+          const childIdsQuery = `
+            SELECT document_id 
+            FROM compiled_document_items 
+            WHERE compiled_document_id = $1
+          `;
+          
+          const childIdsResult = await client.queryObject(childIdsQuery, [id]);
+          const childIds = childIdsResult.rows.map((row: any) => row.document_id);
+          
+          if (childIds.length > 0) {
+            // Delete all child documents
+            const deleteChildrenQuery = `
+              DELETE FROM documents 
+              WHERE id = ANY($1::int[]) 
+              AND deleted_at IS NOT NULL 
+              RETURNING id
+            `;
+            
+            const deleteChildrenResult = await client.queryObject(deleteChildrenQuery, [childIds]);
+            childDocumentsDeleted = deleteChildrenResult.rowCount || 0;
+            console.log(`[UNIFIED ARCHIVE] Deleted ${childDocumentsDeleted} child documents for compiled document ${id}`);
+          }
+        }
+        
+        // Handle hard delete of the compiled document itself
+        const deleteResult = await client.queryObject(
+          "DELETE FROM compiled_documents WHERE id = $1 AND deleted_at IS NOT NULL RETURNING id",
+          [id]
+        );
+        
+        if (deleteResult.rowCount && deleteResult.rowCount > 0) {
+          // Also check and delete from documents table if it exists there too
+          await client.queryObject(
+            "DELETE FROM documents WHERE id = $1",
+            [id]
+          );
+          
+          await client.queryObject("COMMIT");
+          
+          ctx.response.status = 200;
+          ctx.response.body = { 
+            message: "Compiled document permanently deleted successfully", 
+            id, 
+            success: true,
+            child_documents_deleted: childDocumentsDeleted
+          };
+        } else {
+          await client.queryObject("ROLLBACK");
+          ctx.response.status = 404;
+          ctx.response.body = { 
+            error: "Compiled document not found or already deleted", 
+            success: false 
+          };
+        }
+      }
+    } catch (error) {
+      // Rollback transaction on error
+      await client.queryObject("ROLLBACK");
+      throw error;
+    }
+  } catch (error) {
+    console.error("[UNIFIED ARCHIVE] Error hard deleting document:", error);
+    
+    ctx.response.status = 500;
+    ctx.response.body = { 
+      error: error instanceof Error ? error.message : "Unknown error occurred", 
+      success: false 
+    };
   }
 } 

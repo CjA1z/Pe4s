@@ -15,6 +15,7 @@ export async function createCompiledDocument(
     department?: string;
     category?: string;
     foreword?: string;
+    abstract_foreword?: string;
   },
   documentIds: number[]
 ): Promise<number> {
@@ -92,6 +93,11 @@ export async function handleCreateCompiledDocument(request: Request): Promise<Re
 
     // Default to empty array if documentIds not provided
     const documentIds = Array.isArray(body.documentIds) ? body.documentIds : [];
+
+    // Log the abstract_foreword field if it's provided
+    if (body.compiledDoc.abstract_foreword) {
+      console.log(`Received abstract_foreword for new compiled document: ${body.compiledDoc.abstract_foreword.substring(0, 100)}...`);
+    }
 
     const compiledDocId = await createCompiledDocument(body.compiledDoc, documentIds);
 
@@ -297,6 +303,7 @@ export async function updateCompiledDocument(
     department?: string;
     category?: string;
     foreword?: string;
+    abstract_foreword?: string;
     title?: string;
     authors?: any[];
     topics?: any[];

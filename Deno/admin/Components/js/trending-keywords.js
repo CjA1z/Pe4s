@@ -2,10 +2,8 @@
  * Trending Keywords Component
  * 
  * This script fetches and displays trending keywords based on:
- * 1. User searches
- * 2. Keywords from most visited documents
- * 
- * It only displays keywords that already exist in the database.
+ * 1. Document keywords from most visited documents
+ * 2. Keywords from documents list if trending isn't available
  */
 
 // Function to fetch trending keywords
@@ -15,63 +13,154 @@ async function fetchTrendingKeywords() {
         // Show loading state
         showLoadingState();
         
-        // Fetch trending keywords based on document visits and searches
-        // Set limit to 10 to ensure maximum of 10 keywords
-        const response = await fetch('/api/trending-keywords?limit=10');
+        // Try getting keywords from most visited documents first
+        await fetchKeywordsFromMostVisitedDocuments();
+    } catch (error) {
+        console.error('Error fetching trending keywords:', error);
+        // Fallback to keywords from documents list
+        await fetchKeywordsFromDocumentsList();
+    }
+}
+
+// Function to extract keywords from most visited documents
+async function fetchKeywordsFromMostVisitedDocuments() {
+    try {
+        // Use the most-visited-works endpoint which is confirmed to be working
+        const response = await fetch('/api/most-visited-documents?period=30&limit=20');
         
         if (!response.ok) {
-            console.log(`HTTP error! status: ${response.status}`);
-            // Fallback to static keywords from database
-            await fetchStaticKeywords();
+            console.log(`HTTP error! Most visited documents status: ${response.status}`);
+            // Fallback to documents list
+            await fetchKeywordsFromDocumentsList();
             return;
         }
         
         const data = await response.json();
-        console.log('Trending keywords data received:', data);
+        console.log('Most visited documents data received:', data);
         
-        if (!data.keywords || data.keywords.length === 0) {
-            // If no trending keywords, fetch regular keywords as fallback
-            console.log('No trending keywords data available, falling back to static keywords');
-            await fetchStaticKeywords();
+        if (!data || !Array.isArray(data.documents) || data.documents.length === 0) {
+            console.log('No most visited documents data available');
+            await fetchKeywordsFromDocumentsList();
             return;
         }
         
-        updateKeywordsDisplay(data.keywords);
+        // Extract keywords from the documents
+        const allKeywords = [];
+        data.documents.forEach(doc => {
+            if (doc.keywords && Array.isArray(doc.keywords)) {
+                doc.keywords.forEach(keyword => {
+                    if (keyword && typeof keyword === 'string' && keyword.trim() !== '') {
+                        allKeywords.push(keyword.trim());
+                    }
+                });
+            }
+        });
+        
+        if (allKeywords.length === 0) {
+            console.log('No keywords found in most visited documents');
+            await fetchKeywordsFromDocumentsList();
+            return;
+        }
+        
+        // Count keyword occurrences and sort by popularity
+        const keywordCounts = {};
+        allKeywords.forEach(keyword => {
+            keywordCounts[keyword] = (keywordCounts[keyword] || 0) + 1;
+        });
+        
+        // Convert to array of objects and sort
+        const sortedKeywords = Object.keys(keywordCounts)
+            .map(keyword => ({ keyword, count: keywordCounts[keyword] }))
+            .sort((a, b) => b.count - a.count);
+            
+        // Take the top 10 keywords
+        const topKeywords = sortedKeywords.slice(0, 10);
+        
+        if (topKeywords.length > 0) {
+            updateKeywordsDisplay(topKeywords);
+        } else {
+            await fetchKeywordsFromDocumentsList();
+        }
     } catch (error) {
-        console.error('Error fetching trending keywords:', error);
-        // Fallback to static keywords
-        await fetchStaticKeywords();
+        console.error('Error extracting keywords from most visited documents:', error);
+        await fetchKeywordsFromDocumentsList();
     }
 }
 
-// Function to fetch static keywords from database as fallback
-async function fetchStaticKeywords() {
+// Function to fetch keywords from all documents as fallback
+async function fetchKeywordsFromDocumentsList() {
     try {
-        console.log('Fetching static keywords as fallback...');
-        // Fetch existing keywords from database, limit to 10
-        const response = await fetch('/api/keywords?limit=20');
+        console.log('Fetching keywords from documents list as fallback...');
+        
+        // Use the documents list API which should be available
+        const response = await fetch('/api/documents?limit=20');
         
         if (!response.ok) {
-            console.log(`HTTP error fetching static keywords: ${response.status}`);
+            console.log(`HTTP error fetching documents: ${response.status}`);
             displayErrorMessage();
             return;
         }
         
         const data = await response.json();
-        console.log('Static keywords data received:', data);
+        console.log('Documents data received:', data);
         
-        if (!data || !Array.isArray(data) || data.length === 0) {
+        if (!data || !Array.isArray(data.documents) || data.documents.length === 0) {
             displayNoDataMessage();
             return;
         }
         
-        // Take a maximum of 10 random keywords
-        const randomKeywords = getRandomItems(data, 10);
-        updateKeywordsDisplay(randomKeywords);
+        // Extract all keywords from documents
+        const allKeywords = [];
+        data.documents.forEach(doc => {
+            if (doc.keywords && Array.isArray(doc.keywords)) {
+                doc.keywords.forEach(keyword => {
+                    if (keyword && typeof keyword === 'string' && keyword.trim() !== '') {
+                        allKeywords.push(keyword.trim());
+                    }
+                });
+            }
+        });
+        
+        if (allKeywords.length === 0) {
+            // If still no keywords, use hardcoded fallback
+            useHardcodedKeywords();
+            return;
+        }
+        
+        // Remove duplicates by using a Set
+        const uniqueKeywords = [...new Set(allKeywords)];
+        
+        // Select random keywords from the unique list
+        const randomKeywords = getRandomItems(uniqueKeywords, 10);
+        
+        // Format as objects to match expected format
+        const formattedKeywords = randomKeywords.map(keyword => ({ keyword }));
+        
+        updateKeywordsDisplay(formattedKeywords);
     } catch (error) {
-        console.error('Error fetching static keywords:', error);
-        displayErrorMessage();
+        console.error('Error fetching keywords from documents list:', error);
+        useHardcodedKeywords();
     }
+}
+
+// Last resort: use hardcoded keywords if all else fails
+function useHardcodedKeywords() {
+    console.log('Using hardcoded keywords as last resort');
+    
+    const fallbackKeywords = [
+        { keyword: "Research" },
+        { keyword: "Thesis" },
+        { keyword: "Digital Archive" },
+        { keyword: "Academic" },
+        { keyword: "Education" },
+        { keyword: "Preservation" },
+        { keyword: "Documentation" },
+        { keyword: "Analysis" },
+        { keyword: "Archives" },
+        { keyword: "Learning" }
+    ];
+    
+    updateKeywordsDisplay(fallbackKeywords);
 }
 
 // Helper function to get random items from array
@@ -88,6 +177,10 @@ function updateKeywordsDisplay(keywords) {
         console.error('Keywords list container not found');
         return;
     }
+    
+    // Disable scrolling by removing max-height and setting overflow to visible
+    keywordsContainer.style.maxHeight = 'none';
+    keywordsContainer.style.overflowY = 'visible';
     
     // Clear existing content
     keywordsContainer.innerHTML = '';

@@ -28,7 +28,8 @@ import { fetchDocuments, fetchChildDocuments } from "./services/documentService.
 import documentAuthorRoutes from "./routes/documentAuthorRoutes.ts";
 import fileRoutes from "./routes/fileRoutes.ts"; // Import file routes
 import { uploadRoutes, uploadRoutesAllowedMethods } from "./routes/uploadRoutes.ts"; // Import upload routes
-import { handler as categoryHandler } from "./api/category.ts"; // Import category handler
+import reportsRoutes from "./routes/reportsRoutes.ts"; // Import reports routes
+import { handler as categoryHandler, countByCategory } from "./api/category.ts"; // Import category handler
 import { getDepartments } from "./api/departments.ts";
 import { handleCreateDocument } from "./api/document.ts"; // Import document creation handler
 import { getCategories } from "./controllers/categoryController.ts";
@@ -45,6 +46,7 @@ import { DocumentRequestController } from "./controllers/documentRequestControll
 import { emailRoutes } from "./routes/emailRoutes.ts"; // Import email routes
 import { authorVisitsRoutes, authorVisitsAllowedMethods } from "./routes/authorVisitsRoutes.ts"; // Import author visits routes
 import { pageVisitsRoutes, pageVisitsAllowedMethods } from "./routes/pageVisitsRoutes.ts"; // Import page visits routes
+import keywordsRoutes from "./routes/keywordsRoutes.ts"; // Import keywords routes
 import { getCompiledDocument } from "./api/compiledDocument.ts";
 import { handleGetUserProfileForNavbar } from "./api/user.ts"; // Import user profile handler
 import { handleLogout } from "./routes/logout.ts"; // Import logout handler
@@ -237,6 +239,20 @@ router.get("/api/category", async (ctx) => {
   });
   
   const response = await categoryHandler(request);
+  
+  ctx.response.status = response.status;
+  ctx.response.headers = response.headers;
+  ctx.response.body = await response.json();
+});
+
+// Add count-by-category route
+router.get("/api/documents/count-by-category", async (ctx) => {
+  const request = new Request(ctx.request.url.toString(), {
+    method: ctx.request.method,
+    headers: ctx.request.headers
+  });
+  
+  const response = await countByCategory(request);
   
   ctx.response.status = response.status;
   ctx.response.headers = response.headers;
@@ -1134,10 +1150,6 @@ async function startServer() {
     // Run database diagnostics
     await diagnoseDatabaseIssues();
     
-    // Run migrations
-    // TODO: Fix migration functions when DocumentViewController is properly implemented
-    // await runMigrations();
-    
     // Register routes with the application
     app.use(router.routes());
     app.use(router.allowedMethods());
@@ -1151,6 +1163,16 @@ async function startServer() {
     console.log("Registering page visits routes...");
     app.use(pageVisitsRoutes);
     app.use(pageVisitsAllowedMethods);
+    
+    // Register keywords routes
+    console.log("Registering keywords routes...");
+    app.use(keywordsRoutes.routes());
+    app.use(keywordsRoutes.allowedMethods());
+    
+    // Register reports routes
+    console.log("Registering reports routes...");
+    app.use(reportsRoutes.routes());
+    app.use(reportsRoutes.allowedMethods());
     
     // Start the server
     console.log(`🌐 Server running on http://localhost:${PORT}`);

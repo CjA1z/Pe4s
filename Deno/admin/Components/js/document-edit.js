@@ -1023,32 +1023,6 @@ window.documentEdit = {
                 form.addEventListener('submit', submitListener);
             }
             
-            // File upload handling
-            const fileInput = document.getElementById('edit-single-document-file');
-            const fileIndicator = document.getElementById('edit-single-document-file-indicator');
-            if (fileInput && fileIndicator) {
-                // Remove any existing listeners to prevent duplicates
-                const oldListener = fileInput._editChangeListener;
-                if (oldListener) {
-                    fileInput.removeEventListener('change', oldListener);
-                }
-                
-                // Create new listener
-                const changeListener = (e) => {
-                    if (fileInput.files.length > 0) {
-                        fileIndicator.textContent = fileInput.files[0].name;
-                    } else {
-                        fileIndicator.textContent = '';
-                    }
-                };
-                
-                // Store reference to listener for future removal
-                fileInput._editChangeListener = changeListener;
-                
-                // Add the event listener
-                fileInput.addEventListener('change', changeListener);
-            }
-            
             // Initialize author search input
             const authorSearchInput = document.getElementById('edit-single-document-author-search');
             if (authorSearchInput && typeof window.initAuthorSearchInput === 'function') {
@@ -1945,177 +1919,6 @@ window.documentEdit = {
             }
         }
         
-        // Handle file path if available
-        if (data.file_path) {
-            const fileIndicator = document.getElementById('edit-single-document-file-indicator');
-            const currentFileDiv = document.getElementById('edit-single-document-file-current');
-            const uploadAreaDiv = document.getElementById('edit-single-document-file-upload');
-            const fileInput = document.getElementById('edit-single-document-file');
-            const replaceBtn = document.getElementById('edit-single-document-replace-btn');
-            
-            if (fileIndicator && currentFileDiv && uploadAreaDiv && fileInput && replaceBtn) {
-                const fileName = data.file_path.split('/').pop();
-                fileIndicator.textContent = fileName;
-                
-                // Show current file section and hide upload area
-                currentFileDiv.style.display = 'flex';
-                uploadAreaDiv.style.display = 'none';
-                
-                // Store original filename for replacement
-                currentFileDiv.dataset.originalName = fileName;
-                currentFileDiv.dataset.originalPath = data.file_path;
-                currentFileDiv.dataset.filePath = data.file_path;  // Add this attribute for consistency
-                
-                // Clear any existing event listeners
-                const newReplaceBtn = replaceBtn.cloneNode(true);
-                replaceBtn.parentNode.replaceChild(newReplaceBtn, replaceBtn);
-                
-                // Add click handler for replace button
-                newReplaceBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    fileInput.click();
-                });
-                
-                // Clear any existing event listeners on file input
-                const newFileInput = fileInput.cloneNode(true);
-                fileInput.parentNode.replaceChild(newFileInput, fileInput);
-                
-                // Handle file selection
-                newFileInput.addEventListener('change', async (e) => {
-                    if (newFileInput.files.length > 0) {
-                        const file = newFileInput.files[0];
-                        const originalName = currentFileDiv.dataset.originalName;
-                        const originalPath = currentFileDiv.dataset.originalPath;
-                        
-                        if (originalName && originalPath) {
-                            try {
-                                // Create FormData for the file upload
-                                const formData = new FormData();
-                                formData.append('file', file);
-                                formData.append('is_replacement', 'true');
-                                formData.append('original_name', originalName);
-                                formData.append('original_path', originalPath);
-                                
-                                // Add document type to ensure proper storage directory
-                                const documentType = document.getElementById('edit-single-document-type')?.value || 'DISSERTATION';
-                                formData.append('document_type', documentType);
-                                
-                                // Add document ID for reference
-                                const documentId = document.getElementById('edit-single-document-id')?.value;
-                                if (documentId) {
-                                    formData.append('document_id', documentId);
-                                }
-                                
-                                console.log('Replacing file with params:', {
-                                    originalName, 
-                                    originalPath,
-                                    documentType,
-                                    documentId,
-                                    fileType: file.type,
-                                    fileSize: file.size,
-                                    fileName: file.name
-                                });
-                                
-                                // Upload the file
-                                const response = await fetch('/api/upload', {
-                                    method: 'POST',
-                                    body: formData
-                                });
-                                
-                                if (!response.ok) {
-                                    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-                                    throw new Error(errorData.error || `Server responded with status: ${response.status}`);
-                                }
-                                
-                                const result = await response.json();
-                                
-                                if (result.error) {
-                                    throw new Error(result.error);
-                                }
-                                
-                                // Update display
-                                fileIndicator.textContent = originalName + ' (Replaced)';
-                                
-                                // Show current file view
-                                currentFileDiv.style.display = 'flex';
-                                uploadAreaDiv.style.display = 'none';
-                                
-                                // Add success indicator
-                                const successIndicator = document.createElement('div');
-                                successIndicator.className = 'file-status-indicator success';
-                                successIndicator.innerHTML = '<i class="fas fa-check-circle"></i> File replaced successfully';
-                                successIndicator.style.backgroundColor = '#d4edda';
-                                successIndicator.style.color = '#155724';
-                                successIndicator.style.padding = '8px 12px';
-                                successIndicator.style.borderRadius = '4px';
-                                successIndicator.style.marginTop = '8px';
-                                successIndicator.style.display = 'flex';
-                                successIndicator.style.alignItems = 'center';
-                                successIndicator.style.gap = '6px';
-                                
-                                // Remove any existing status indicators
-                                const existingIndicator = currentFileDiv.parentNode.querySelector('.file-status-indicator');
-                                if (existingIndicator) {
-                                    existingIndicator.remove();
-                                }
-                                
-                                // Add the success indicator after the current file div
-                                currentFileDiv.parentNode.insertBefore(successIndicator, currentFileDiv.nextSibling);
-                                
-                                // Auto-remove the indicator after 5 seconds
-                                setTimeout(() => {
-                                    successIndicator.style.transition = 'opacity 0.5s';
-                                    successIndicator.style.opacity = '0';
-                                    setTimeout(() => successIndicator.remove(), 500);
-                                }, 5000);
-                                
-                                // Update the dataset with the new file path
-                                if (result.filePath) {
-                                    currentFileDiv.dataset.filePath = result.filePath;
-                                    currentFileDiv.dataset.originalPath = result.filePath;
-                                    console.log('Updated file path in data attributes:', result.filePath);
-                                }
-                                
-                                console.log('File replacement completed:', result);
-                                showToast('File replaced successfully', 'success');
-                            } catch (error) {
-                                console.error('Error replacing file:', error);
-                                
-                                // Add error indicator
-                                const errorIndicator = document.createElement('div');
-                                errorIndicator.className = 'file-status-indicator error';
-                                errorIndicator.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${error.message || 'Error replacing file'}`;
-                                errorIndicator.style.backgroundColor = '#f8d7da';
-                                errorIndicator.style.color = '#721c24';
-                                errorIndicator.style.padding = '8px 12px';
-                                errorIndicator.style.borderRadius = '4px';
-                                errorIndicator.style.marginTop = '8px';
-                                errorIndicator.style.display = 'flex';
-                                errorIndicator.style.alignItems = 'center';
-                                errorIndicator.style.gap = '6px';
-                                
-                                // Remove any existing status indicators
-                                const existingIndicator = currentFileDiv.parentNode.querySelector('.file-status-indicator');
-                                if (existingIndicator) {
-                                    existingIndicator.remove();
-                                }
-                                
-                                // Add the error indicator after the current file div
-                                currentFileDiv.parentNode.insertBefore(errorIndicator, currentFileDiv.nextSibling);
-                                
-                                // Show current file view with the error message
-                                currentFileDiv.style.display = 'flex';
-                                uploadAreaDiv.style.display = 'none';
-                                
-                                showToast('Error replacing file: ' + error.message, 'error');
-                            }
-                        }
-                    }
-                });
-            }
-        }
-        
         // Add styles for file handling
         const style = document.createElement('style');
         style.textContent += `
@@ -2697,147 +2500,7 @@ window.documentEdit = {
                 submitButton.innerHTML = '<span class="inline-block animate-spin mr-2">↻</span> Saving...';
             }
 
-            // Step 1: Handle file upload first if a new file is selected
-            const fileInput = document.getElementById('edit-single-document-file');
-            let uploadedFilePath = null;
-            
-            if (fileInput && fileInput.files.length > 0) {
-                const file = fileInput.files[0];
-                console.log(`Uploading replacement file: ${file.name}`);
-                
-                try {
-                    const fileFormData = new FormData();
-                    fileFormData.append('file', file);
-                    fileFormData.append('document_id', documentId);
-                    fileFormData.append('is_replacement', 'true');
-                    
-                    // Get the original filename from the current file display
-                    const currentFileDiv = document.getElementById('edit-single-document-file-current');
-                    if (currentFileDiv && currentFileDiv.dataset.originalName) {
-                        fileFormData.append('original_name', currentFileDiv.dataset.originalName);
-                        console.log('Using original filename for replacement:', currentFileDiv.dataset.originalName);
-                    }
-
-                    // Add the original file path for proper replacement
-                    if (currentFileDiv && currentFileDiv.dataset.filePath) {
-                        fileFormData.append('original_path', currentFileDiv.dataset.filePath);
-                        console.log('Using original file path for replacement:', currentFileDiv.dataset.filePath);
-                    }
-
-                    // Add document type information
-                    const documentTypeSelect = document.getElementById('edit-single-document-type');
-                    if (documentTypeSelect && documentTypeSelect.value) {
-                        fileFormData.append('document_type', documentTypeSelect.value);
-                    }
-
-                    // Try multiple upload endpoints
-                    const uploadEndpoints = [
-                        '/api/upload',
-                        '/api/documents/upload',
-                        '/api/files/upload'
-                    ];
-
-                    let uploadSuccess = false;
-                    for (const endpoint of uploadEndpoints) {
-                        try {
-                            console.log(`Attempting file upload to ${endpoint}`);
-                            const uploadResponse = await fetch(endpoint, {
-                                method: 'POST',
-                                body: fileFormData
-                            });
-
-                            if (uploadResponse.ok) {
-                                const uploadResult = await uploadResponse.json();
-                                uploadedFilePath = uploadResult.filePath || uploadResult.file_path;
-                                
-                                // Display success indicator
-                                const fileStatusContainer = document.querySelector('.file-status-indicator');
-                                if (fileStatusContainer) {
-                                    fileStatusContainer.innerHTML = `<i class="fas fa-check-circle"></i> File uploaded successfully`;
-                                    fileStatusContainer.style.backgroundColor = '#d4edda';
-                                    fileStatusContainer.style.color = '#155724';
-                                } else {
-                                    // Create new status indicator if it doesn't exist
-                                    const successIndicator = document.createElement('div');
-                                    successIndicator.className = 'file-status-indicator success';
-                                    successIndicator.innerHTML = '<i class="fas fa-check-circle"></i> File uploaded successfully';
-                                    successIndicator.style.backgroundColor = '#d4edda';
-                                    successIndicator.style.color = '#155724';
-                                    successIndicator.style.padding = '8px 12px';
-                                    successIndicator.style.borderRadius = '4px';
-                                    successIndicator.style.marginTop = '8px';
-                                    successIndicator.style.display = 'flex';
-                                    successIndicator.style.alignItems = 'center';
-                                    successIndicator.style.gap = '6px';
-                                    
-                                    const insertTarget = document.getElementById('edit-single-document-file-current');
-                                    if (insertTarget && insertTarget.parentNode) {
-                                        insertTarget.parentNode.appendChild(successIndicator);
-                                    }
-                                }
-                                
-                                // Update the file path in the UI element for later use
-                                if (currentFileDiv) {
-                                    currentFileDiv.dataset.filePath = uploadedFilePath;
-                                    currentFileDiv.dataset.originalPath = uploadedFilePath;
-                                }
-                                
-                                console.log(`File uploaded successfully, path: ${uploadedFilePath}`);
-                                uploadSuccess = true;
-                                break;
-                            } else {
-                                console.warn(`Upload failed at ${endpoint}: ${uploadResponse.status}`);
-                                const errorData = await uploadResponse.json().catch(() => ({ error: 'Unknown error' }));
-                                throw new Error(errorData.error || `Server responded with status: ${uploadResponse.status}`);
-                            }
-                        } catch (endpointError) {
-                            console.warn(`Error with upload endpoint ${endpoint}:`, endpointError);
-                        }
-                    }
-
-                    if (!uploadSuccess) {
-                        throw new Error('Failed to upload file to any endpoint');
-                    }
-                } catch (fileError) {
-                    console.error('File upload failed:', fileError);
-                    showToast('File upload failed. Please try again.', 'error');
-                    
-                    // Create error indicator
-                    const errorIndicator = document.createElement('div');
-                    errorIndicator.className = 'file-status-indicator error';
-                    errorIndicator.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${fileError.message || 'Error uploading file'}`;
-                    errorIndicator.style.backgroundColor = '#f8d7da';
-                    errorIndicator.style.color = '#721c24';
-                    errorIndicator.style.padding = '8px 12px';
-                    errorIndicator.style.borderRadius = '4px';
-                    errorIndicator.style.marginTop = '8px';
-                    errorIndicator.style.display = 'flex';
-                    errorIndicator.style.alignItems = 'center';
-                    errorIndicator.style.gap = '6px';
-                    
-                    // Remove any existing status indicators
-                    const existingIndicator = document.querySelector('.file-status-indicator');
-                    if (existingIndicator) {
-                        existingIndicator.remove();
-                    }
-                    
-                    const insertTarget = document.getElementById('edit-single-document-file-current');
-                    if (insertTarget && insertTarget.parentNode) {
-                        insertTarget.parentNode.appendChild(errorIndicator);
-                    }
-                    
-                    throw fileError;
-                }
-            } else {
-                // Check if we have a replaced file that hasn't been uploaded yet
-                const currentFileDiv = document.getElementById('edit-single-document-file-current');
-                if (currentFileDiv && currentFileDiv.style.display !== 'none' && currentFileDiv.dataset.filePath) {
-                    uploadedFilePath = currentFileDiv.dataset.filePath;
-                    console.log('Using already replaced file path:', uploadedFilePath);
-                }
-            }
-
-            // Step 2: Prepare document data
+            // Step 1: Prepare document data
             const documentData = {
                 id: documentId,
                 title: formData.get('title'),
@@ -2846,23 +2509,11 @@ window.documentEdit = {
                 category_id: formData.get('category_id') || null
             };
 
-            // Add file path if we uploaded a new file
-            if (uploadedFilePath) {
-                documentData.file_path = uploadedFilePath;
-                console.log('Updating document with new file path:', uploadedFilePath);
-            } else {
-                // If no new file was uploaded, but there is an existing file
-                const currentFileDiv = document.getElementById('edit-single-document-file-current');
-                if (currentFileDiv && currentFileDiv.dataset.filePath) {
-                    // Make sure we still include the current file path
-                    documentData.file_path = currentFileDiv.dataset.filePath;
-                    console.log('Using existing file path:', documentData.file_path);
-                }
-            }
-            
+            // We don't need to handle file uploads since the feature was removed
+            // We'll keep the existing file path from the document record
             console.log('Document data to save:', documentData);
 
-            // Step 3: Collect author IDs
+            // Step 2: Collect author IDs
             const selectedAuthors = document.getElementById('edit-single-document-selected-authors');
             const authorIds = [];
             if (selectedAuthors) {
@@ -2875,7 +2526,7 @@ window.documentEdit = {
             }
             console.log('Selected author IDs:', authorIds);
         
-            // Step 4: Collect topic IDs
+            // Step 3: Collect topic IDs
             const selectedTopics = document.getElementById('edit-single-document-selected-topics');
             const topicIds = [];
             if (selectedTopics) {
@@ -2888,7 +2539,7 @@ window.documentEdit = {
             }
             console.log('Selected topic IDs:', topicIds);
         
-            // Step 5: Save document with all data
+            // Step 4: Save document with all data
             console.log('Saving document with document-edit API');
             const requestData = {
                 document: documentData,

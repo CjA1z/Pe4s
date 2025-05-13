@@ -1369,6 +1369,9 @@ window.documentArchive = (function() {
                 <button class="action-btn restore-btn" title="Restore Document" data-document-id="${doc.id}">
                         <i class="fas fa-trash-restore"></i>
                     </button>
+                    <button class="action-btn hard-delete-btn" title="Permanently Delete" data-document-id="${doc.id}">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
                 </div>`;
         
         // Add event listeners for compiled documents
@@ -2685,6 +2688,56 @@ window.documentArchive = (function() {
         }
     }
 
+    /**
+     * Update the category filters with the provided counts
+     * @param {Object} categoryCounts - Object mapping category names to counts
+     */
+    function updateCategoryFilters(categoryCounts) {
+        console.log('Updating category filters with data:', categoryCounts);
+        
+        if (!categoryCounts) {
+            console.warn('No category counts provided to updateCategoryFilters');
+            return;
+        }
+        
+        // Calculate total count across all categories
+        let totalCount = 0;
+        for (const category in categoryCounts) {
+            if (Object.prototype.hasOwnProperty.call(categoryCounts, category)) {
+                totalCount += Number(categoryCounts[category]);
+            }
+        }
+        
+        // Find all category filter elements
+        const categoryElements = document.querySelectorAll('.category-filter, .filter-item, .category-card');
+        
+        // Update the "All" category count
+        categoryElements.forEach(element => {
+            const category = element.getAttribute('data-category') || element.getAttribute('data-filter');
+            if (category === 'All' || category === 'all' || !category) {
+                const countElement = element.querySelector('.count, .filter-count, .category-count');
+                if (countElement) {
+                    countElement.textContent = `${totalCount} ${totalCount === 1 ? 'file' : 'files'}`;
+                }
+            }
+        });
+        
+        // Update individual category counts
+        categoryElements.forEach(element => {
+            const category = element.getAttribute('data-category') || element.getAttribute('data-filter');
+            if (category && category !== 'All' && category !== 'all') {
+                const count = categoryCounts[category] || 0;
+                const countElement = element.querySelector('.count, .filter-count, .category-count');
+                if (countElement) {
+                    countElement.textContent = `${count} ${count === 1 ? 'file' : 'files'}`;
+                }
+            }
+        });
+        
+        // Log completion
+        console.log('Category filters updated with total count:', totalCount);
+    }
+
     // Public API
     return {
         // Archive mode state
@@ -2781,6 +2834,25 @@ function showRestoreConfirmation(documentId, isCompiled = false, docTitle = null
         modal.style.position = 'fixed';
         modal.style.zIndex = '9999';
         
+        // Create modal content
+        modal.innerHTML = `
+            <div class="modal-content confirmation-modal">
+                <div class="modal-header">
+                    <h3 id="restore-confirmation-title">Restore Document</h3>
+                    <button class="close-button" id="close-restore-confirmation">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="confirmation-icon">
+                        <i class="fas fa-history"></i>
+                    </div>
+                    <p id="restore-confirmation-message">Are you sure you want to restore this document? It will be available in the main document list.</p>
+                </div>
+                <div class="modal-footer">
+                    <button id="cancel-restore-confirmation" class="btn-secondary">Cancel</button>
+                    <button id="confirm-restore-btn" class="btn-primary">Restore</button>
+                </div>
+            </div>
+        `;
         
         // Add to document body
         document.body.appendChild(modal);
@@ -2999,6 +3071,330 @@ function showRestoreConfirmation(documentId, isCompiled = false, docTitle = null
     document.addEventListener('keydown', keyHandler);
 }
 
+/**
+ * Show confirmation dialog for hard deleting a document
+ * This is a permanent action that cannot be undone
+ * @param {string|number} documentId - ID of document to delete
+ * @param {boolean} isCompiled - Whether this is a compiled document
+ * @param {string} docTitle - Document title for better UX
+ */
+function showHardDeleteConfirmation(documentId, isCompiled = false, docTitle = null) {
+    // Log function call for debugging
+    console.log(`showHardDeleteConfirmation called with ID: ${documentId}, isCompiled: ${isCompiled}, title: ${docTitle}`);
+    
+    // Validate document ID
+    if (!documentId) {
+        console.error('Cannot show delete confirmation: Missing document ID');
+        showToast('Cannot delete: Missing document ID', 'error');
+        return;
+    }
+    
+    // Parse document ID as integer if it's a string
+    const docId = typeof documentId === 'string' ? parseInt(documentId, 10) : documentId;
+    
+    if (isNaN(docId) || docId <= 0) {
+        console.error(`Invalid document ID: ${documentId}. ID must be a positive integer.`);
+        showToast('Cannot delete: Invalid document ID', 'error');
+        return;
+    }
+    
+    // Store the parsed ID
+    documentId = docId;
+    
+    console.log(`Showing hard delete confirmation for document ${documentId}, isCompiled: ${isCompiled}`);
+    
+    // Get document info if not provided
+    if (!docTitle) {
+        const docCard = document.querySelector(`.document-card[data-document-id="${documentId}"]`);
+        if (docCard) {
+            const titleEl = docCard.querySelector('.document-title');
+            if (titleEl) {
+                docTitle = titleEl.textContent.trim();
+                if (docTitle.length > 40) {
+                    docTitle = docTitle.substring(0, 37) + '...';
+                }
+            }
+            
+            isCompiled = docCard.classList.contains('compiled-document') || 
+                          docCard.classList.contains('compilation');
+        }
+    }
+    
+    // Look for existing modal or create new one
+    let modal = document.getElementById('hard-delete-confirmation-modal');
+    
+    // If modal doesn't exist, create it
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'hard-delete-confirmation-modal';
+        modal.className = 'modal-overlay';
+        modal.style.display = 'none';
+        modal.style.position = 'fixed';
+        modal.style.zIndex = '9999';
+        
+        // Create modal content
+        modal.innerHTML = `
+            <div class="modal-content confirmation-modal">
+                <div class="modal-header">
+                    <h3 id="hard-delete-confirmation-title">Permanently Delete Document</h3>
+                    <button class="close-button" id="close-hard-delete-confirmation">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="confirmation-icon danger">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <p id="hard-delete-confirmation-message">
+                        <strong>Warning:</strong> This action cannot be undone. This will permanently delete this document from the database.
+                    </p>
+                    <div class="confirmation-input-container">
+                        <label for="delete-confirmation-input">Please type <strong>Delete</strong> to confirm:</label>
+                        <input type="text" id="delete-confirmation-input" class="confirmation-input" placeholder="Type 'Delete' here">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="cancel-hard-delete-confirmation" class="btn-secondary">Cancel</button>
+                    <button id="confirm-hard-delete-btn" class="btn-danger" disabled>Permanently Delete</button>
+                </div>
+            </div>
+        `;
+        
+        // Add to document body
+        document.body.appendChild(modal);
+        
+        // Add styles for the danger icon and button
+        const styleEl = document.createElement('style');
+        styleEl.id = 'hard-delete-confirmation-styles';
+        styleEl.textContent = `
+            .confirmation-icon.danger {
+                color: #dc3545;
+                margin: 0 auto 20px;
+                text-align: center;
+            }
+            .confirmation-icon.danger i {
+                font-size: 48px;
+                background: rgba(220, 53, 69, 0.1);
+                padding: 15px;
+                border-radius: 50%;
+            }
+            .btn-danger {
+                background-color: #dc3545;
+                color: white;
+                border: 1px solid #bd2130;
+                padding: 8px 16px;
+                border-radius: 4px;
+                cursor: pointer;
+                transition: background-color 0.2s;
+            }
+            .btn-danger:hover {
+                background-color: #bd2130;
+            }
+            .btn-danger:disabled {
+                background-color: #e9a2a9;
+                border-color: #e9a2a9;
+                cursor: not-allowed;
+                opacity: 0.65;
+            }
+            .confirmation-input-container {
+                margin-top: 20px;
+                text-align: left;
+            }
+            .confirmation-input-container label {
+                display: block;
+                margin-bottom: 8px;
+                font-weight: 500;
+            }
+            .confirmation-input {
+                width: 100%;
+                padding: 10px;
+                border: 1px solid #ced4da;
+                border-radius: 4px;
+                font-size: 16px;
+                margin-bottom: 10px;
+            }
+            .confirmation-input.error {
+                border-color: #dc3545;
+                box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+            }
+        `;
+        document.head.appendChild(styleEl);
+    }
+    
+    // Set the title and message
+    const titleEl = modal.querySelector('#hard-delete-confirmation-title');
+    const messageEl = modal.querySelector('#hard-delete-confirmation-message');
+    
+    if (titleEl) {
+        titleEl.textContent = isCompiled ? 'Permanently Delete Compilation' : 'Permanently Delete Document';
+    }
+    
+    if (messageEl) {
+        messageEl.innerHTML = `
+            <strong>Warning:</strong> Are you sure you want to permanently delete 
+            "${docTitle || (isCompiled ? 'this compilation' : 'this document')}"?
+            <br><br>
+            This action <strong>CANNOT</strong> be undone and will remove the document completely from the database.
+            ${isCompiled ? '<br><br>This will also delete all child documents belonging to this compilation.' : ''}
+        `;
+    }
+    
+    // Set up event listeners
+    const closeBtn = modal.querySelector('#close-hard-delete-confirmation');
+    const cancelBtn = modal.querySelector('#cancel-hard-delete-confirmation');
+    const confirmBtn = modal.querySelector('#confirm-hard-delete-btn');
+    const confirmationInput = modal.querySelector('#delete-confirmation-input');
+    
+    // Clear any previous input
+    if (confirmationInput) {
+        confirmationInput.value = '';
+        confirmationInput.classList.remove('error');
+        
+        // Add input event listener to validate and enable/disable the confirm button
+        confirmationInput.addEventListener('input', function() {
+            const inputValue = this.value.trim();
+            confirmBtn.disabled = inputValue !== 'Delete';
+            
+            // Add visual indicator for incorrect input
+            if (inputValue && inputValue !== 'Delete') {
+                this.classList.add('error');
+            } else {
+                this.classList.remove('error');
+            }
+        });
+    }
+    
+    // Close modal when X button is clicked
+    if (closeBtn) {
+        closeBtn.onclick = function() {
+            modal.style.display = 'none';
+        };
+    }
+    
+    // Close modal when Cancel button is clicked
+    if (cancelBtn) {
+        cancelBtn.onclick = function() {
+            modal.style.display = 'none';
+        };
+    }
+    
+    // Handle confirm button
+    if (confirmBtn) {
+        // Remove existing event listeners
+        confirmBtn.replaceWith(confirmBtn.cloneNode(true));
+        
+        // Add new event listener
+        modal.querySelector('#confirm-hard-delete-btn').addEventListener('click', function() {
+            const inputValue = confirmationInput ? confirmationInput.value.trim() : '';
+            
+            // Double-check the input value is correct before proceeding
+            if (inputValue === 'Delete') {
+                console.log(`Hard delete confirmed for document ${documentId}`);
+                modal.style.display = 'none';
+                
+                hardDeleteDocument(documentId, isCompiled)
+                    .then(success => {
+                        if (success) {
+                            console.log(`Document ${documentId} permanently deleted`);
+                            // Remove the document card from the UI
+                            let card = document.querySelector(`.document-card[data-document-id="${documentId}"]`);
+                            if (!card) {
+                                // Try alternative data attribute used in some templates
+                                card = document.querySelector(`.document-card[data-id="${documentId}"]`);
+                            }
+                            
+                            if (card) {
+                                // Check if this is the last card
+                                const wrapper = card.closest('.document-wrapper');
+                                if (wrapper) {
+                                    wrapper.remove();
+                                } else {
+                                    card.remove();
+                                }
+                            }
+                            
+                            // Check if any archived documents remain
+                            checkRemainingArchived();
+                        }
+                    });
+            } else {
+                // Highlight the input as an error
+                if (confirmationInput) {
+                    confirmationInput.classList.add('error');
+                }
+            }
+        });
+    }
+    
+    // Show the modal
+    modal.style.display = 'block';
+    
+    // Focus on the confirmation input
+    if (confirmationInput) {
+        setTimeout(() => confirmationInput.focus(), 100);
+    }
+}
+
+/**
+ * Permanently delete a document from the database
+ * This action cannot be undone
+ * @param {string|number} documentId - ID of document to delete
+ * @param {boolean} isCompiled - Whether this is a compiled document
+ * @returns {Promise<boolean>} True if successful, false otherwise
+ */
+async function hardDeleteDocument(documentId, isCompiled = false) {
+    try {
+        // Ensure documentId is a valid integer
+        const parsedId = parseInt(documentId, 10);
+        
+        if (isNaN(parsedId) || parsedId <= 0) {
+            throw new Error(`Invalid document ID: ${documentId}. ID must be a positive integer.`);
+        }
+        
+        console.log(`Permanently deleting ${isCompiled ? 'compiled' : 'regular'} document: ${parsedId}`);
+        
+        // Show loading state
+        updateLoadingState(true);
+        
+        // Use the appropriate API endpoint based on document type
+        const endpoint = isCompiled 
+            ? `/api/compiled-documents/${parsedId}/hard-delete`
+            : `/api/documents/${parsedId}/hard-delete`;
+            
+        console.log(`Using endpoint: ${endpoint}`);
+        
+        // Call API to permanently delete document
+        const response = await fetch(endpoint, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        // Hide loading state
+        updateLoadingState(false);
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(`Failed to delete document: ${response.status} ${response.statusText} ${errorData.error || ''}`);
+        }
+        
+        const result = await response.json();
+        console.log('Hard delete result:', result);
+        
+        // Show success message
+        showToast('Document permanently deleted', 'success');
+        
+        return true;
+    } catch (error) {
+        // Hide loading state
+        updateLoadingState(false);
+        
+        console.error('Error during permanent deletion:', error);
+        showToast(`Permanent deletion failed: ${error.message}`, 'error');
+        
+        return false;
+    }
+}
+
 // Register with window for global access
 window.documentArchive = {
     // Document actions
@@ -3006,12 +3402,61 @@ window.documentArchive = {
     archiveCompiledDocument,
     restoreDocument,
     showRestoreConfirmation,
+    showHardDeleteConfirmation,
+    hardDeleteDocument,
+    loadArchivedDocuments,
+    
+    // UI functions
+    updateCategoryFilters,
+    toggleArchiveMode,
+    showToast,
+    
+    // State functions
+    isArchiveMode: function() {
+        return archiveState.isArchiveMode;
+    },
+    setArchiveMode: function(mode) {
+        archiveState.setArchiveMode(mode);
+    },
+    getCurrentCache: function() {
+        return {
+            isArchiveMode: archiveState.isArchiveMode,
+            documents: archiveState.documents,
+            page: archiveState.currentPage,
+            totalPages: archiveState.totalPages,
+            category: archiveState.categoryFilter,
+            search: archiveState.searchTerm
+        };
+    },
     
     // Module info
-    version: '1.2.0',
+    version: '1.2.1',
+    
+    // Initialization
+    initializeArchive: initializeArchive,
     
     // For debugging
     _legacyArchiveDocument: legacyArchiveDocument,
     _legacyArchiveCompiledDocument: legacyArchiveCompiledDocument,
     _legacyRestoreDocument: legacyRestoreDocument
 };
+
+// Make sure functions are also available at global scope for legacy code
+window.showHardDeleteConfirmation = showHardDeleteConfirmation;
+window.showRestoreConfirmation = showRestoreConfirmation;
+window.hardDeleteDocument = hardDeleteDocument;
+window.restoreDocument = restoreDocument;
+window.loadArchivedDocuments = loadArchivedDocuments;
+window.archiveDocument = archiveDocument;
+window.archiveCompiledDocument = archiveCompiledDocument;
+window.toggleArchiveMode = toggleArchiveMode;
+window.checkRemainingArchived = checkRemainingArchived;
+window.updateCategoryFilters = updateCategoryFilters;
+window.refreshCurrentView = refreshCurrentView;
+window.showToast = showToast;
+
+// Also expose legacy functions for internal use
+window.legacyArchiveDocument = legacyArchiveDocument;
+window.legacyArchiveCompiledDocument = legacyArchiveCompiledDocument;
+window.legacyRestoreDocument = legacyRestoreDocument;
+window.legacyLoadArchivedDocuments = legacyLoadArchivedDocuments;

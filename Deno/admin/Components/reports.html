@@ -77,6 +77,9 @@
         <header class="mb-8 text-center">
             <h1 class="text-3xl md:text-4xl font-bold text-gray-800">Archive System Reports</h1>
             <p class="text-gray-600 mt-2">Overview of document statistics and status.</p>
+            <button id="refresh-btn" class="mt-4 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md flex mx-auto items-center">
+                <i class="fas fa-sync-alt mr-2"></i> Refresh Data
+            </button>
         </header>
 
         <section id="documentStats" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
@@ -108,6 +111,17 @@
 
         <section id="exportOptions" class="text-center">
             <h2 class="text-2xl font-semibold text-gray-800 mb-6">Export Report</h2>
+            <div class="mb-4">
+                <label for="timeRange" class="block text-gray-700 mb-2">Select Time Range:</label>
+                <p class="text-sm text-gray-500 mb-2">Filter statistics by time period to analyze trends</p>
+                <select id="timeRange" class="w-full sm:w-64 mx-auto px-4 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="all">All Time</option>
+                    <option value="yearly">Yearly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="daily">Daily</option>
+                </select>
+            </div>
             <div class="flex flex-col sm:flex-row justify-center items-center gap-4 export-buttons-container">
                 <button onclick="exportToPDF()" class="export-button export-pdf">
                     <i class="fas fa-file-pdf"></i> Export to PDF
@@ -125,12 +139,11 @@
     </div>
 
     <script>
-        // --- Mock Data ---
-        // In a real application, you would fetch this data from your backend.
-        const mockData = {
-            uploaded: 1250,
-            active: 800,
-            archived: 450
+        // Replace mock data with database fetching
+        let documentStats = {
+            uploaded: 0,
+            active: 0,
+            archived: 0
         };
 
         // --- DOM Elements ---
@@ -143,15 +156,149 @@
 
         let statusChart = null; // To hold the chart instance
 
-        // --- Functions ---
+        /**
+         * Fetch document statistics from the database
+         */
+        async function fetchDocumentStats() {
+            try {
+                showMessage("Fetching statistics from API...", "info");
+                
+                // Add loading indicators
+                uploadedCountEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                activeCountEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                archivedCountEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                
+                // Try the new simplified API endpoint first
+                try {
+                    // Use the new endpoint we created
+                    const response = await fetch('/api/stats/summary');
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        
+                        // Update our statistics object
+                        documentStats = {
+                            uploaded: data.total_documents || 0,
+                            active: data.active_documents || 0,
+                            archived: data.archived_documents || 0
+                        };
+                        
+                        console.log("Document statistics from new API:", documentStats);
+                        
+                        // Update the UI
+                        updateCounts();
+                        renderStatusChart();
+                        
+                        showMessage("Statistics updated successfully", "success");
+                        return true;
+                    } else {
+                        // If API returns an error, log it and fall back
+                        console.warn("New statistics API returned error, trying original endpoint...");
+                    }
+                } catch (newApiError) {
+                    console.warn("Error with new statistics API, trying original endpoint:", newApiError);
+                }
+                
+                // Try the original statistics API
+                try {
+                    const response = await fetch('/api/documents/statistics?timeRange=all');
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        
+                        // Update our statistics object
+                        documentStats = {
+                            uploaded: data.total_documents || 0,
+                            active: data.active_documents || 0,
+                            archived: data.archived_documents || 0
+                        };
+                        
+                        console.log("Document statistics from original API:", documentStats);
+                        
+                        // Update the UI
+                        updateCounts();
+                        renderStatusChart();
+                        
+                        showMessage("Statistics updated successfully", "success");
+                        return true;
+                    } else {
+                        // If API returns an error, log it and fall back to custom method
+                        console.warn("Original statistics API returned error, falling back to custom method");
+                        throw new Error("API returned non-OK status");
+                    }
+                } catch (apiError) {
+                    console.warn("Error with all statistics APIs, using fallback method:", apiError);
+                    
+                    // Fall back to our custom statistics calculation
+                    console.log("Building custom document statistics...");
+                    
+                    // Get active document count
+                    let activeCount = 0;
+                    let archivedCount = 0;
+                    
+                    try {
+                        // Fetch active documents count
+                        const activeResponse = await fetch('/api/documents?limit=1');
+                        if (activeResponse.ok) {
+                            const activeData = await activeResponse.json();
+                            activeCount = activeData.totalDocuments || 0;
+                            console.log("Active documents count:", activeCount);
+                        } else {
+                            console.warn("Could not get active document count");
+                        }
+                        
+                        // Note: We know the archived endpoint doesn't exist, so we'll skip it
+                        // and just report 0 archived documents to avoid the 400 error
+                        console.log("Archived endpoint not available, using 0 for archived count");
+                        
+                        // Calculate total uploaded documents
+                        const uploadedCount = activeCount + archivedCount;
+                        
+                        // Update our statistics object
+                        documentStats = {
+                            uploaded: uploadedCount,
+                            active: activeCount,
+                            archived: archivedCount
+                        };
+                        
+                        console.log("Custom document statistics built:", documentStats);
+                        
+                        // Update the UI
+                        updateCounts();
+                        renderStatusChart();
+                        
+                        showMessage("Statistics loaded using fallback method", "info");
+                        return true;
+                    } catch (error) {
+                        console.error("Error building custom statistics:", error);
+                        throw new Error("Failed to build custom statistics");
+                    }
+                }
+            } catch (error) {
+                console.error("Error fetching document statistics:", error);
+                showMessage("Error connecting to database. Please try again later.", "error");
+                
+                // Reset counts to zero on error
+                documentStats = {
+                    uploaded: 0,
+                    active: 0,
+                    archived: 0
+                };
+                
+                // Update the UI to show zeros
+                updateCounts();
+                renderStatusChart();
+                return false;
+            }
+        }
 
         /**
          * Updates the count displays on the page.
          */
         function updateCounts() {
-            uploadedCountEl.textContent = mockData.uploaded.toLocaleString();
-            activeCountEl.textContent = mockData.active.toLocaleString();
-            archivedCountEl.textContent = mockData.archived.toLocaleString();
+            uploadedCountEl.textContent = documentStats.uploaded.toLocaleString();
+            activeCountEl.textContent = documentStats.active.toLocaleString();
+            archivedCountEl.textContent = documentStats.archived.toLocaleString();
         }
 
         /**
@@ -159,11 +306,11 @@
          */
         function renderStatusChart() {
             const ctx = document.getElementById('documentStatusChart').getContext('2d');
-            const totalDocsForChart = mockData.active + mockData.archived;
+            const totalDocsForChart = documentStats.active + documentStats.archived;
             
             // Calculate percentages
-            const activePercentage = totalDocsForChart > 0 ? ((mockData.active / totalDocsForChart) * 100).toFixed(1) : 0;
-            const archivedPercentage = totalDocsForChart > 0 ? ((mockData.archived / totalDocsForChart) * 100).toFixed(1) : 0;
+            const activePercentage = totalDocsForChart > 0 ? ((documentStats.active / totalDocsForChart) * 100).toFixed(1) : 0;
+            const archivedPercentage = totalDocsForChart > 0 ? ((documentStats.archived / totalDocsForChart) * 100).toFixed(1) : 0;
 
             const data = {
                 labels: [
@@ -172,7 +319,7 @@
                 ],
                 datasets: [{
                     label: 'Document Status',
-                    data: [mockData.active, mockData.archived],
+                    data: [documentStats.active, documentStats.archived],
                     backgroundColor: [
                         'rgba(34, 197, 94, 0.7)',  // green-500 with opacity
                         'rgba(234, 179, 8, 0.7)'   // yellow-500 with opacity
@@ -232,111 +379,321 @@
 
             // Update legend text (optional, as Chart.js legend is good)
             chartLegendEl.innerHTML = `
-                <span class="inline-flex items-center mr-4"><span class="w-3 h-3 bg-green-500 rounded-full mr-2"></span>Active: ${mockData.active.toLocaleString()}</span>
-                <span class="inline-flex items-center"><span class="w-3 h-3 bg-yellow-500 rounded-full mr-2"></span>Archived: ${mockData.archived.toLocaleString()}</span>
+                <span class="inline-flex items-center mr-4"><span class="w-3 h-3 bg-green-500 rounded-full mr-2"></span>Active: ${documentStats.active.toLocaleString()}</span>
+                <span class="inline-flex items-center"><span class="w-3 h-3 bg-yellow-500 rounded-full mr-2"></span>Archived: ${documentStats.archived.toLocaleString()}</span>
             `;
         }
 
         /**
          * Shows a notification message.
          * @param {string} message - The message to display.
-         * @param {string} type - 'success' or 'error' (affects styling, not implemented here but could be).
+         * @param {string} type - 'success', 'error', or 'info' (affects styling).
          */
         function showMessage(message, type = 'info') {
             messageText.textContent = message;
+            
+            // Update styling based on message type
+            messageBox.className = 'fixed bottom-5 right-5 p-4 rounded-lg shadow-md transition-opacity duration-300';
+            
+            switch(type) {
+                case 'success':
+                    messageBox.style.backgroundColor = '#10b981'; // Green
+                    break;
+                case 'error':
+                    messageBox.style.backgroundColor = '#ef4444'; // Red
+                    break;
+                case 'info':
+                default:
+                    messageBox.style.backgroundColor = '#3b82f6'; // Blue
+                    break;
+            }
+            
             messageBox.classList.remove('hidden');
-            messageBox.classList.add('opacity-100');
 
             // Hide after 3 seconds
             setTimeout(() => {
                 messageBox.classList.add('hidden');
-                messageBox.classList.remove('opacity-100');
             }, 3000);
         }
 
         /**
-         * Mock function for PDF export.
+         * Export report data to PDF
          */
-        function exportToPDF() {
-            // In a real application, this would trigger a PDF generation process.
-            // This could involve:
-            // 1. Client-side libraries like jsPDF (for simple content)
-            // 2. Server-side generation (for complex reports, recommended)
-            console.log("Attempting to export to PDF...");
-            showMessage("PDF export functionality is a placeholder. In a real app, this would generate a PDF.", "info");
-            // Example with jsPDF (if you were to implement basic client-side):
-            // const { jsPDF } = window.jspdf; // Assuming jsPDF is loaded
-            // const doc = new jsPDF();
-            // doc.text("Archive System Report", 10, 10);
-            // doc.text(`Uploaded Documents: ${mockData.uploaded}`, 10, 20);
-            // doc.text(`Active Documents: ${mockData.active}`, 10, 30);
-            // doc.text(`Archived Documents: ${mockData.archived}`, 10, 40);
-            // // Add chart image (requires converting canvas to image)
-            // // const chartImage = document.getElementById('documentStatusChart').toDataURL('image/png');
-            // // doc.addImage(chartImage, 'PNG', 10, 50, 180, 90);
-            // doc.save("archive_report.pdf");
+        async function exportToPDF() {
+            showMessage("Generating PDF report...", "info");
+            
+            try {
+                // Get selected time range
+                const timeRange = document.getElementById('timeRange').value;
+                
+                // Call the server API to generate the PDF
+                const response = await fetch('/api/reports/export-pdf', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        reportType: 'document-statistics',
+                        timeRange: timeRange,
+                        data: documentStats
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to generate PDF report');
+                }
+                
+                // Check if we got a blob response (PDF file)
+                const blob = await response.blob();
+                
+                // Create a download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = `archive-report-${timeRange}-${new Date().toISOString().split('T')[0]}.pdf`;
+                
+                // Append to body, click, and clean up
+                document.body.appendChild(a);
+                a.click();
+                
+                // Clean up
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                showMessage("PDF report downloaded successfully!", "success");
+            } catch (error) {
+                console.error("Error generating PDF:", error);
+                showMessage("PDF generation not available. This is a placeholder feature.", "error");
+                
+                // Fallback message
+                alert("PDF export is not fully implemented. In a complete system, this would connect to a server-side PDF generation service.");
+            }
         }
 
         /**
-         * Mock function for CSV export.
+         * Export report data to CSV
          */
-        function exportToCSV() {
-            // In a real application, this would trigger a CSV generation process.
-            console.log("Attempting to export to CSV...");
-            
+        async function exportToCSV() {
+            try {
+                showMessage("Generating CSV report...", "info");
+                
+                // Get selected time range
+                const timeRange = document.getElementById('timeRange').value;
+                
+                // Call the server API to generate the CSV
+                const response = await fetch('/api/reports/export-csv', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        reportType: 'document-statistics',
+                        timeRange: timeRange,
+                        data: documentStats
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to generate CSV report');
+                }
+                
+                // Get the CSV data
+                const blob = await response.blob();
+                
+                // Create a download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = `archive-report-${timeRange}-${new Date().toISOString().split('T')[0]}.csv`;
+                
+                // Append to body, click, and clean up
+                document.body.appendChild(a);
+                a.click();
+                
+                // Clean up
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                showMessage("CSV report downloaded successfully!", "success");
+            } catch (error) {
+                console.error("Error generating CSV:", error);
+                
+                // Fallback to client-side CSV generation 
+                try {
+                    console.log("Falling back to client-side CSV generation");
+                    // Get selected time range
+                    const timeRange = document.getElementById('timeRange').value;
+                    
+                    // Create CSV content from document stats
             let csvContent = "data:text/csv;charset=utf-8,";
-            csvContent += "Category,Count\r\n";
-            csvContent += `Uploaded Documents,${mockData.uploaded}\r\n`;
-            csvContent += `Active Documents,${mockData.active}\r\n`;
-            csvContent += `Archived Documents,${mockData.archived}\r\n`;
-            
+                    csvContent += "Category,Count,TimeRange\r\n";
+                    csvContent += `Uploaded Documents,${documentStats.uploaded},${timeRange}\r\n`;
+                    csvContent += `Active Documents,${documentStats.active},${timeRange}\r\n`;
+                    csvContent += `Archived Documents,${documentStats.archived},${timeRange}\r\n`;
+                    
+                    // Create download link
             const encodedUri = encodeURI(csvContent);
             const link = document.createElement("a");
             link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "archive_report.csv");
-            document.body.appendChild(link); // Required for Firefox
+                    link.setAttribute("download", `archive-report-${timeRange}-${new Date().toISOString().split('T')[0]}.csv`);
+                    document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
             
-            showMessage("CSV report downloaded (mock data).", "success");
+                    showMessage("CSV report generated in browser", "success");
+                } catch (fallbackError) {
+                    showMessage("Failed to generate CSV report", "error");
+                }
+            }
+        }
+        
+        /**
+         * Fetch document statistics for a specific time range
+         * @param {string} timeRange - The time range to fetch stats for (yearly, monthly, weekly, daily, all)
+         */
+        async function fetchStatsForTimeRange(timeRange) {
+            try {
+                showMessage(`Fetching ${timeRange} statistics...`, "info");
+                
+                // Add loading indicators to the card values
+                uploadedCountEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                activeCountEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                archivedCountEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                
+                // If using the 'all' time range, use our main fetch function which tries all endpoints
+                if (timeRange === 'all') {
+                    return await fetchDocumentStats();
+                }
+                
+                // For specific time ranges, first try the simplified API
+                // (Note: This doesn't support time filtering but we'll try it anyway)
+                try {
+                    const simplifiedEndpoint = `/api/stats/summary`;
+                    console.log(`Trying simplified endpoint (note: doesn't support time filtering): ${simplifiedEndpoint}`);
+                    
+                    const simpleResponse = await fetch(simplifiedEndpoint);
+                    if (simpleResponse.ok) {
+                        // If it works, show a notification that we're using all-time stats
+                        console.log(`Using simplified endpoint data (all-time statistics)`);
+                        
+                        const data = await simpleResponse.json();
+                        
+                        // Update our statistics object
+                        documentStats = {
+                            uploaded: data.total_documents || 0,
+                            active: data.active_documents || 0,
+                            archived: data.archived_documents || 0
+                        };
+                        
+                        // Update the UI
+                        updateCounts();
+                        renderStatusChart();
+                        
+                        showMessage(`Time filtering not available. Showing all-time statistics.`, "info");
+                        return true;
+                    }
+                } catch (simpleError) {
+                    console.warn(`Error with simplified endpoint:`, simpleError);
+                }
+                
+                // Now try the original API with time range parameter
+                try {
+                    const endpoint = `/api/documents/statistics?timeRange=${timeRange}`;
+                    console.log(`Fetching from original endpoint: ${endpoint}`);
+                    
+                    const response = await fetch(endpoint);
+                    if (response.ok) {
+                        const data = await response.json();
+                        
+                        // Update our statistics object
+                        documentStats = {
+                            uploaded: data.total_documents || 0,
+                            active: data.active_documents || 0,
+                            archived: data.archived_documents || 0
+                        };
+                        
+                        console.log(`${timeRange} statistics from API:`, documentStats);
+                        
+                        // Update the UI
+                        updateCounts();
+                        renderStatusChart();
+                        
+                        showMessage(`${timeRange} statistics updated`, "success");
+                        return true;
+                    } else {
+                        throw new Error(`Statistics API error for ${timeRange} range: ${response.status}`);
+                    }
+                } catch (apiError) {
+                    console.warn(`Error fetching ${timeRange} statistics from API:`, apiError);
+                    
+                    // Fall back to using the all-time stats
+                    showMessage(`Time filtering for ${timeRange} is not available. Showing all-time statistics.`, "info");
+                    
+                    // Use all-time stats by calling the main fetch function
+                    return await fetchDocumentStats();
+                }
+            } catch (error) {
+                console.error(`Error fetching ${timeRange} statistics:`, error);
+                showMessage(`Error loading ${timeRange} statistics. Please try again later.`, "error");
+                
+                // Show zeros for failed requests
+                documentStats = {
+                    uploaded: 0,
+                    active: 0,
+                    archived: 0
+                };
+                
+                // Update the UI to show zeros
+                updateCounts();
+                renderStatusChart();
+                return false;
+            }
         }
         
         // --- Initialization ---
-        window.onload = () => {
-            updateCounts();
-            renderStatusChart();
-
-            // Example: Simulate data update after a few seconds (for demonstration)
-            // setTimeout(() => {
-            //     mockData.active += 50;
-            //     mockData.uploaded += 50;
-            //     mockData.archived -= 20; // if possible
-            //     updateCounts();
-            //     renderStatusChart();
-            //     showMessage("Report data updated!", "info");
-            // }, 5000);
-        };
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Initial UI state with loading indicators
+            uploadedCountEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            activeCountEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            archivedCountEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            
+            // Fetch data from the database
+            await fetchDocumentStats();
+            
+            // Add refresh button event listener
+            document.getElementById('refresh-btn').addEventListener('click', fetchDocumentStats);
+            
+            // Add time range change listener
+            document.getElementById('timeRange').addEventListener('change', function() {
+                const selectedRange = this.value;
+                if (selectedRange === 'all') {
+                    fetchDocumentStats();
+                } else {
+                    fetchStatsForTimeRange(selectedRange);
+                }
+            });
+        });
 
         // Handle window resize to redraw chart if necessary (Chart.js handles most of this)
         window.onresize = () => {
-            // Chart.js is generally responsive, but if you have specific needs:
-            // if (statusChart) {
-            //    statusChart.resize();
-            // }
+            if (statusChart) {
+                statusChart.resize();
+            }
         };
-
     </script>
     <script>
-        fetch('/side_bar.html')
+        fetch('/admin/Components/side_bar.html')
           .then(response => response.text())
           .then(data => {
-            document.getElementById('side-bar').innerHTML = data;
+            document.getElementById('sidebar-container').innerHTML = data;
           })
-          .catch(error => console.error('Error loading header:', error));
+          .catch(error => console.error('Error loading sidebar:', error));
       </script>
     
     <script>
-        fetch('navbar_header.html')
+        fetch('/admin/Components/navbar_header.html')
           .then(response => response.text())
           .then(data => {
             document.getElementById('navbar-header').innerHTML = data;

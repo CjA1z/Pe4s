@@ -843,6 +843,7 @@ async function handleCompiledDocumentSubmit(e) {
         // Process the foreword file if it exists
         const forewordFileInput = document.getElementById('foreword-file-upload');
         let forewordFilePath = null;
+        let forewordAbstract = null;
         
         if (forewordFileInput && forewordFileInput.files && forewordFileInput.files.length > 0) {
             console.log('Found foreword file:', forewordFileInput.files[0].name);
@@ -889,10 +890,29 @@ async function handleCompiledDocumentSubmit(e) {
                 
                 // Set forewordFilePath to null so it's properly recorded in the database
                 forewordFilePath = null;
+                forewordAbstract = null;
             } else {
                 const forewordResult = await forewordFileResponse.json();
                 forewordFilePath = forewordResult.filePath;
                 console.log('Uploaded foreword file to:', forewordFilePath);
+                
+                // Try to extract abstract from foreword file
+                if (forewordFileInput.files[0].type === 'application/pdf') {
+                    try {
+                        console.log('Extracting abstract from foreword PDF...');
+                        forewordAbstract = await extractPDFAbstractPromise(forewordFileInput.files[0]);
+                        console.log('Foreword abstract extracted:', forewordAbstract?.substring(0, 100) + '...');
+                    } catch (extractionError) {
+                        console.error('Error extracting foreword abstract:', extractionError);
+                        forewordAbstract = 'Failed to extract abstract from foreword document.';
+                    }
+                    
+                    // Use server-provided metadata as fallback
+                    if ((!forewordAbstract || forewordAbstract.trim() === '') && forewordResult.metadata && forewordResult.metadata.abstract) {
+                        forewordAbstract = forewordResult.metadata.abstract;
+                        console.log('Using server-extracted foreword abstract:', forewordAbstract?.substring(0, 100) + '...');
+                    }
+                }
             }
         } else {
             console.log('No foreword file found');
@@ -926,7 +946,8 @@ async function handleCompiledDocumentSubmit(e) {
             issue_number: documentType === 'SYNERGY' ? null : (formData.get('issued-no') ? parseInt(formData.get('issued-no')) : null),
             department: departmentId ? getSelectedDepartmentText() : null,
             category: category.toUpperCase(), // Ensure category is uppercase to match enum values
-            foreword: forewordFilePath // Add the foreword file path
+            foreword: forewordFilePath, // Keep the foreword file path
+            abstract_foreword: forewordAbstract // Add the foreword abstract
         };
         
         // Call API to create the compiled document entry
@@ -959,6 +980,7 @@ async function handleCompiledDocumentSubmit(e) {
         
         for (let i = 0; i < researchSections.length; i++) {
             const section = researchSections[i];
+            
             // Use the broader selector to find file inputs
             const fileInput = section.querySelector('input[type="file"], .research-file, .hidden-file-input, #file-upload-' + (i+1));
             
@@ -969,10 +991,6 @@ async function handleCompiledDocumentSubmit(e) {
             if (titleInput) {
                 console.log(`Section ${i+1} title value:`, titleInput.value);
             }
-            
-            // Try to find the abstract input with multiple selectors
-            const abstractInput = section.querySelector('.research-abstract, textarea[name^="research"][name$="[abstract]"], #research-abstract-' + (i+1));
-            console.log(`Section ${i+1} abstract input:`, abstractInput);
             
             if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
                 console.log(`Skipping section ${i+1} - no file uploaded`);
@@ -1014,8 +1032,19 @@ async function handleCompiledDocumentSubmit(e) {
             // Get study category ID (should match the parent document category)
             let studyCategoryId = categoryId;
             
-            // Get abstract text with a null check
-            const abstractText = abstractInput && abstractInput.value ? abstractInput.value.trim() : 'No abstract provided';
+            // Get abstract content from the UI or extracted from PDF
+            const abstractContent = section.querySelector('.abstract-content');
+            
+            // Prioritize extracted abstract from PDF visible in the UI first
+            let abstractText = 'No abstract provided';
+            
+            if (abstractContent && abstractContent.textContent && 
+                abstractContent.textContent.trim() !== '' && 
+                !abstractContent.textContent.includes('Abstract will be extracted') &&
+                !abstractContent.textContent.includes('Extracting abstract')) {
+                console.log(`Using extracted abstract from PDF for section ${i+1}`);
+                abstractText = abstractContent.textContent.trim();
+            }
             
             // Create study document data (will be linked to the compiled document)
             const studyData = {
@@ -1030,12 +1059,18 @@ async function handleCompiledDocumentSubmit(e) {
                 compiled_parent_id: compiledDocEntryId  // Reference to the compiled document ID
             };
             
-            // Extract metadata from PDF if available
+            // Extract metadata from PDF if available from the server
             if (fileResult.metadata && fileResult.fileType === 'pdf') {
-                studyData.abstract = fileResult.metadata.abstract || abstractText;
+                // Only override abstract if we don't already have one from the UI extraction
+                if (abstractText === 'No abstract provided' && fileResult.metadata.abstract) {
+                    studyData.abstract = fileResult.metadata.abstract;
+                    console.log(`Using metadata abstract from API for section ${i+1}`);
+                }
                 studyData.pages = fileResult.metadata.pageCount || 0;
             }
-                
+            
+            console.log(`Saving child document with abstract length: ${studyData.abstract.length} chars`);
+            
             // Save study document to database
             const studyPromise = fetch('/api/documents', {
                 method: 'POST',

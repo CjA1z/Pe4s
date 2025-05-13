@@ -132,15 +132,43 @@ router.get("/api/archived-docs", async (ctx) => {
     
     // Get category counts for filter badges
     const categoriesQuery = `
+      WITH document_categories AS (
+        SELECT 
+          document_type as category, 
+          COUNT(*) as count
+        FROM 
+          documents
+        WHERE 
+          deleted_at IS NOT NULL
+          AND compiled_parent_id IS NULL -- Exclude child documents of compilations
+        GROUP BY 
+          document_type
+          
+        UNION ALL
+        
+        -- Include compiled documents from compiled_documents table
+        SELECT 
+          category, 
+          COUNT(*) as count
+        FROM 
+          compiled_documents
+        WHERE 
+          deleted_at IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM documents 
+            WHERE id = compiled_documents.id AND deleted_at IS NOT NULL
+          )
+        GROUP BY 
+          category
+      )
+      
       SELECT 
-        document_type as category, 
-        COUNT(*) as count
-      FROM 
-        documents
-      WHERE 
-        deleted_at IS NOT NULL
-      GROUP BY 
-        document_type
+        category,
+        SUM(count) as count
+      FROM
+        document_categories
+      GROUP BY
+        category
     `;
     
     const categoryCountsResult = await db.query(categoriesQuery);
@@ -315,16 +343,45 @@ router.get("/api/archived-category-counts", async (ctx) => {
   try {
     const db = new Database();
     
+    // Query that excludes child documents of compilations to avoid double-counting
     const query = `
+      WITH document_categories AS (
+        SELECT 
+          document_type as category, 
+          COUNT(*) as count
+        FROM 
+          documents
+        WHERE 
+          deleted_at IS NOT NULL
+          AND compiled_parent_id IS NULL -- Exclude child documents of compilations
+        GROUP BY 
+          document_type
+          
+        UNION ALL
+        
+        -- Include compiled documents from compiled_documents table
+        SELECT 
+          category, 
+          COUNT(*) as count
+        FROM 
+          compiled_documents
+        WHERE 
+          deleted_at IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM documents 
+            WHERE id = compiled_documents.id AND deleted_at IS NOT NULL
+          )
+        GROUP BY 
+          category
+      )
+      
       SELECT 
-        document_type as category, 
-        COUNT(*) as count
-      FROM 
-        documents
-      WHERE 
-        deleted_at IS NOT NULL
-      GROUP BY 
-        document_type
+        category,
+        SUM(count) as count
+      FROM
+        document_categories
+      GROUP BY
+        category
     `;
     
     const result = await db.query(query);

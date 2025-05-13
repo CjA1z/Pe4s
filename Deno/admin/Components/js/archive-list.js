@@ -208,6 +208,9 @@ function createDocumentCard(doc) {
             <button class="action-btn restore-btn" title="Restore Document" data-document-id="${doc.id}">
                 <i class="fas fa-trash-restore"></i>
             </button>
+            <button class="action-btn hard-delete-btn" title="Permanently Delete" data-document-id="${doc.id}">
+                <i class="fas fa-trash-alt"></i>
+            </button>
         </div>`;
     
     // Add restore button event listener
@@ -217,6 +220,16 @@ function createDocumentCard(doc) {
             e.stopPropagation();
             const docId = this.getAttribute('data-document-id');
             restoreDocument(docId);
+        });
+    }
+    
+    // Add hard delete button event listener
+    const hardDeleteBtn = card.querySelector('.hard-delete-btn');
+    if (hardDeleteBtn) {
+        hardDeleteBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const docId = this.getAttribute('data-document-id');
+            showHardDeleteConfirmation(docId);
         });
     }
     
