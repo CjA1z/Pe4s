@@ -167,6 +167,28 @@
 
         let selectedFile = null;
 
+        // Load user profile data on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Try to load the current user's profile pic
+            fetch('/api/user/profile')
+                .then(response => {
+                    if (!response.ok) {
+                        console.warn('Could not load user profile');
+                        return null;
+                    }
+                    return response.json();
+                })
+                .then(userData => {
+                    if (userData && userData.profilePicUrl) {
+                        // If user has a profile pic, update the preview
+                        profilePicPreview.src = userData.profilePicUrl;
+                    }
+                })
+                .catch(error => {
+                    console.warn('Error loading profile:', error);
+                });
+        });
+
         profilePicInput.addEventListener('change', function(event) {
             const file = event.target.files[0];
             if (file) {
@@ -220,6 +242,15 @@
             formData.append('storagePath', 'storage/authors/profile-pictures');
             formData.append('is_profile_picture', 'true');
             
+            // Ensure we preserve the original file extension
+            const fileExt = selectedFile.name.split('.').pop();
+            if (fileExt) {
+                formData.append('preserveExtension', fileExt);
+            }
+            
+            // Track the uploaded file data
+            let uploadedFileData = null;
+            
             // Upload the file to the server
             fetch('/api/upload', {
                 method: 'POST',
@@ -233,6 +264,7 @@
             })
             .then(data => {
                 console.log('Profile picture uploaded successfully:', data);
+                uploadedFileData = data; // Store the uploaded file data
                 
                 // Get the current user info to update
                 return fetch('/api/user/profile');
@@ -241,42 +273,81 @@
                 if (!response.ok) {
                     // If we can't get the current user, just show success message
                     // This is a fallback for systems without user profile API
-                    showMessage('Profile picture updated successfully!', 'success');
+                    showMessage('Profile picture uploaded successfully!', 'success');
                     return null;
                 }
                 return response.json();
             })
             .then(userData => {
-                if (userData && userData.id) {
-                    // If we have user data, update the profile with new picture URL
+                if (userData && userData.id && uploadedFileData) {
+                    // If we have user data and upload data, update the profile with new picture URL
                     const profileUpdate = {
-                        profilePicUrl: `/storage/authors/profile-pictures/${selectedFile.name}`
+                        profilePicUrl: `/storage/authors/profile-pictures/${uploadedFileData.name}`
                     };
                     
-                    return fetch(`/api/authors/${userData.id}`, {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(profileUpdate)
-                    });
+                    // Only attempt to update the profile if we have a valid ID (not mock-user-id)
+                    if (userData.id !== 'mock-user-id') {
+                        return fetch(`/api/authors/${userData.id}`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(profileUpdate)
+                        });
+                    }
                 }
+                
+                // If no userData or mock data, skip the profile update step
                 return null;
             })
             .then(response => {
+                if (response) {
+                    // Only process response if we got one from the previous step
+                    if (!response.ok) {
+                        console.warn('Profile metadata update failed:', response.status);
+                    }
+                }
+                
                 // Show success message regardless of profile update result
                 showMessage('Profile picture updated successfully!', 'success');
                 
-                // Update navbar profile picture if possible
-                try {
-                    const profileImages = document.querySelectorAll('.profile-image, .user-avatar');
-                    if (profileImages.length > 0) {
-                        profileImages.forEach(img => {
-                            img.src = profilePicPreview.src;
-                        });
+                // Update profile picture globally
+                if (uploadedFileData) {
+                    const newProfileUrl = `/storage/authors/profile-pictures/${uploadedFileData.name}`;
+                    
+                    // Update navbar profile picture if possible
+                    try {
+                        // Update all user avatars in navbars
+                        const profileImages = document.querySelectorAll('.profile-image, .user-avatar, .profile-pic-image, .user-profile-image');
+                        if (profileImages.length > 0) {
+                            profileImages.forEach(img => {
+                                img.src = profilePicPreview.src;
+                            });
+                            console.log(`Updated ${profileImages.length} profile images in the UI`);
+                        }
+                        
+                        // Also try to update the user info in local/session storage if used by navbar
+                        try {
+                            const sessionUserInfo = sessionStorage.getItem('userInfo');
+                            const localUserInfo = localStorage.getItem('userInfo');
+                            
+                            if (sessionUserInfo) {
+                                const userObj = JSON.parse(sessionUserInfo);
+                                userObj.profilePicUrl = newProfileUrl;
+                                sessionStorage.setItem('userInfo', JSON.stringify(userObj));
+                            }
+                            
+                            if (localUserInfo) {
+                                const userObj = JSON.parse(localUserInfo);
+                                userObj.profilePicUrl = newProfileUrl;
+                                localStorage.setItem('userInfo', JSON.stringify(userObj));
+                            }
+                        } catch (storageErr) {
+                            console.warn('Could not update profile in storage:', storageErr);
+                        }
+                    } catch (e) {
+                        console.warn('Could not update navbar profile image:', e);
                     }
-                } catch (e) {
-                    console.warn('Could not update navbar profile image:', e);
                 }
                 
                 // Reset the form

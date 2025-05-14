@@ -1,0 +1,1367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Archiving System Page - Optimized</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        /* CSS Variables for Theming */
+        :root {
+            --theme-gold: #FDB813;
+            --theme-gold-darker: #EAA10F;
+            --theme-gold-light-bg: rgba(253, 184, 19, 0.2);
+            --theme-gold-lighter-bg: rgba(253, 184, 19, 0.1);
+            --theme-gold-highlight: rgba(253, 184, 19, 0.4);
+            --theme-green-dark: #006A4E;
+            --theme-green-darker-text: #00523D;
+            --theme-green-light-bg: rgba(0, 106, 78, 0.3);
+            --theme-green-lighter-bg: rgba(0, 106, 78, 0.1);
+            --theme-green-border: rgba(0, 106, 78, 0.7);
+            --theme-page-bg: #F9F6EE;
+            --neutral-border-color: #e5e7eb;
+            --input-border-color: #d1d5db;
+            --placeholder-text-color: #9ca3af;
+            --text-on-gold: #000000;
+            --text-on-green: #FFFFFF;
+            --primary-text-color: #1f2937;
+            --secondary-text-color: #4b5563;
+            --tertiary-text-color: #6b7280;
+            --theme-accent-gray: #6b7280;
+            --pastel-gold: #FFF5CC;
+            --pastel-green: #D0EAD0;
+            --footer-glass-bg-color: rgba(255, 255, 255, 0.25);
+            --footer-glass-border-color: rgba(255, 255, 255, 0.4);
+            --footer-glass-blur-radius: 6px;
+            --card-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            --card-hover-shadow: 0 6px 16px rgba(0,0,0,0.12);
+            --card-border-radius: 0.75rem;
+        }
+
+        /* Base HTML & Body */
+        html {
+            height: 100%;
+            box-sizing: border-box;
+            scroll-behavior: smooth;
+        }
+        *, *:before, *:after {
+            box-sizing: inherit;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--theme-page-bg);
+            background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23D3CBBF' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            color: var(--primary-text-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            margin: 0;
+            line-height: 1.6;
+        }
+
+        /* Layout & Container */
+        .page-wrapper {
+            flex-grow: 1;
+            padding-top: 2.5rem;
+            padding-bottom: 6rem; /* Increased padding for floating button */
+        }
+        .container {
+            width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+            padding-left: 1rem;
+            padding-right: 1rem;
+            max-width: 1024px;
+        }
+        @media (min-width: 640px) {
+            .page-wrapper { padding-top: 3rem; }
+            .container { padding-left: 1.5rem; padding-right: 1.5rem; }
+        }
+         @media (min-width: 1024px) {
+             .page-wrapper { padding-top: 4rem; }
+             .container { padding-left: 2rem; padding-right: 2rem; }
+         }
+
+        /* Typography */
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Inter', sans-serif;
+            color: var(--primary-text-color);
+            font-weight: 600;
+            margin-top: 0;
+            margin-bottom: 0.75rem;
+            line-height: 1.3;
+        }
+        .font-libre { font-family: 'Libre Baskerville', serif; }
+        .font-inter { font-family: 'Inter', sans-serif; }
+        p { margin-bottom: 1rem; }
+        a { color: var(--theme-green-dark); text-decoration: none; transition: color 0.2s ease; }
+        a:hover { color: var(--theme-gold-darker); text-decoration: none; }
+
+        /* Page Header */
+        .page-header {
+            position: relative; overflow: hidden; background-color: var(--theme-green-dark);
+            color: var(--text-on-green); padding: 3rem 0; margin-bottom: 3rem;
+            border-bottom: 5px solid var(--theme-gold);
+        }
+        @keyframes headerGradientAnimation { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        .page-header::before {
+            content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 0;
+            background-image: linear-gradient(135deg, rgba(0, 106, 78, 0.25), rgba(253, 184, 19, 0.3), rgba(0, 106, 78, 0.25), rgba(253, 184, 19, 0.3));
+            background-size: 400% 400%; animation: headerGradientAnimation 25s ease infinite; opacity: 0.85;
+        }
+        .page-header .header-content { position: relative; z-index: 1; text-align: left; }
+        .page-header .header-content h1 { color: var(--text-on-green); font-weight: 700; font-size: 2rem; line-height: 1.2; margin-bottom: 0.5rem; }
+        .page-header .header-content p { color: rgba(255, 255, 255, 0.9); font-size: 1.125rem; margin-bottom: 0.25rem; }
+        .page-header .header-content p:last-of-type { font-size: 1rem; margin-bottom: 0; }
+        @media (min-width: 768px) {
+            .page-header { padding: 4rem 0; }
+            .page-header .header-content h1 { font-size: 2.5rem; }
+            .page-header .header-content p { font-size: 1.25rem; }
+            .page-header .header-content p:last-of-type { font-size: 1.125rem; }
+        }
+        @media (min-width: 1024px) {
+             .page-header { padding: 5rem 0; }
+            .page-header .header-content h1 { font-size: 3rem; }
+        }
+
+        /* Document Item Base Card Style */
+        .document-item-base {
+            transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, border-color 0.3s ease;
+            background-color: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px) saturate(120%);
+            -webkit-backdrop-filter: blur(10px) saturate(120%);
+            border: 1px solid var(--neutral-border-color);
+            border-radius: var(--card-border-radius);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--card-shadow);
+        }
+        .document-item-base:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--card-hover-shadow);
+        }
+        main > :last-child.document-item-base { margin-bottom: 3rem; }
+        @media (min-width: 640px) { .document-item-base { padding: 2rem; } }
+        @media (min-width: 1024px) { .document-item-base { padding: 2.5rem; } }
+
+        /* Card Section Titles */
+        .document-item-base h2 {
+            font-size: 1.375rem; font-weight: 600; margin-bottom: 1rem;
+            padding-bottom: 0.75rem; border-bottom: 1px solid var(--neutral-border-color);
+            color: var(--theme-green-darker-text);
+        }
+        .document-item-base h3.sub-doc-title {
+            font-size: 1.125rem; font-weight: 600; margin-bottom: 0.3rem;
+            color: var(--theme-green-dark);
+        }
+        @media (min-width: 768px) {
+            .document-item-base h2 { font-size: 1.625rem; }
+            .document-item-base h3.sub-doc-title { font-size: 1.25rem; }
+        }
+
+        /* Text Content Styles */
+        .document-item-base .foreword-text,
+        .document-item-base .sub-doc-abstract {
+            color: var(--secondary-text-color); line-height: 1.65; text-align: justify;
+            font-size: 1rem; margin-top: 1rem; margin-bottom: 1rem;
+        }
+        .document-item-base .sub-doc-abstract { font-size: 0.95rem; margin-top: 0.5rem; margin-bottom: 1.5rem; }
+        .document-item-base .sub-doc-author { color: var(--tertiary-text-color); font-size: 0.9rem; margin-bottom: 1rem; }
+        .document-item-base .sub-doc-author a.clickable-author { color: inherit; }
+        .document-item-base .sub-doc-author a.clickable-author:hover { color: var(--theme-green-darker-text); text-decoration: none; }
+
+        /* Keywords Section */
+        .document-item-base .keywords-section,
+        .document-item-base .sub-doc-keywords-section {
+            margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--neutral-border-color);
+        }
+        .document-item-base .keywords-section h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--primary-text-color); }
+        .document-item-base .sub-doc-keywords-section strong { font-size: 0.9rem; font-weight: 600; color: var(--primary-text-color); margin-right: 0.5em; display: block; margin-bottom: 0.5rem; }
+        .document-item-base .keywords-container-flex { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+        .document-item-base .sub-doc-keywords-section .keywords-container-flex .tag-pill { font-size: 0.75rem; padding: 0.2rem 0.6rem; }
+
+        /* Document Info Grid */
+        .doc-info-grid { display: grid; grid-template-columns: 1fr; gap: 0.8rem 0; font-size: 0.95rem; margin-top: 1rem; }
+        .doc-info-grid > div { line-height: 1.5; transition: transform 0.2s ease-in-out; padding: 0.1rem 0; transform-origin: center left; }
+        .doc-info-grid > div:hover { transform: scale(1.03); }
+        .doc-info-grid strong { display: block; margin-bottom: 0.1rem; color: var(--primary-text-color); font-weight: 500; }
+        .doc-info-grid span, .doc-info-grid a { color: var(--secondary-text-color); }
+        .doc-info-grid #info-author-container a.clickable-author { color: var(--secondary-text-color); }
+        .doc-info-grid #info-author-container a.clickable-author:hover { color: var(--theme-green-darker-text); text-decoration: none; }
+        .doc-info-grid .opacity-90 { opacity: 0.9; }
+        .editor-list { padding-left: 0; list-style: none; margin: 0.25rem 0 0 0; }
+        .editor-list li { margin-bottom: 0.1rem; font-size: 0.9em; }
+
+        /* Buttons (General) */
+        .btn {
+            padding: 0.6rem 1.2rem; border-radius: 0.375rem; font-weight: 500; text-align: center;
+            transition: all 0.2s ease; display: inline-flex; align-items: center; justify-content: center;
+            gap: 0.5rem; font-size: 0.9rem; line-height: 1.4; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            cursor: pointer; text-decoration: none; border: 1px solid transparent;
+        }
+        .btn:hover { box-shadow: 0 3px 6px rgba(0,0,0,0.1); transform: translateY(-1px); }
+        .btn-primary { background-color: var(--theme-green-dark); color: var(--text-on-green); border-color: var(--theme-green-dark); }
+        .btn-primary:hover { background-color: var(--theme-green-darker-text); border-color: var(--theme-green-darker-text); }
+        .btn-secondary { background-color: var(--theme-gold); color: var(--text-on-gold); border-color: var(--theme-gold); }
+        .btn-secondary:hover { background-color: var(--theme-gold-darker); border-color: var(--theme-gold-darker); }
+        .btn-cancel {
+            background-color: var(--theme-accent-gray);
+            color: white;
+            border-color: var(--theme-accent-gray);
+        }
+        .btn-cancel:hover {
+            background-color: #5a6268;
+            border-color: #5a6268;
+        }
+        .btn i, .btn svg { width: 1em; height: 1em; font-size: 1.1em; }
+
+
+        /* Clickable Meta (Authors/Keywords) */
+        .clickable-meta { cursor: pointer; text-decoration: none; color: var(--primary-text-color); opacity: 0.9; margin-right: 0.25rem; display: inline; transition: all 0.2s ease; }
+        .clickable-meta:hover { opacity: 1; text-decoration: none; }
+        a.clickable-author { transition: color 0.2s ease, text-decoration 0.2s ease; }
+        a.clickable-author:hover { color: var(--theme-green-darker-text); text-decoration: none; }
+        .clickable-keyword:hover { color: var(--theme-gold-darker); text-decoration: none; }
+
+        /* Tag Pill */
+        .tag-pill {
+            display: inline-block; background-color: var(--theme-gold-lighter-bg); color: var(--theme-gold-darker);
+            padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 0.8rem; font-weight: 500; white-space: nowrap;
+            cursor: pointer; transition: all 0.2s ease; border: 1px solid var(--theme-gold-light-bg);
+            text-decoration: none;
+        }
+        .tag-pill:hover { background-color: var(--theme-gold); color: var(--text-on-gold); border-color: var(--theme-gold-darker); box-shadow: 0 2px 4px rgba(0,0,0,0.07); }
+
+        /* Table of Contents (TOC) Styles */
+        #toc-container h2 { color: var(--theme-green-darker-text); }
+        #toc-list { list-style: none; padding-left: 0; margin: 0; }
+        #toc-list li { margin-bottom: 0.6rem; border-bottom: 1px solid var(--theme-green-lighter-bg); padding-bottom: 0.6rem; }
+        #toc-list li:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        #toc-list .toc-link-content { display: flex; flex-direction: column; }
+        #toc-list a.toc-title-link { color: var(--theme-green-darker-text); font-weight: 500; display: flex; align-items: center; padding: 0.2rem 0; transition: color 0.2s ease; cursor: pointer; }
+        #toc-list a.toc-title-link:hover { color: var(--theme-gold-darker); }
+        #toc-list a.toc-title-link i { margin-right: 0.6rem; color: var(--theme-green-dark); width: 1.1em; text-align: center; transition: color 0.2s ease; }
+        #toc-list a.toc-title-link:hover i { color: var(--theme-gold-darker); }
+        #toc-list .toc-author { font-size: 0.85rem; color: var(--tertiary-text-color); padding-left: calc(1.1em + 0.6rem); margin-top: 0.1rem; }
+        #toc-list .toc-author a.clickable-author { color: inherit; margin: 0 0.15rem; }
+        #toc-list .toc-author a.clickable-author:hover { color: var(--theme-green-darker-text); text-decoration: none; }
+
+        /* Divider Style */
+        .section-divider { border: none; height: 1px; background-color: var(--neutral-border-color); margin: 2.5rem 0; opacity: 0.7; }
+
+        /* Article Card Animation */
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        .article-card { animation: fadeInUp 0.5s ease-out forwards; opacity: 0; }
+        .article-card:nth-child(1) { animation-delay: 0.05s; }
+        .article-card:nth-child(2) { animation-delay: 0.1s; }
+        .article-card:nth-child(3) { animation-delay: 0.15s; }
+        .article-card:nth-child(4) { animation-delay: 0.2s; }
+        .article-card:nth-child(5) { animation-delay: 0.25s; }
+
+        /* Footer styles */
+        @keyframes subtleGradientAnimation { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        .footer-wrapper { margin-top: auto; width: 100%; }
+        .site-footer { position: relative; overflow: hidden; background-color: var(--footer-glass-bg-color); -webkit-backdrop-filter: blur(var(--footer-glass-blur-radius)); backdrop-filter: blur(var(--footer-glass-blur-radius)); border-top: 1px solid var(--footer-glass-border-color); box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08); color: #374151; }
+        .site-footer::before { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: -1; background: linear-gradient(45deg, var(--pastel-gold), var(--pastel-green), var(--pastel-gold)); background-size: 200% 200%; animation: subtleGradientAnimation 18s ease infinite; opacity: 0.7; }
+        .footer-content-padding { position: relative; z-index: 1; padding: 2rem 1.5rem; max-width: 80rem; margin-left: auto; margin-right: auto; }
+        @media (min-width: 640px) { .footer-content-padding { padding-left: 2rem; padding-right: 2rem; } }
+        @media (min-width: 1024px) { .footer-content-padding { padding-left: 2.5rem; padding-right: 2.5rem; } }
+        .footer-layout { display: flex; flex-direction: column; align-items: center; gap: 2rem; text-align: center; }
+        @media (min-width: 1024px) { .footer-layout { flex-direction: row; justify-content: space-between; align-items: flex-start; text-align: left; } }
+        .footer-logo-section { flex-shrink: 0; }
+        .footer-logo-container { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 0.75rem; }
+        @media (min-width: 640px) { .footer-logo-container { align-items: flex-start; text-align: left; } }
+        @media (min-width: 1024px) { .footer-logo-container { align-items: flex-start; } }
+        .footer-logo-container img { height: 4rem; width: auto; margin-bottom: 0.5rem; }
+        @media (min-width: 640px) { .footer-logo-container img { height: 5rem; margin-bottom: 0; } }
+        .footer-nav { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; font-size: 0.875rem; }
+        @media (min-width: 1024px) { .footer-nav { align-items: flex-start; } }
+        .footer-link { color: var(--theme-green-dark); transition: color 0.2s ease-in-out, opacity 0.2s ease-in-out; text-decoration: none; font-weight: 500; }
+        .footer-link:hover { color: var(--theme-gold); opacity: 0.85; text-decoration: none; }
+        .copyright-text { color: #6b7280; font-size: 0.75rem; }
+
+        /* Message box styles (for general messages) */
+        .message-box-overlay {
+            position: fixed; inset: 0; background-color: rgba(0, 0, 0, 0.6);
+            display: flex; align-items: center; justify-content: center; z-index: 2000;
+            opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .message-box-overlay.visible { opacity: 1; visibility: visible; }
+        .message-box-content {
+            background-color: white; padding: 2rem; border-radius: var(--card-border-radius);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15); max-width: 90%; width: 400px;
+            text-align: center; position: relative;
+            transform: scale(0.95);
+            transition: transform 0.3s ease;
+        }
+        .message-box-overlay.visible .message-box-content { transform: scale(1); }
+        .message-box-text { font-size: 1.125rem; color: var(--primary-text-color); margin-bottom: 1rem; }
+        .message-box-close-btn {
+            position: absolute; top: 0.75rem; right: 0.75rem; background: transparent;
+            border: none; font-size: 1.5rem; line-height: 1; cursor: pointer;
+            color: #9ca3af; padding: 0.25rem;
+        }
+        .message-box-close-btn:hover { color: #6b7280; }
+
+
+        /* START: Styles for Modals (Access Request, Terms, Choice) */
+        .modal-overlay-form {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.65); /* Darker backdrop for focus */
+            display: flex; justify-content: center; align-items: center;
+            z-index: 1000; visibility: hidden; opacity: 0;
+            transition: opacity 0.3s ease-in-out, visibility 0s 0.3s linear;
+            overflow-y: auto; padding: 1rem;
+        }
+        .modal-overlay-form.visible {
+            visibility: visible; opacity: 1;
+            transition: opacity 0.3s ease-in-out, visibility 0s 0s linear;
+        }
+        .modal-content-form {
+            background-color: #fff; padding: 2rem; border-radius: var(--card-border-radius); /* Consistent border radius */
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1); /* Softer shadow */
+            max-width: 90%; position: relative; text-align: left;
+            margin: 20px auto; transform: translateY(-20px) scale(0.95);
+            transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.3s ease-in-out;
+            opacity: 0;
+        }
+        .modal-overlay-form.visible .modal-content-form { transform: translateY(0) scale(1); opacity: 1; }
+
+        .modal-content-form .close-button-form {
+            position: absolute; top: 1rem; right: 1rem; font-size: 1.75rem;
+            line-height: 1; cursor: pointer; color: var(--tertiary-text-color);
+            transition: color 0.2s ease, transform 0.2s ease;
+        }
+        .modal-content-form .close-button-form:hover { color: var(--primary-text-color); transform: scale(1.1); }
+
+        /* Modal Titles and Subtitles */
+        .modal-content-form h2.modal-title { /* New class for consistent modal titles */
+            text-align: center;
+            color: var(--theme-green-dark);
+            font-weight: 600;
+            margin-bottom: 0.75rem; /* Reduced margin for tighter look with subtitle */
+            font-size: 1.4rem; /* Consistent title size */
+        }
+        .modal-content-form p.modal-subtitle { /* New class for subtitles */
+            text-align: center;
+            font-size: 0.95rem;
+            color: var(--secondary-text-color);
+            margin-bottom: 1.75rem; /* Increased space after subtitle */
+        }
+
+
+        /* Access Request Form Specific Width */
+        #accessRequestModal .modal-content-form { width: 550px; }
+        /* Terms Modal Specific Width */
+        #termsModal .modal-content-form { width: 650px; max-height: 85vh; overflow-y: auto; }
+        /* Choice Modal Specific Width & Styling */
+        #requestChoiceModal .modal-content-form { width: 500px; padding: 2.5rem; } /* Increased padding */
+
+
+        .modal-section-hidden { display: none !important; }
+
+        .terms-modal-content-form h2 { color: var(--theme-green-dark); font-weight: 600; margin-bottom: 1.5rem; } /* Keep specific if needed */
+        .terms-modal-content-form h3 { color: var(--primary-text-color); font-weight: 600; margin-top: 1rem; margin-bottom: 0.5rem; }
+        .terms-modal-content-form p { margin-bottom: 0.75rem; color: var(--secondary-text-color); }
+
+        /* Form Element Styling (Shared by Access Request Form) */
+        .modal-content-form label {
+            color: var(--theme-green-darker-text); font-weight: 500;
+            font-size: 0.9rem; margin-bottom: 0.5rem; display: block; /* Ensure label is block */
+        }
+        .modal-content-form input[type="text"],
+        .modal-content-form input[type="email"],
+        .modal-content-form textarea {
+            border: 1px solid var(--input-border-color); border-radius: 0.375rem; /* Consistent radius */
+            padding: 0.75rem; width: 100%; color: var(--primary-text-color); /* Increased padding */
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            font-size: 0.95rem;
+        }
+        .modal-content-form input[type="text"]:focus,
+        .modal-content-form input[type="email"]:focus,
+        .modal-content-form textarea:focus {
+            outline: none; border-color: var(--theme-green-dark); /* Darker green for focus */
+            box-shadow: 0 0 0 0.2rem var(--theme-green-lighter-bg); /* Softer focus shadow */
+        }
+        .modal-content-form input::placeholder,
+        .modal-content-form textarea::placeholder { color: var(--placeholder-text-color); opacity: 1; }
+
+        /* Modal Buttons (Submit, Choice, Agree) */
+        .modal-content-form .form-submit-button, /* Applied to Submit Request */
+        .choice-button { /* Applied to choice modal buttons */
+            background-color: var(--theme-green-dark); color: var(--text-on-green);
+            font-weight: 500; padding: 0.75rem 1.5rem; border-radius: 0.375rem;
+            transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.07); border: none; cursor: pointer;
+            width: 100%; text-align: center; margin-bottom: 0.75rem;
+            font-size: 0.95rem;
+        }
+        .modal-content-form .form-submit-button:hover,
+        .choice-button:hover {
+            background-color: var(--theme-green-darker-text); transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .modal-content-form .form-submit-button:active,
+        .choice-button:active { transform: translateY(0px); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+
+        .choice-button.secondary { /* For specific article buttons in choice modal */
+            background-color: var(--theme-gold); color: var(--text-on-gold);
+        }
+        .choice-button.secondary:hover { background-color: var(--theme-gold-darker); }
+        .choice-button i.fa-fw { margin-right: 0.5rem; }
+
+        .form-actions-container { /* Container for submit and cancel buttons on Access Request Form */
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 1.5rem;
+        }
+        .form-actions-container .form-submit-button, /* Submit button in this container */
+        .form-actions-container .btn-cancel { /* Cancel button in this container */
+            width: auto; /* Allow buttons to size based on content */
+            flex-grow: 1; /* Make buttons share space */
+            max-width: 220px; /* Max width for these buttons */
+            margin-bottom: 0; /* Remove bottom margin if it's on .form-submit-button */
+        }
+        .btn-cancel { /* Style for the cancel button in the form */
+            background-color: var(--theme-accent-gray);
+            color: white;
+            border-color: var(--theme-accent-gray);
+        }
+        .btn-cancel:hover {
+            background-color: #5a6268; /* Darken gray */
+            border-color: #5a6268;
+        }
+
+
+        /* Reason Tags */
+        .reason-tag {
+            display: inline-block; background-color: #e9ecef; /* Lighter gray */
+            color: var(--secondary-text-color);
+            padding: 0.35rem 0.8rem; margin: 0.25rem; border-radius: 1rem; /* Pill shape */
+            cursor: pointer; transition: all 0.2s ease;
+            font-size: 0.85rem; font-weight: 500; border: 1px solid #dee2e6; /* Subtle border */
+        }
+        .reason-tag:hover { background-color: #ced4da; border-color: #adb5bd; transform: translateY(-1px); }
+        .reason-tag.selected {
+            background-color: var(--theme-green-dark); color: white;
+            border-color: var(--theme-green-darker-text);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        #reasonTagsContainer.highlight-error { border: 1px solid #dc3545; padding: 0.5rem; border-radius: 0.375rem; }
+        #reasonError.text-red-500 { color: #dc3545; font-size: 0.8rem; } /* Standard red for errors */
+
+        #reasonDescriptionSection {
+            overflow: hidden;
+            transition: max-height 0.4s ease-in-out, opacity 0.3s ease-in-out 0.1s, margin-top 0.3s ease-in-out;
+            max-height: 0; opacity: 0; margin-top: 0;
+        }
+        #reasonDescriptionSection:not(.reason-description-hidden) {
+            max-height: 200px; opacity: 1; margin-top: 1.25rem; /* Increased margin when visible */
+        }
+
+        /* Checkbox */
+        .modal-content-form input[type="checkbox"] {
+            accent-color: var(--theme-green-dark); width: 1.1rem; height: 1.1rem; /* Slightly larger */
+            margin-right: 0.6rem; margin-top: 0.2rem; /* Adjust alignment */
+        }
+        .modal-content-form #consentCheckbox + label { font-size: 0.9rem; }
+        .modal-content-form #consentCheckbox + label a { color: var(--theme-green-dark); text-decoration: underline; }
+        .modal-content-form #consentCheckbox + label a:hover { color: var(--theme-gold-darker); }
+
+        /* Receipt Section Styles - Reverted to original DocumentRequestForm.html look */
+        .polished-receipt {
+            border: none;
+            padding: 2rem;
+            margin-top: 1rem;
+            background: linear-gradient(to bottom, #f7fafc, #e2e8f0); /* Original gradient */
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1); /* Original shadow */
+            text-align: center;
+            font-family: "Inter", sans-serif;
+            font-size: 1rem;
+            color: #2d3748; /* Original text color */
+        }
+        .polished-receipt .receipt-header {
+            text-align: center;
+            margin-bottom: 1.5rem;
+            font-size: 1.5rem; /* Original size */
+            font-weight: bold; /* Original weight */
+            text-transform: uppercase; /* Original transform */
+            color: #2f855a; /* Original color (Tailwind green-700) */
+            border-bottom: 2px solid #48bb78; /* Original border (Tailwind green-500) */
+            padding-bottom: 1rem;
+        }
+        .polished-receipt .receipt-unique-number {
+            text-align: center;
+            font-size: 1.5rem; /* Original size */
+            font-weight: bold; /* Original weight */
+            color: #2f855a; /* Original color */
+            margin: 1.5rem 0;
+            padding: 0.75rem;
+            border: 3px solid #48bb78; /* Original border */
+            border-radius: 0.5rem;
+            background-color: #c6f6d5; /* Original background (Tailwind green-100) */
+            display: inline-block;
+        }
+        .polished-receipt .receipt-unique-number p { margin: 0.25rem 0; } /* Original spacing */
+        .polished-receipt .receipt-footer {
+            text-align: center;
+            margin-top: 2rem; /* Original margin */
+            font-size: 0.9rem; /* Original size */
+            color: #4a5568; /* Original color (Tailwind gray-700) */
+        }
+        .polished-receipt .receipt-footer a {
+             color: #4299e1; /* Original link color (Tailwind blue-500) */
+             text-decoration: underline;
+        }
+
+        /* Checkmark Animation - Reverted to original DocumentRequestForm.html classes and styles */
+        .checkmark-circle {
+            width: 80px;
+            height: 80px;
+            stroke-width: 4;
+            stroke: #4CAF50; /* Original Green color */
+            fill: none;
+            margin: 20px auto; /* Original margin */
+            border-radius: 50%;
+            stroke-dasharray: 480;
+            stroke-dashoffset: 480;
+            animation: strokeAnimation 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+            display: block;
+        }
+        .checkmark-check {
+            transform-origin: 50% 50%;
+            stroke-dasharray: 100;
+            stroke-dashoffset: 100;
+            animation: strokeAnimation 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards; /* Original delay */
+        }
+        @keyframes strokeAnimation {
+            100% { stroke-dashoffset: 0; }
+        }
+
+
+        .email-service-link-button {
+            display: inline-block; background-color: var(--theme-accent-gray); color: white;
+            font-weight: 500; padding: 0.7rem 1.4rem; border-radius: 0.375rem;
+        }
+        .email-service-link-button:hover { background-color: #5a6268; }
+        /* END: Styles for Modals */
+
+
+        /* START: Floating Action Button Styles */
+        .floating-request-button-container {
+            position: fixed;
+            bottom: 2.5rem;
+            /* MODIFIED for centering */
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 999;
+            /* Removed right: 2.5rem; */
+        }
+        .floating-request-button {
+            /* MODIFIED for green background and rectangular shape */
+            background-color: var(--theme-green-dark);
+            color: var(--text-on-green);
+            border-radius: 8px; /* Softer rectangle */
+            /* Keep other styles like padding, font-weight, etc., or adjust as needed */
+            padding: 0.9rem 1.6rem;
+            font-weight: 600;
+            font-size: 1rem;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.12);
+            transition: all 0.25s ease;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+        }
+        .floating-request-button:hover:not(.status-pending) {
+            /* MODIFIED for green hover */
+            background-color: var(--theme-green-darker-text);
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 7px 20px rgba(0,0,0,0.18);
+        }
+        .floating-request-button i {
+            font-size: 1.25em;
+        }
+
+        /* Styles for "Request Pending" state of the floating button */
+        .floating-request-button.status-pending {
+            background-color: var(--theme-accent-gray);
+            color: white;
+            cursor: default;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            border-radius: 8px; /* Ensure pending state also has new border-radius */
+        }
+        .floating-request-button.status-pending:hover {
+            background-color: var(--theme-accent-gray);
+            transform: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        /* END: Floating Action Button Styles */
+
+        /* Styles for Choice Modal Content */
+        #choiceModalContent h3.choice-section-title { /* New class for "Or a specific article:" */
+            font-size: 1rem; color: var(--primary-text-color);
+            margin-top: 1.5rem; margin-bottom: 0.75rem; font-weight: 500;
+            border-top: 1px solid var(--neutral-border-color); padding-top: 1.25rem;
+        }
+        #specificDocumentList {
+            list-style: none; padding: 0; margin: 0;
+            max-height: 220px; overflow-y: auto;
+            border: 1px solid var(--neutral-border-color); border-radius: 0.375rem;
+            padding: 0.75rem; background-color: #f8f9fa; /* Light background for the list */
+        }
+        #specificDocumentList li button.choice-button.secondary { /* Target specific article buttons */
+            width: 100%; margin-bottom: 0.6rem; text-align: left;
+            padding: 0.6rem 1rem; font-size: 0.9rem;
+            white-space: normal; line-height: 1.4;
+            display: flex; align-items: center; /* For icon alignment */
+        }
+         #specificDocumentList li:last-child button.choice-button.secondary { margin-bottom: 0; }
+
+        #compilationTitleChoice { /* Sub-text on the main collection button */
+            font-weight: normal; font-size: 0.85em; display: block;
+            margin-top: 0.2rem; opacity: 0.9;
+            color: var(--text-on-green);
+        }
+         #requestCompilationButton.choice-button {
+            background-color: var(--theme-green-dark); color: var(--text-on-green);
+        }
+        #requestCompilationButton.choice-button:hover { background-color: var(--theme-green-darker-text); }
+
+
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+
+        <header class="page-header" role="banner">
+            <div class="header-content container">
+                <h1 id="main-doc-title-header">Document Title</h1>
+                <p id="main-doc-author-header">Author/Publisher</p>
+                <p id="main-doc-year-header">Year</p>
+            </div>
+        </header>
+
+        <main class="container" role="main">
+            <article id="foreword-card" class="document-item-base">
+                <header>
+                    <h2>Foreword</h2>
+                </header>
+                <section>
+                    <p class="foreword-text">
+                        Foreword content will be loaded here.
+                    </p>
+                </section>
+            </article>
+
+            <hr class="section-divider">
+
+            <div id="toc-container" class="document-item-base" style="display: none;">
+                 <h2>Contents</h2>
+                 <ul id="toc-list">
+                     </ul>
+            </div>
+
+             <hr id="toc-articles-divider" class="section-divider" style="display: none;">
+
+             <div id="contained-documents-cards-container">
+                </div>
+
+            <article id="doc-info-card" class="document-item-base">
+                 <header>
+                    <h2>Document Information</h2>
+                </header>
+                <section class="doc-info-grid">
+                    <div>
+                        <strong>Title:</strong>
+                        <span id="info-title"></span>
+                    </div>
+                    <div>
+                        <strong>Author(s):</strong>
+                        <span id="info-author-container"></span>
+                    </div>
+                    <div>
+                        <strong>Editor(s):</strong>
+                        <span class="opacity-90" id="info-editor"></span>
+                    </div>
+                    <div>
+                        <strong>Publication Year:</strong>
+                        <span id="info-year"></span>
+                    </div>
+                    <div>
+                        <strong>Volume:</strong>
+                        <span id="info-volume"></span>
+                    </div>
+                    <div>
+                        <strong>Number of Pages:</strong>
+                        <span id="info-pages"></span>
+                    </div>
+                    <div>
+                        <strong>Category:</strong>
+                        <span class="opacity-90" id="info-category"></span>
+                    </div>
+                    <div>
+                        <strong>Research Agenda:</strong>
+                        <span class="opacity-90" id="info-agenda"></span>
+                    </div>
+                    <div>
+                        <strong>Date Uploaded:</strong>
+                        <span id="info-date-uploaded"></span>
+                    </div>
+                    <div>
+                        <strong>Keywords:</strong>
+                        <span id="info-keywords"></span>
+                    </div>
+                </section>
+            </article>
+        </main>
+    </div>
+
+    <div class="footer-wrapper">
+        <footer id="site-footer-element" class="site-footer" role="contentinfo">
+            <div class="footer-content-padding">
+                <div class="footer-layout">
+                    <div class="footer-logo-section">
+                        <div class="footer-logo-container">
+                            <img
+                                src="https://placehold.co/200x80/006A4E/FFFFFF?text=PeAS+Logo"
+                                alt="PeAS Logo"
+                                onerror="this.onerror=null; this.src='https://placehold.co/200x80/cccccc/ffffff?text=Logo+Error';">
+                        </div>
+                        <p class="copyright-text">&copy; <span id="footerCurrentYear"></span> PeAS. All Rights Reserved.</p>
+                    </div>
+                    <nav class="footer-nav" role="navigation" aria-label="Footer Navigation">
+                        <a href="#" class="footer-link">Home</a>
+                        <a href="#" class="footer-link">Contact</a>
+                        <a href="#" class="footer-link">Terms & Conditions</a>
+                        <a href="#" class="footer-link">Privacy Policy</a>
+                    </nav>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <div id="message-box-overlay" class="message-box-overlay" aria-hidden="true">
+        <div class="message-box-content" role="alertdialog" aria-labelledby="message-box-text">
+            <button id="message-box-close" class="message-box-close-btn" aria-label="Close message">&times;</button>
+            <p id="message-box-text" class="message-box-text"></p>
+        </div>
+    </div>
+
+    <div class="floating-request-button-container">
+        <button id="floatingRequestAccessButton" class="floating-request-button">
+            <i class="fas fa-file-alt"></i> Request Access
+        </button>
+    </div>
+
+    <div id="requestChoiceModal" class="modal-overlay-form">
+        <div class="modal-content-form">
+            <span class="close-button-form" id="closeChoiceModalButton">&times;</span>
+            <h2 class="modal-title">Choose Access Type</h2>
+            <p class="modal-subtitle">What would you like to request access to?</p>
+            <div id="choiceModalContent">
+                <button id="requestCompilationButton" class="choice-button">
+                    Entire Collection
+                    <span id="compilationTitleChoice"></span>
+                </button>
+                <div id="specificDocumentChoicesContainer">
+                    <h3 class="choice-section-title">Or a specific article:</h3>
+                    <ul id="specificDocumentList">
+                        </ul>
+                </div>
+                <p id="noSpecificDocumentsMessage" style="display:none; text-align:center; margin-top:1rem; color: var(--tertiary-text-color);">No individual articles listed in this collection.</p>
+            </div>
+        </div>
+    </div>
+
+
+    <div id="accessRequestModal" class="modal-overlay-form">
+        <div class="modal-content-form">
+            <span class="close-button-form" id="closeAccessModalButton">&times;</span>
+            <div id="formSection">
+                <h2 class="modal-title">Request Full Document Access</h2>
+                <p class="modal-subtitle">
+                    You are requesting access for: <strong id="modalDocTitle" style="color: var(--primary-text-color);"></strong>
+                </p>
+                <form id="accessForm">
+                    <input type="hidden" id="requestedDocId" name="requested_doc_id">
+                    <input type="hidden" id="requestedDocTitle" name="requested_doc_title">
+                    <div style="margin-bottom: 1rem;">
+                        <label for="full_name">Full Name:</label>
+                        <input type="text" id="full_name" name="full_name" required placeholder="e.g., Juan Dela Cruz">
+                    </div>
+                    <div style="margin-bottom: 1rem;">
+                        <label for="email">Email:</label>
+                        <input type="email" id="email" name="email" required placeholder="e.g., juan.delacruz@example.com">
+                    </div>
+                    <div style="margin-bottom: 1.5rem;">
+                        <label for="affiliation">Affiliation:</label>
+                        <input type="text" id="affiliation" name="affiliation" required placeholder="e.g., St. Paul University Dumaguete">
+                    </div>
+                    <div style="margin-bottom: 1rem;">
+                        <label>Reason for Access:</label>
+                        <div id="reasonTagsContainer" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.25rem;">
+                            <span class="reason-tag" data-reason="Academic Research">Academic Research</span>
+                            <span class="reason-tag" data-reason="Professional Development">Professional Development</span>
+                            <span class="reason-tag" data-reason="Personal Interest">Personal Interest</span>
+                            <span class="reason-tag" data-reason="Coursework/Study">Coursework/Study</span>
+                            <span class="reason-tag" data-reason="Writing Project">Writing Project</span>
+                            <span class="reason-tag" data-reason="Institutional Requirement">Institutional Requirement</span>
+                            <span class="reason-tag" data-reason="Other">Other</span>
+                        </div>
+                         <p id="reasonError" class="text-red-500" style="font-size: 0.75rem; font-style: italic; margin-top: 0.25rem; display:none;">Please select at least one reason.</p>
+                    </div>
+                    <div id="reasonDescriptionSection" class="reason-description-hidden" style="margin-bottom: 1.5rem;">
+                        <label id="reasonDescriptionLabel" for="reasonDescription">Reason Details:</label>
+                        <textarea id="reasonDescription" name="reason_description" rows="3" placeholder="Provide details for your access request..."></textarea>
+                    </div>
+                    <div style="margin-bottom: 1.5rem; display: flex; align-items: flex-start;">
+                        <input type="checkbox" id="consentCheckbox" name="consent" required>
+                        <label for="consentCheckbox" style="font-size: 0.875rem; color: var(--secondary-text-color); line-height: 1.5;">
+                            I agree to the terms and conditions and consent to the processing of my personal data.
+                            <a href="#" id="openTermsModalLink">Read Terms and Conditions</a>
+                        </label>
+                    </div>
+                    <div class="form-actions-container">
+                        <button type="button" id="cancelAccessFormButton" class="btn btn-cancel">Cancel</button>
+                        <button type="submit" class="form-submit-button">Submit Request</button>
+                    </div>
+                </form>
+            </div>
+            <div id="receiptSection" class="modal-section-hidden">
+                 <div class="polished-receipt">
+                    <div class="receipt-header">Access Request Submitted</div>
+                     <p style="margin-bottom: 1rem; font-size: 0.9rem;">Your request for <strong id="receiptDocTitle" style="color: var(--primary-text-color);"></strong> has been received.</p>
+                    <div class="receipt-unique-number">
+                        <p style="font-size:0.8rem; margin-bottom:0.2rem;">Request Number:</p>
+                        <p id="receiptNumber" style="font-size:1.1rem;"></p>
+                    </div>
+                     <svg class="checkmark-circle" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+                        <circle cx="26" cy="26" r="25" fill="none"/>
+                        <path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+                    </svg>
+                    <div class="receipt-footer">
+                        <p>Thank you. You will be notified via email regarding its status.</p>
+                        <p>Questions? Contact <a href="mailto:info@examplepeas.com">info@examplepeas.com</a></p>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: center; margin-top: 1.5rem;">
+                    <a id="emailServiceLink" href="#" target="_blank" class="email-service-link-button">
+                        Open Email Service
+                    </a>
+                </div>
+                 <div style="text-align: center; margin-top: 1rem;">
+                    <button type="button" id="closeReceiptAndModalButton" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.5rem 1rem;">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="termsModal" class="modal-overlay-form">
+        <div class="modal-content-form terms-modal-content-form">
+             <span class="close-button-form" id="closeTermsModalButton">&times;</span>
+            <h2 class="modal-title">Terms and Conditions</h2>
+            <div style="font-size: 0.875rem; line-height: 1.6;">
+                <p>These T&C govern your use of the document archiving system...</p>
+                <h3>1. Data Usage</h3><p>Personal data collected... RA 10173...</p>
+                <h3>2. Document Usage</h3><p>Access granted is for individual, non-commercial use...</p>
+                <h3>3. Request Processing</h3><p>Requests reviewed by admins... 3-5 business days...</p>
+                <h3>4. User Responsibilities</h3><p>Accurate information... no unlawful purpose...</p>
+                <h3>5. Changes to Terms</h3><p>Terms may be updated... review periodically.</p>
+                <h3>6. Contact</h3><p>Questions? <a href="mailto:info@examplepeas.com" style="color: var(--theme-green-dark); text-decoration:underline;">info@examplepeas.com</a>.</p>
+                <p style="text-align: center; margin-top: 2rem; font-size: 0.75rem; color: var(--tertiary-text-color);">Last updated: May 14, 2025</p>
+            </div>
+            <div style="display: flex; justify-content: center; margin-top: 1.5rem;">
+                <button type="button" id="agreeToTermsButton" class="form-submit-button">I Agree</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Cache DOM Elements ---
+            const mainHeaderTitle = document.getElementById('main-doc-title-header');
+            const mainHeaderAuthor = document.getElementById('main-doc-author-header');
+            const mainHeaderYear = document.getElementById('main-doc-year-header');
+            const forewordTextElement = document.querySelector('#foreword-card .foreword-text');
+            const infoTitle = document.getElementById('info-title');
+            const infoAuthorContainer = document.getElementById('info-author-container');
+            const infoEditor = document.getElementById('info-editor');
+            const infoYearElem = document.getElementById('info-year');
+            const infoVolume = document.getElementById('info-volume');
+            const infoPages = document.getElementById('info-pages');
+            const infoCategory = document.getElementById('info-category');
+            const infoAgenda = document.getElementById('info-agenda');
+            const infoDateUploaded = document.getElementById('info-date-uploaded');
+            const infoKeywordsContainer = document.getElementById('info-keywords');
+            const tocContainer = document.getElementById('toc-container');
+            const tocList = document.getElementById('toc-list');
+            const tocArticlesDivider = document.getElementById('toc-articles-divider');
+            const containedDocumentsCardsContainer = document.getElementById('contained-documents-cards-container');
+
+            const messageBoxOverlay = document.getElementById('message-box-overlay');
+            const messageBoxText = document.getElementById('message-box-text');
+            const messageBoxCloseBtn = document.getElementById('message-box-close');
+             const messageBoxContent = messageBoxOverlay ? messageBoxOverlay.querySelector('.message-box-content') : null;
+
+
+            // Access Request Modal Elements
+            const accessModal = document.getElementById('accessRequestModal');
+            const closeAccessModalButton = document.getElementById('closeAccessModalButton');
+            const cancelAccessFormButton = document.getElementById('cancelAccessFormButton');
+            const accessForm = document.getElementById('accessForm');
+            const formSection = document.getElementById('formSection');
+            const receiptSection = document.getElementById('receiptSection');
+            const receiptNumberElement = document.getElementById('receiptNumber');
+            const emailServiceLink = document.getElementById('emailServiceLink');
+            const reasonTagsContainer = document.getElementById('reasonTagsContainer');
+            const reasonTags = reasonTagsContainer.querySelectorAll('.reason-tag');
+            const reasonDescriptionSection = document.getElementById('reasonDescriptionSection');
+            const reasonDescriptionLabel = document.getElementById('reasonDescriptionLabel');
+            const reasonDescription = document.getElementById('reasonDescription');
+            const reasonErrorElement = document.getElementById('reasonError');
+            const consentCheckbox = document.getElementById('consentCheckbox');
+            const modalDocTitleElement = document.getElementById('modalDocTitle');
+            const requestedDocIdInput = document.getElementById('requestedDocId');
+            const requestedDocTitleInput = document.getElementById('requestedDocTitle');
+            const receiptDocTitleElement = document.getElementById('receiptDocTitle');
+            const closeReceiptAndModalButton = document.getElementById('closeReceiptAndModalButton');
+
+            // Terms and Conditions Modal elements
+            const openTermsModalLink = document.getElementById('openTermsModalLink');
+            const termsModal = document.getElementById('termsModal');
+            const closeTermsModalButton = document.getElementById('closeTermsModalButton');
+            const agreeToTermsButton = document.getElementById('agreeToTermsButton');
+
+            // Floating Action Button & Choice Modal Elements
+            const floatingRequestButton = document.getElementById('floatingRequestAccessButton');
+            const requestChoiceModal = document.getElementById('requestChoiceModal');
+            const closeChoiceModalButton = document.getElementById('closeChoiceModalButton');
+            const requestCompilationButton = document.getElementById('requestCompilationButton');
+            const compilationTitleChoiceSpan = document.getElementById('compilationTitleChoice');
+            const specificDocumentChoicesContainer = document.getElementById('specificDocumentChoicesContainer');
+            const specificDocumentListUL = document.getElementById('specificDocumentList');
+            const noSpecificDocumentsMessageP = document.getElementById('noSpecificDocumentsMessage');
+
+
+            let selectedReasons = [];
+            let mainDocumentData = {}; // Stores data for the main document/collection
+
+            // --- Smooth Scroll ---
+            function smoothScrollTo(elementId) {
+                const element = document.getElementById(elementId);
+                if (element) element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+
+            // --- Create Author Links ---
+            function createAuthorLinks(authorString, containerElement, linkClass = 'clickable-author') {
+                 if (!containerElement) return;
+                containerElement.innerHTML = '';
+                if (!authorString || typeof authorString !== 'string') {
+                    if (containerElement.id === 'info-author-container') containerElement.textContent = 'N/A';
+                    return;
+                }
+                const authorsRaw = authorString.split(/,\s*|\s+and\s+|\s*&\s*/).map(a => a.trim()).filter(a => a);
+                authorsRaw.forEach((authorEntry, index) => {
+                    const link = document.createElement('a');
+                    link.href = `#/search/author/${encodeURIComponent(authorEntry)}`;
+                    link.className = linkClass;
+                    link.textContent = authorEntry;
+                    link.onclick = (e) => { e.preventDefault(); e.stopPropagation(); searchByAuthor(authorEntry); };
+                    containerElement.appendChild(link);
+                    if (index < authorsRaw.length - 1) containerElement.appendChild(document.createTextNode(', '));
+                });
+                if (authorsRaw.length === 0 && containerElement.id === 'info-author-container') containerElement.textContent = 'N/A';
+            }
+
+            // --- Update Floating Button Display based on localStorage ---
+            function updateFloatingButtonDisplay() {
+                if (!floatingRequestButton || !mainDocumentData.doc_id) return;
+
+                const requestStatus = localStorage.getItem('requestStatus_' + mainDocumentData.doc_id);
+                if (requestStatus === 'pending') {
+                    floatingRequestButton.classList.add('status-pending');
+                    floatingRequestButton.innerHTML = '<i class="fas fa-hourglass-half"></i> Request Pending';
+                    floatingRequestButton.disabled = true;
+                } else {
+                    floatingRequestButton.classList.remove('status-pending');
+                    floatingRequestButton.innerHTML = '<i class="fas fa-file-alt"></i> Request Access';
+                    floatingRequestButton.disabled = false;
+                }
+            }
+
+
+            // --- Load Document Data ---
+            async function loadDocumentData(docId) {
+                try {
+                    let currentMockData;
+                    if (docId === 4) { // Main collection example
+                        currentMockData = {
+                            doc_id: "MAIN_COLLECTION_004", // Ensure main doc has an ID
+                            title: "The SPUD CONFLUENCE: 2020-2021, Vol. 11, No. 1",
+                            author: "St. Paul University Dumaguete",
+                            publication_year: "2020-2021",
+                            abstract: "This issue of Confluence presents research designs, an approach for answering research questions...", // Shortened for brevity
+                            keywords: ["Faculty Research", "Academic Journal", "Higher Education"],
+                            editor: { vp_academic_affairs: "SR HELEN MALUBAY, SPC", board_of_reviewers: ["Reviewer A", "Reviewer B"] },
+                            volume: "Vol. 11, No. 1", pages: "Multiple Articles", category: "Confluence",
+                            research_agenda: "Varied Academic Research", date_uploaded: "2021-06-01T00:00:00.000Z",
+                            contained_documents: [
+                                { doc_id: 401, title: "Research Designs Used by Students", author: "Roel Jumawan, et al.", abstract: "Study on research designs...", keywords: ["research designs", "students"] },
+                                { doc_id: 402, title: "Thematic Patterns in Editorials", author: "Sami Managbanag, et al.", abstract: "Analysis of thematic patterns...", keywords: ["discourse analysis", "editorials"] },
+                                { doc_id: 403, title: "Resiliency and Mental Health of Students", author: "Adah Balbon, et al.", abstract: "Assessment of student well-being...", keywords: ["resiliency", "mental health"] }
+                            ]
+                        };
+                    } else { // Fallback for unknown ID
+                        currentMockData = { doc_id: "UNKNOWN_DOC", title: "Document Not Found", abstract: "Details not available." };
+                    }
+                    mainDocumentData = currentMockData;
+
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                    const data = mainDocumentData;
+
+                    if(mainHeaderTitle) mainHeaderTitle.textContent = data.title || 'Title Not Found';
+                    if(mainHeaderAuthor) mainHeaderAuthor.textContent = data.author || 'Author Not Found';
+                    if(mainHeaderYear) mainHeaderYear.textContent = data.publication_year || 'Year Not Found';
+                    if(forewordTextElement) forewordTextElement.textContent = data.abstract || 'Foreword not available.';
+                    if(infoTitle) infoTitle.textContent = data.title || '';
+                    if(infoAuthorContainer) createAuthorLinks(data.author, infoAuthorContainer);
+
+                     if (infoEditor) {
+                        infoEditor.innerHTML = '';
+                        if (data.editor && typeof data.editor === 'object') {
+                            let editorHTML = '';
+                            if (data.editor.vp_academic_affairs) {
+                                editorHTML += `<span>${data.editor.vp_academic_affairs} (Vice-President, Academic Affairs)</span><br>`;
+                            }
+                            if (data.editor.board_of_reviewers && Array.isArray(data.editor.board_of_reviewers) && data.editor.board_of_reviewers.length > 0) {
+                                editorHTML += '<strong>Board of Reviewers:</strong><ul class="editor-list">';
+                                data.editor.board_of_reviewers.forEach(reviewer => {
+                                    editorHTML += `<li>${reviewer}</li>`;
+                                });
+                                editorHTML += '</ul>';
+                            }
+                             infoEditor.innerHTML = editorHTML || 'N/A';
+                        } else if (typeof data.editor === 'string') {
+                             infoEditor.textContent = data.editor;
+                        } else {
+                             infoEditor.textContent = 'N/A';
+                        }
+                    }
+                    if (infoYearElem) infoYearElem.textContent = data.publication_year || 'N/A';
+                    if (infoCategory) infoCategory.textContent = data.category || 'N/A';
+                    if (infoVolume) {
+                        infoVolume.textContent = (data.category === "Confluence" || data.category === "Synergy") ? (data.volume || 'N/A') : 'N/A';
+                    }
+                    if (infoPages) infoPages.textContent = data.pages || 'N/A';
+                    if (infoAgenda) infoAgenda.textContent = data.research_agenda || 'N/A';
+                    if (infoDateUploaded) {
+                        infoDateUploaded.textContent = data.date_uploaded ? new Date(data.date_uploaded).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A';
+                    }
+                    if (infoKeywordsContainer) {
+                        infoKeywordsContainer.innerHTML = '';
+                        if(data.keywords && Array.isArray(data.keywords) && data.keywords.length > 0){
+                            data.keywords.forEach((keyword, index) => {
+                                const link = document.createElement('a');
+                                link.href = `#/search/keyword/${encodeURIComponent(keyword)}`;
+                                link.className = 'clickable-meta clickable-keyword';
+                                link.textContent = keyword;
+                                link.onclick = (e) => { e.preventDefault(); searchByKeyword(keyword); };
+                                infoKeywordsContainer.appendChild(link);
+                                if (index < data.keywords.length - 1) {
+                                    infoKeywordsContainer.appendChild(document.createTextNode(', '));
+                                }
+                            });
+                        } else {
+                             infoKeywordsContainer.innerHTML = '<span>N/A</span>';
+                        }
+                    }
+
+                    if (tocContainer && tocList && containedDocumentsCardsContainer) {
+                        tocList.innerHTML = '';
+                        containedDocumentsCardsContainer.innerHTML = '';
+                        if (data.contained_documents && data.contained_documents.length > 0) {
+                            tocContainer.style.display = 'block';
+                            if(tocArticlesDivider) tocArticlesDivider.style.display = 'block';
+                            data.contained_documents.forEach(doc => {
+                                const cardId = `article-${doc.doc_id}`;
+                                const titleId = `sub-doc-title-${doc.doc_id}`;
+                                const tocItem = document.createElement('li');
+                                const tocLinkContent = document.createElement('div');
+                                tocLinkContent.className = 'toc-link-content';
+                                const tocLink = document.createElement('a');
+                                tocLink.href = `#${cardId}`;
+                                tocLink.className = 'toc-title-link';
+                                tocLink.innerHTML = `<i class="fas fa-book-open" aria-hidden="true"></i> ${doc.title || 'Untitled'}`;
+                                tocLink.onclick = (e) => { e.preventDefault(); smoothScrollTo(cardId); };
+                                tocLinkContent.appendChild(tocLink);
+                                if (doc.author) {
+                                    const tocAuthorSpan = document.createElement('span');
+                                    tocAuthorSpan.className = 'toc-author';
+                                    tocAuthorSpan.appendChild(document.createTextNode('by '));
+                                    createAuthorLinks(doc.author, tocAuthorSpan);
+                                    tocLinkContent.appendChild(tocAuthorSpan);
+                                }
+                                tocItem.appendChild(tocLinkContent);
+                                tocList.appendChild(tocItem);
+                                const card = document.createElement('article');
+                                card.id = cardId;
+                                card.className = 'document-item-base article-card';
+                                card.setAttribute('aria-labelledby', titleId);
+                                let cardHTML = `<h3 id="${titleId}" class="sub-doc-title">${doc.title || 'Untitled'}</h3>`;
+                                const authorP = document.createElement('p');
+                                authorP.className = 'sub-doc-author';
+                                if (doc.author) {
+                                    authorP.appendChild(document.createTextNode('by '));
+                                    createAuthorLinks(doc.author, authorP);
+                                } else {
+                                    authorP.textContent = 'Author not available';
+                                }
+                                cardHTML += authorP.outerHTML;
+                                if (doc.abstract) cardHTML += `<p class="sub-doc-abstract">${doc.abstract}</p>`;
+                                if (doc.keywords && doc.keywords.length > 0) {
+                                    cardHTML += `<div class="sub-doc-keywords-section"><strong>Keywords:</strong><div class="keywords-container-flex">`;
+                                    doc.keywords.forEach(kw => {
+                                        const pillA = document.createElement('a');
+                                        pillA.href = `#/search/keyword/${encodeURIComponent(kw)}`;
+                                        pillA.className = 'tag-pill clickable-keyword';
+                                        pillA.textContent = kw;
+                                        pillA.onclick = (e) => { e.preventDefault(); e.stopPropagation(); searchByKeyword(kw); };
+                                        cardHTML += pillA.outerHTML;
+                                    });
+                                    cardHTML += `</div></div>`;
+                                }
+                                card.innerHTML = cardHTML;
+                                containedDocumentsCardsContainer.appendChild(card);
+                            });
+                        } else {
+                            if(tocContainer) tocContainer.style.display = 'none';
+                            if(tocArticlesDivider) tocArticlesDivider.style.display = 'none';
+                        }
+                    }
+                    updateFloatingButtonDisplay(); // Update FAB status after data is loaded
+                } catch (error) {
+                    console.error('Error fetching document data:', error);
+                    if(forewordTextElement) forewordTextElement.textContent = 'Failed to load document data.';
+                    showGeneralMessage('Error: Could not load document details.', true);
+                }
+            }
+
+            function showGeneralMessage(message, isError = false) {
+                if (!messageBoxOverlay || !messageBoxText || !messageBoxContent) return;
+                messageBoxText.textContent = message;
+                messageBoxOverlay.classList.add('visible');
+                messageBoxContent.style.borderColor = isError ? 'var(--theme-gold-darker)' : 'var(--theme-green-border)';
+                if (messageBoxCloseBtn) messageBoxCloseBtn.focus();
+            }
+            function hideGeneralMessage() {
+                if (messageBoxOverlay) messageBoxOverlay.classList.remove('visible');
+            }
+            if (messageBoxCloseBtn) messageBoxCloseBtn.addEventListener('click', hideGeneralMessage);
+            if (messageBoxOverlay) messageBoxOverlay.addEventListener('click', e => { if (e.target === messageBoxOverlay) hideGeneralMessage(); });
+
+            function openModal(modalElement) { if (modalElement) modalElement.classList.add('visible'); }
+            function closeModal(modalElement) { if (modalElement) modalElement.classList.remove('visible'); }
+
+            function openAccessRequestModal(docId, docTitle) {
+                if (!accessModal || !requestedDocIdInput || !requestedDocTitleInput || !modalDocTitleElement || !receiptDocTitleElement || !formSection || !receiptSection) return;
+                requestedDocIdInput.value = docId;
+                requestedDocTitleInput.value = docTitle;
+                modalDocTitleElement.textContent = docTitle;
+                receiptDocTitleElement.textContent = docTitle;
+
+                formSection.classList.remove('modal-section-hidden');
+                receiptSection.classList.add('modal-section-hidden');
+                if(accessForm) accessForm.reset();
+                selectedReasons = [];
+                reasonTags.forEach(tag => tag.classList.remove('selected'));
+                if(reasonDescription) reasonDescription.value = '';
+                if(reasonDescriptionSection) {
+                    reasonDescriptionSection.classList.add('reason-description-hidden');
+                    reasonDescriptionSection.style.maxHeight = '0';
+                    reasonDescriptionSection.style.opacity = '0';
+                }
+                if(reasonDescriptionLabel) reasonDescriptionLabel.textContent = 'Reason Details:';
+                if(reasonTagsContainer) reasonTagsContainer.classList.remove('highlight-error');
+                if(reasonErrorElement) reasonErrorElement.style.display = 'none';
+                if(consentCheckbox) consentCheckbox.checked = false;
+                openModal(accessModal);
+            }
+            if(closeAccessModalButton) closeAccessModalButton.addEventListener('click', () => closeModal(accessModal));
+            if(cancelAccessFormButton) cancelAccessFormButton.addEventListener('click', () => closeModal(accessModal));
+            if(closeReceiptAndModalButton) closeReceiptAndModalButton.addEventListener('click', () => closeModal(accessModal));
+
+            if(openTermsModalLink) openTermsModalLink.addEventListener('click', (e) => { e.preventDefault(); openModal(termsModal); });
+            if(closeTermsModalButton) closeTermsModalButton.addEventListener('click', () => closeModal(termsModal));
+            if(agreeToTermsButton && consentCheckbox) agreeToTermsButton.addEventListener('click', () => { consentCheckbox.checked = true; closeModal(termsModal); });
+
+            function openRequestChoiceModal() {
+                if (!requestChoiceModal || !compilationTitleChoiceSpan || !specificDocumentListUL || !specificDocumentChoicesContainer || !noSpecificDocumentsMessageP) return;
+
+                compilationTitleChoiceSpan.textContent = `: "${mainDocumentData.title || 'Main Collection'}"`;
+                specificDocumentListUL.innerHTML = '';
+
+                if (mainDocumentData.contained_documents && mainDocumentData.contained_documents.length > 0) {
+                    specificDocumentChoicesContainer.style.display = 'block';
+                    noSpecificDocumentsMessageP.style.display = 'none';
+                    mainDocumentData.contained_documents.forEach(doc => {
+                        const li = document.createElement('li');
+                        const button = document.createElement('button');
+                        button.className = 'choice-button secondary';
+                        button.textContent = doc.title || 'Untitled Article';
+                        button.dataset.docId = doc.doc_id;
+                        button.dataset.docTitle = doc.title || 'Untitled Article';
+                        button.onclick = () => {
+                            openAccessRequestModal(doc.doc_id, doc.title || 'Untitled Article');
+                            closeModal(requestChoiceModal);
+                        };
+                        li.appendChild(button);
+                        specificDocumentListUL.appendChild(li);
+                    });
+                } else {
+                    specificDocumentChoicesContainer.style.display = 'none';
+                    noSpecificDocumentsMessageP.style.display = 'block';
+                }
+                openModal(requestChoiceModal);
+            }
+
+            if (floatingRequestButton) {
+                floatingRequestButton.addEventListener('click', () => {
+                    // Only open choice modal if not in pending state
+                    if (!floatingRequestButton.classList.contains('status-pending')) {
+                        openRequestChoiceModal();
+                    }
+                });
+            }
+
+            if(closeChoiceModalButton) closeChoiceModalButton.addEventListener('click', () => closeModal(requestChoiceModal));
+            if(requestCompilationButton && mainDocumentData) {
+                requestCompilationButton.onclick = () => { // Ensure mainDocumentData is available
+                    if (mainDocumentData && mainDocumentData.doc_id) {
+                        openAccessRequestModal(mainDocumentData.doc_id, mainDocumentData.title || 'Main Collection');
+                        closeModal(requestChoiceModal);
+                    } else {
+                        showGeneralMessage("Collection details not available for request.", true);
+                        closeModal(requestChoiceModal);
+                    }
+                };
+            }
+
+
+            reasonTags.forEach(tag => {
+                tag.addEventListener('click', () => {
+                    const reason = tag.dataset.reason;
+                    tag.classList.toggle('selected');
+                    if (tag.classList.contains('selected')) {
+                        if (!selectedReasons.includes(reason)) selectedReasons.push(reason);
+                    } else {
+                        selectedReasons = selectedReasons.filter(r => r !== reason);
+                    }
+                    if(reasonTagsContainer) reasonTagsContainer.classList.remove('highlight-error');
+                    if(reasonErrorElement) reasonErrorElement.style.display = 'none';
+
+                    if (reasonDescriptionSection) {
+                        if (selectedReasons.includes('Other')) {
+                            reasonDescriptionSection.classList.remove('reason-description-hidden');
+                            void reasonDescriptionSection.offsetWidth;
+                            reasonDescriptionSection.style.maxHeight = (reasonDescription ? reasonDescription.scrollHeight : 100) + 'px';
+                            reasonDescriptionSection.style.opacity = '1';
+                            if(reasonDescriptionLabel) reasonDescriptionLabel.textContent = 'Please specify "Other" reason:';
+                        } else {
+                            reasonDescriptionSection.style.maxHeight = '0';
+                            reasonDescriptionSection.style.opacity = '0';
+                            setTimeout(() => {
+                                reasonDescriptionSection.classList.add('reason-description-hidden');
+                                if(reasonDescription) reasonDescription.value = '';
+                                if(reasonDescriptionLabel) reasonDescriptionLabel.textContent = 'Reason Details:';
+                            }, 400);
+                        }
+                    }
+                });
+            });
+
+            if (accessForm) {
+                accessForm.addEventListener('submit', (event) => {
+                    event.preventDefault();
+                    if (selectedReasons.length === 0) {
+                        if(reasonTagsContainer) reasonTagsContainer.classList.add('highlight-error');
+                        if(reasonErrorElement) reasonErrorElement.style.display = 'block';
+                        return;
+                    }
+                    if (selectedReasons.includes('Other') && reasonDescription && reasonDescription.value.trim() === '') {
+                         showGeneralMessage("Please provide details for your 'Other' reason.", true);
+                         if(reasonDescription) reasonDescription.focus(); return;
+                    }
+                    if (!consentCheckbox || !consentCheckbox.checked) {
+                        showGeneralMessage("Please agree to the Terms and Conditions.", true); return;
+                    }
+
+                    const formData = {
+                        docId: requestedDocIdInput.value, // This is the ID of the item being requested
+                        docTitle: requestedDocTitleInput.value,
+                        fullName: document.getElementById('full_name').value,
+                        email: document.getElementById('email').value,
+                        affiliation: document.getElementById('affiliation').value,
+                        reasons: selectedReasons,
+                        reasonDetails: reasonDescription ? reasonDescription.value : ''
+                     };
+                    console.log("Access Request For:", formData);
+
+                    // Store pending status for the main document if the request was for the main document
+                    // OR if the request was for any document originating from the floating button workflow.
+                    // For simplicity, we'll tie the floating button's pending state to the main document's ID.
+                    if (mainDocumentData.doc_id) { // Check if mainDocumentData and its doc_id exist
+                        if (formData.docId === mainDocumentData.doc_id) { // Only set pending for main document requests
+                             localStorage.setItem('requestStatus_' + mainDocumentData.doc_id, 'pending');
+                             updateFloatingButtonDisplay(); // Update the FAB to "Request Pending"
+                        }
+                    }
+
+
+                    if(receiptNumberElement) receiptNumberElement.textContent = 'REQ-' + Date.now();
+                    if(receiptDocTitleElement) receiptDocTitleElement.textContent = formData.docTitle;
+                    const emailInfo = getEmailServiceInfo(formData.email.toLowerCase());
+                    if(emailServiceLink) {
+                        emailServiceLink.href = emailInfo.url;
+                        emailServiceLink.textContent = `Open ${emailInfo.name}`;
+                    }
+                    if(formSection) formSection.classList.add('modal-section-hidden');
+                    if(receiptSection) receiptSection.classList.remove('modal-section-hidden');
+                });
+            }
+
+            function getEmailServiceInfo(email) {
+                const domain = email.substring(email.lastIndexOf('@') + 1).toLowerCase();
+                let url = '#', name = 'Email Service';
+                if (domain === 'gmail.com') { url = 'https://mail.google.com/'; name = 'Gmail'; }
+                else if (['yahoo.com', 'ymail.com'].includes(domain)) { url = 'https://mail.yahoo.com/'; name = 'Yahoo Mail'; }
+                else if (['outlook.com', 'hotmail.com', 'live.com'].includes(domain)) { url = 'https://outlook.live.com/'; name = 'Outlook Mail'; }
+                else { name = `Email (${domain})`;}
+                return { url, name };
+            }
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    if (requestChoiceModal && requestChoiceModal.classList.contains('visible')) closeModal(requestChoiceModal);
+                    else if (accessModal && accessModal.classList.contains('visible')) closeModal(accessModal);
+                    else if (termsModal && termsModal.classList.contains('visible')) closeModal(termsModal);
+                    else if (messageBoxOverlay && messageBoxOverlay.classList.contains('visible')) hideGeneralMessage();
+                }
+            });
+
+            function searchByKeyword(keyword) { showGeneralMessage(`Search: Keyword "${keyword}"`); }
+            function searchByAuthor(author) { showGeneralMessage(`Search: Author "${author}"`); }
+
+            loadDocumentData(4);
+            const yearElement = document.getElementById('footerCurrentYear');
+            if (yearElement) yearElement.textContent = new Date().getFullYear();
+        });
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Profile</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+    <style>
+        :root {
+            --theme-gold: #FDB813;
+            --theme-gold-darker: #EAA10F;
+            --theme-gold-darkest: #D48F0D;
+            --theme-gold-light-bg: rgba(253, 184, 19, 0.2);
+            --theme-gold-lighter-bg: rgba(253, 184, 19, 0.1);
+            --theme-green-dark: #006A4E;
+            --theme-green-darker-text: #00523D;
+            --theme-green-light-bg: rgba(0, 106, 78, 0.3);
+            --theme-green-lighter-bg: rgba(0, 106, 78, 0.15);
+            --theme-green-border: rgba(0, 106, 78, 0.7);
+            --pastel-gold: #FFF5CC;
+            --pastel-green: #D0EAD0; 
+            --neutral-border-color: #e5e7eb; 
+            --input-border-color: #d1d5db; 
+            --placeholder-text-color: #9ca3af; 
+            --off-white-text: #F5F5F5;
+            --card-shadow-color: rgba(0, 106, 78, 0.08); 
+            --card-shadow-hover-color: rgba(0, 106, 78, 0.12);
+            --muted-text-color: #6b7280; /* Tailwind gray-500 */
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-image: linear-gradient(to bottom right, #fdfae8, #e6f4ea);
+            color: #1f2937; 
+        }
+        .profile-card {
+            background-color: #ffffff;
+            border-radius: 0.75rem; 
+            box-shadow: 0 4px 6px -1px var(--card-shadow-color), 0 2px 4px -2px var(--card-shadow-color), 0 0 0 1px var(--neutral-border-color);
+            transition: box-shadow 0.3s ease-in-out;
+        }
+        .profile-card:hover {
+             box-shadow: 0 10px 15px -3px var(--card-shadow-hover-color), 0 4px 6px -2px var(--card-shadow-hover-color), 0 0 0 1px var(--theme-green-border);
+        }
+        .image-preview-container {
+            width: 150px; height: 150px; border-radius: 50%;
+            overflow: hidden; margin-bottom: 0.75rem; 
+            border: 4px solid var(--theme-gold); 
+            box-shadow: 0 5px 12px -2px rgba(253, 184, 19, 0.3), 0 3px 7px -3px rgba(253, 184, 19, 0.2); 
+            background-color: #f3f4f6; position: relative; cursor: pointer; 
+        }
+        #profilePicturePreview {
+            display: block; width: 100%; height: 100%;
+            object-fit: cover; transition: filter 0.3s ease, transform 0.3s ease; 
+        }
+        .image-preview-container:hover #profilePicturePreview {
+            filter: brightness(0.75); transform: scale(1.05); 
+        }
+        .edit-picture-hover-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.5); color: white;
+            display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; text-align: center;
+            opacity: 0; visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+            border-radius: 50%; z-index: 5; cursor: pointer; 
+        }
+        .image-preview-container:hover .edit-picture-hover-overlay {
+            opacity: 1; visibility: visible; transition-delay: 0s; 
+        }
+        .edit-picture-hover-overlay i { font-size: 1.75rem; margin-bottom: 0.375rem; }
+        .edit-picture-hover-overlay span { font-size: 0.9375rem; font-weight: 500; }
+        .profile-info-text {
+            font-size: 0.875rem; color: var(--muted-text-color);
+            text-align: center; line-height: 1.4;
+            user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; 
+        }
+        .profile-info-text strong { color: var(--theme-green-darker-text); font-weight: 500; }
+
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.65); 
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000; opacity: 0; visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+        }
+        .modal-overlay.active { opacity: 1; visibility: visible; transition: opacity 0.3s ease; }
+        .modal-content {
+            background-color: white; border-radius: 0.75rem; 
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2), 0 8px 10px -6px rgba(0,0,0,0.1);
+            width: 90%; max-width: 600px; /* Slightly wider modal for preview */
+            text-align: left; overflow: hidden; 
+        }
+        .modal-header {
+            background-color: var(--pastel-green); padding: 1rem 1.25rem; 
+            border-bottom: 1px solid var(--neutral-border-color);
+        }
+        .modal-title {
+            font-size: 1.25rem; font-weight: 600; 
+            color: var(--theme-green-darker-text); text-align: center;
+        }
+        .modal-body { 
+            padding: 1.25rem; 
+            display: flex; /* Use flexbox for side-by-side layout */
+            gap: 1.25rem; /* Space between cropper and preview */
+            align-items: flex-start; /* Align items at the top */
+        }
+        #cropperImageModalContainer { 
+            flex: 1; /* Allow cropper container to take available space */
+            /* Max height removed, let it size naturally within flex */
+            /* max-height: 350px;  */
+            margin-bottom: 0; /* Removed bottom margin */
+            overflow: hidden; background-color: #e9ecef; 
+            border-radius: 0.375rem; border: 1px solid var(--input-border-color);
+        }
+        #cropperImageModalContainer img { display: block; max-width: 100%; }
+
+        /* Live Preview Area in Modal */
+        .modal-preview-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 150px; /* Fixed width matching the final preview */
+            flex-shrink: 0; /* Prevent preview area from shrinking */
+        }
+        #liveCropPreview {
+            width: 150px; 
+            height: 150px; 
+            border-radius: 50%; 
+            background-color: #f0f0f0; /* Placeholder background */
+            margin-bottom: 0.75rem; /* Space below preview */
+            overflow: hidden; /* Ensure background image is clipped */
+            background-size: cover; /* Scale the background image */
+            background-position: center center;
+            background-repeat: no-repeat;
+            border: 2px solid var(--theme-green-border); /* Add a border */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .modal-preview-area p {
+            font-size: 0.8rem;
+            color: var(--muted-text-color);
+            text-align: center;
+        }
+
+        .modal-actions {
+            margin-top: 0; padding: 1rem 1.25rem; /* Adjusted padding */
+            display: flex; justify-content: flex-end; gap: 0.75rem; 
+            border-top: 1px solid var(--neutral-border-color); 
+        }
+        .crop-action-button { 
+            font-size: 0.875rem; padding: 0.625rem 1.25rem; border-radius: 0.375rem; 
+            cursor: pointer; transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+            border: 1px solid transparent; display: inline-flex; align-items: center; font-weight: 500;
+        }
+        .crop-action-button.apply {
+            background-color: var(--theme-green-dark); color: var(--off-white-text);
+            border-color: var(--theme-green-darker-text);
+        }
+        .crop-action-button.apply:hover { background-color: var(--theme-green-darker-text); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .crop-action-button.cancel {
+            background-color: #f8f9fa; color: #4b5563; 
+            border-color: var(--input-border-color);
+        }
+        .crop-action-button.cancel:hover { background-color: #f3f4f6; border-color: #9ca3af; }
+        .crop-action-button i { margin-right: 0.375rem; }
+
+        input[type="file"] { display: none; }
+        .form-input { 
+            margin-top: 0.25rem; display: block; width: 100%;
+            padding: 0.625rem 0.875rem; font-size: 0.875rem;
+            border: 1px solid var(--input-border-color); border-radius: 0.375rem;
+            background-color: #f9fafb; transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            color: var(--theme-green-darker-text);
+        }
+        .form-input:focus {
+            outline: none; border-color: var(--theme-gold);
+            box-shadow: 0 0 0 3px var(--theme-gold-lighter-bg), inset 0 1px 2px rgba(0,0,0,0.075); 
+            background-color: white;
+        }
+        .input-icon-wrapper { position: relative; }
+        .input-icon { 
+            position: absolute; top: 50%; right: 0.75rem; 
+            transform: translateY(-50%); color: var(--placeholder-text-color); 
+        }
+        .password-toggle-icon {
+             position: absolute; top: 50%; right: 0.75rem; 
+             transform: translateY(-50%); color: var(--placeholder-text-color); 
+             cursor: pointer; padding: 0.25rem; 
+        }
+        .password-toggle-icon:hover { color: var(--theme-green-dark); }
+
+        .save-changes-button {
+            background-image: linear-gradient(to right, var(--theme-gold) 0%, var(--theme-gold-darker) 50%, var(--theme-gold) 100%);
+            background-size: 200% auto; color: var(--off-white-text);
+            padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 600;
+            font-size: 0.9375rem; line-height: 1.375rem;
+            transition: background-position 0.4s ease-out, color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+            border: none; display: inline-flex; align-items: center; justify-content: center;
+            cursor: pointer; box-shadow: 0 2px 5px rgba(228, 152, 15, 0.2), 0 1px 3px rgba(0,0,0,0.08); 
+            animation: moveGradient 4s linear infinite;
+        }
+        @keyframes moveGradient { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        .save-changes-button:hover {
+            background-position: right center; color: var(--off-white-text);
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 4px 10px rgba(234, 161, 15, 0.3), 0 2px 6px rgba(234, 161, 15, 0.2);
+        }
+        .save-changes-button:active {
+            transform: translateY(0px) scale(0.98);
+            background-image: linear-gradient(to right, var(--theme-gold-darker) 0%, var(--theme-gold-darkest) 50%, var(--theme-gold-darker) 100%);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        .save-changes-button:focus-visible { 
+            outline: none; box-shadow: 0 0 0 3px var(--theme-gold-light-bg), 0 4px 10px rgba(234, 161, 15, 0.3);
+        }
+        .save-changes-button i { margin-right: 0.5rem; }
+        .message-box {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            padding: 1rem 1.5rem; border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            z-index: 1001; opacity: 0;
+            transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+            pointer-events: none; font-weight: 500;
+        }
+        .message-box.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+        .message-box.success {
+            background-color: var(--pastel-green); color: var(--theme-green-darker-text);
+            border: 1px solid var(--theme-green-dark);
+        }
+        .message-box.error {
+            background-color: var(--pastel-gold); color: var(--theme-gold-darkest);
+            border: 1px solid var(--theme-gold-darker);
+        }
+        .form-label {
+            display: block; font-size: 0.875rem; font-weight: 600;
+            color: var(--theme-green-darker-text); margin-bottom: 0.375rem; 
+        }
+        .page-title {
+            font-size: 1.875rem; font-weight: 700; color: var(--theme-green-dark); 
+            margin-bottom: 2rem; text-align: center;
+            text-shadow: 1px 1px 2px rgba(0, 106, 78, 0.1); 
+        }
+         @media (min-width: 640px) { .page-title { font-size: 2.25rem; margin-bottom: 2.5rem; } }
+        .hidden { display: none !important; }
+        #newPasswordFieldsContainer {
+            overflow: hidden;
+            transition: max-height 0.4s ease-out, opacity 0.3s ease-out, margin-top 0.4s ease-out;
+            max-height: 0; opacity: 0; margin-top: 0 !important; 
+        }
+        #newPasswordFieldsContainer.visible {
+            max-height: 300px; opacity: 1; margin-top: 1.5rem !important; 
+        }
+        .cropper-view-box, .cropper-face { border-radius: 50%; }
+        #cropperImageInModal.cropper-hidden { max-width: 100%; max-height: 350px; }
+        hr { border: none; height: 1px; background-color: var(--neutral-border-color); margin: 1.5rem 0; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js" defer></script>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4 sm:p-6 md:p-8">
+
+    <div class="profile-card p-6 sm:p-8 md:p-10 w-full max-w-xl">
+        <h1 class="page-title">User Profile</h1>
+
+        <div class="flex flex-col items-center mb-6"> 
+            <div class="image-preview-container">
+                <img id="profilePicturePreview" 
+                     src="https://placehold.co/150x150/A0AEC0/FFFFFF?text=AP" 
+                     alt="Profile Picture"
+                     onerror="this.onerror=null; this.src='https://placehold.co/150x150/A0AEC0/FFFFFF?text=Error';">
+                <label for="profilePictureInput" class="edit-picture-hover-overlay" title="Change profile picture">
+                    <i class="fas fa-pencil-alt"></i>
+                    <span>Edit</span>
+                </label>
+            </div>
+            <input type="file" id="profilePictureInput" accept="image/*">
+
+            <div class="mt-2 text-center space-y-1"> 
+                <p id="displayUserId" class="profile-info-text">
+                    <strong>ID:</strong> <span>USER12345XYZ</span>
+                </p>
+                <p id="displayEmail" class="profile-info-text">
+                    <strong>Email:</strong> <span>user.email@example.com</span>
+                </p>
+            </div>
+        </div>
+
+        <hr /> 
+
+        <form id="profileForm" class="space-y-6 mt-6"> 
+            <div>
+                <label for="username" class="form-label">Username</label>
+                <div class="input-icon-wrapper">
+                    <input type="text" id="username" name="username" class="form-input" value="current_username">
+                    <span class="input-icon"><i class="fas fa-pencil-alt"></i></span>
+                </div>
+            </div>
+
+            <div>
+                <label for="currentPassword" class="form-label">Current Password</label>
+                <div class="input-icon-wrapper">
+                    <input type="password" id="currentPassword" name="currentPassword" class="form-input" placeholder="Enter current password to change">
+                     <span class="password-toggle-icon" onclick="togglePasswordVisibility('currentPassword', this)"><i class="fas fa-eye"></i></span>
+                </div>
+            </div>
+            
+            <div id="newPasswordFieldsContainer"> 
+                <div class="space-y-6"> 
+                    <div>
+                        <label for="newPassword" class="form-label">New Password</label>
+                         <div class="input-icon-wrapper">
+                            <input type="password" id="newPassword" name="newPassword" class="form-input" placeholder="Enter new password">
+                            <span class="password-toggle-icon" onclick="togglePasswordVisibility('newPassword', this)"><i class="fas fa-eye"></i></span>
+                        </div>
+                    </div>
+                     <div>
+                        <label for="confirmPassword" class="form-label">Confirm New Password</label>
+                         <div class="input-icon-wrapper">
+                            <input type="password" id="confirmPassword" name="confirmPassword" class="form-input" placeholder="Confirm new password">
+                             <span class="password-toggle-icon" onclick="togglePasswordVisibility('confirmPassword', this)"><i class="fas fa-eye"></i></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="pt-6"> 
+                <button type="submit" class="w-full save-changes-button">
+                    <i class="fas fa-save"></i>Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div id="cropModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                 <h3 class="modal-title">Edit Profile Picture</h3>
+            </div>
+            <div class="modal-body">
+                <div id="cropperImageModalContainer">
+                    <img id="cropperImageInModal" src="#" alt="Image to crop">
+                </div>
+                <div class="modal-preview-area">
+                    <div id="liveCropPreview"></div>
+                    <p>Live Preview</p>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="cancelCropModalButton" class="crop-action-button cancel">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button id="applyCropModalButton" class="crop-action-button apply">
+                    <i class="fas fa-check"></i> Apply Crop
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="messageBox" class="message-box">
+        <span id="messageText"></span>
+    </div>
+
+    <script>
+        // --- Constants ---
+        const DEFAULT_PROFILE_PICTURE_URL = "https://placehold.co/150x150/A0AEC0/FFFFFF?text=AP";
+        const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024; 
+        const WEBP_OUTPUT_QUALITY = 0.8; 
+        const CROPPED_IMAGE_SIZE = 150; 
+
+        // --- DOM Elements ---
+        const profilePicturePreview = document.getElementById('profilePicturePreview'); 
+        const profilePictureInput = document.getElementById('profilePictureInput'); 
+        const profileForm = document.getElementById('profileForm');
+        const usernameInput = document.getElementById('username');
+        const displayUserId = document.getElementById('displayUserId').querySelector('span'); 
+        const displayEmail = document.getElementById('displayEmail').querySelector('span'); 
+        const currentPasswordInput = document.getElementById('currentPassword');
+        const newPasswordInput = document.getElementById('newPassword');
+        const confirmPasswordInput = document.getElementById('confirmPassword');
+        const newPasswordFieldsContainer = document.getElementById('newPasswordFieldsContainer'); 
+        const messageBox = document.getElementById('messageBox');
+        const messageText = document.getElementById('messageText');
+        const cropModal = document.getElementById('cropModal'); 
+        const cropperImageInModal = document.getElementById('cropperImageInModal'); 
+        const applyCropModalButton = document.getElementById('applyCropModalButton');
+        const cancelCropModalButton = document.getElementById('cancelCropModalButton');
+        const liveCropPreview = document.getElementById('liveCropPreview'); // Live preview element
+
+        // --- State ---
+        let cropper = null; 
+        let newProfilePicDataUrl = null; 
+
+        // --- Simulated User Data ---
+        let currentUserData = {
+            username: "ArchivistPro", userId: "ARCHSYS-007", email: "archivist.pro@system.local", 
+            profilePictureUrl: DEFAULT_PROFILE_PICTURE_URL 
+        };
+
+        // --- Core Functions ---
+
+        function loadUserData() {
+            usernameInput.value = currentUserData.username;
+            displayUserId.textContent = currentUserData.userId;
+            displayEmail.textContent = currentUserData.email;
+            profilePicturePreview.src = currentUserData.profilePictureUrl || DEFAULT_PROFILE_PICTURE_URL;
+            newProfilePicDataUrl = null; 
+            currentPasswordInput.value = '';
+            newPasswordInput.value = '';
+            confirmPasswordInput.value = '';
+            newPasswordFieldsContainer.classList.remove('visible'); 
+        }
+
+        function showMessage(message, type = 'success') {
+            messageText.textContent = message;
+            messageBox.className = `message-box ${type} show`; 
+            setTimeout(() => messageBox.classList.remove('show'), 3000);
+        }
+
+        function openCropModal() {
+            cropModal.classList.add('active');
+            document.body.style.overflow = 'hidden'; 
+        }
+
+        function closeCropModal() {
+            cropModal.classList.remove('active');
+            if (cropper) { cropper.destroy(); cropper = null; }
+            profilePictureInput.value = ''; 
+            document.body.style.overflow = ''; 
+            liveCropPreview.style.backgroundImage = 'none'; // Clear live preview on close
+        }
+
+        function togglePasswordVisibility(fieldId, toggleButton) {
+            const passwordInput = document.getElementById(fieldId);
+            const icon = toggleButton.querySelector('i');
+            if (passwordInput.type === "password") {
+                passwordInput.type = "text";
+                icon.classList.replace("fa-eye", "fa-eye-slash");
+            } else {
+                passwordInput.type = "password";
+                icon.classList.replace("fa-eye-slash", "fa-eye");
+            }
+        }
+
+        function dataURLtoBlob(dataUrl) {
+            try {
+                const arr = dataUrl.split(',');
+                if (arr.length < 2) return null;
+                const mimeMatch = arr[0].match(/:(.*?);/);
+                if (!mimeMatch || mimeMatch.length < 2) return null;
+                const mime = mimeMatch[1];
+                const bstr = atob(arr[1]);
+                let n = bstr.length;
+                const u8arr = new Uint8Array(n);
+                while (n--) { u8arr[n] = bstr.charCodeAt(n); }
+                return new Blob([u8arr], { type: mime });
+            } catch (e) { console.error("Error converting data URL to Blob:", e); return null; }
+        }
+
+        // --- Event Listeners ---
+
+        profilePictureInput.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                if (!file.type.startsWith('image/')) { showMessage('Please select a valid image file.', 'error'); profilePictureInput.value = ''; return; }
+                if (file.size > MAX_FILE_SIZE_BYTES) { showMessage(`Image size max ${MAX_FILE_SIZE_BYTES / 1024 / 1024}MB.`, 'error'); profilePictureInput.value = ''; return; }
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    cropperImageInModal.src = e.target.result; 
+                    openCropModal(); 
+                    if (cropper) cropper.destroy();
+                    
+                    cropper = new Cropper(cropperImageInModal, {
+                        aspectRatio: 1 / 1, viewMode: 1, dragMode: 'move', background: true, 
+                        autoCropArea: 0.8, responsive: true, modal: false, guides: false, // Hide guides for cleaner look maybe?
+                        center: false, highlight: false, // Simplify visual elements
+                        cropBoxMovable: true, cropBoxResizable: true,
+                        toggleDragModeOnDblclick: false,
+                        // Add the 'crop' event listener for live preview
+                        crop: function(event) {
+                            if (!liveCropPreview) return;
+                            const canvas = this.cropper.getCroppedCanvas({
+                                width: CROPPED_IMAGE_SIZE, // Preview size
+                                height: CROPPED_IMAGE_SIZE,
+                                imageSmoothingEnabled: false // Faster preview rendering
+                            });
+                            if (canvas) {
+                                // Update the background of the preview div
+                                liveCropPreview.style.backgroundImage = `url(${canvas.toDataURL()})`;
+                            }
+                        }
+                    });
+                };
+                reader.onerror = () => { showMessage('Error reading file.', 'error'); profilePictureInput.value = ''; };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        applyCropModalButton.addEventListener('click', function() {
+            if (!cropper) return; 
+
+            const croppedCanvas = cropper.getCroppedCanvas({
+                width: CROPPED_IMAGE_SIZE, height: CROPPED_IMAGE_SIZE, 
+                imageSmoothingEnabled: true, imageSmoothingQuality: 'high',
+            });
+
+            if (croppedCanvas) {
+                try {
+                    newProfilePicDataUrl = croppedCanvas.toDataURL('image/webp', WEBP_OUTPUT_QUALITY);
+                    profilePicturePreview.src = newProfilePicDataUrl; 
+                    showMessage('Crop applied. Click "Save Changes" to update.', 'success');
+                } catch (error) {
+                    console.error("WebP conversion error:", error);
+                    showMessage('Could not convert to WebP. Using PNG.', 'error');
+                    newProfilePicDataUrl = croppedCanvas.toDataURL('image/png');
+                    profilePicturePreview.src = newProfilePicDataUrl; 
+                }
+            } else { showMessage('Could not get cropped image.', 'error'); }
+            closeCropModal(); 
+        });
+
+        cancelCropModalButton.addEventListener('click', closeCropModal);
+        cropModal.addEventListener('click', (event) => { if (event.target === cropModal) closeCropModal(); });
+
+        currentPasswordInput.addEventListener('input', function() {
+            if (currentPasswordInput.value.length > 0) {
+                newPasswordFieldsContainer.classList.add('visible');
+            } else {
+                newPasswordFieldsContainer.classList.remove('visible');
+                newPasswordInput.value = '';
+                confirmPasswordInput.value = '';
+            }
+        });
+
+        profileForm.addEventListener('submit', async function(event) { 
+            event.preventDefault(); 
+            const newUsername = usernameInput.value.trim();
+            const currentPassword = currentPasswordInput.value; 
+            const newPassword = newPasswordInput.value;
+            const confirmPassword = confirmPasswordInput.value;
+
+            // Validation
+            if (!newUsername) { showMessage('Username cannot be empty.', 'error'); usernameInput.focus(); return; }
+            if (newUsername.length < 3) { showMessage('Username must be at least 3 characters.', 'error'); usernameInput.focus(); return; }
+            if (newUsername.length > 50) { showMessage('Username cannot exceed 50 characters.', 'error'); usernameInput.focus(); return; }
+
+            const isChangingPassword = newPasswordFieldsContainer.classList.contains('visible') && (newPassword || confirmPassword);
+            
+            if (isChangingPassword) {
+                if (!currentPassword) { showMessage('Please enter current password to change it.', 'error'); currentPasswordInput.focus(); return; }
+                if (newPassword.length < 8) { showMessage('New password must be at least 8 characters.', 'error'); newPasswordInput.focus(); return; }
+                if (newPassword !== confirmPassword) { showMessage('New passwords do not match.', 'error'); confirmPasswordInput.focus(); return; }
+            } else if (currentPassword && !newPassword && !confirmPassword) {
+                 // Ignore if current pw entered but new/confirm are empty
+            }
+
+            // Prepare data for backend
+            const formData = new FormData();
+            formData.append('username', newUsername);
+            if (isChangingPassword) {
+                formData.append('currentPassword', currentPassword);
+                formData.append('newPassword', newPassword);
+            }
+            if (newProfilePicDataUrl) {
+                 const imageBlob = dataURLtoBlob(newProfilePicDataUrl);
+                 if (imageBlob) formData.append('profilePicture', imageBlob, 'profile.webp'); 
+            }
+            
+            // Send Data to Backend (Replace with actual fetch)
+            console.log('Simulating sending FormData to backend...');
+            try {
+                // const response = await fetch('/api/profile', { method: 'PUT', body: formData });
+                // if (response.ok) {
+                    // Simulate Success
+                    showMessage('Profile updated successfully!', 'success');
+                    currentUserData.username = newUsername; 
+                    if (newProfilePicDataUrl) currentUserData.profilePictureUrl = newProfilePicDataUrl; 
+                    newProfilePicDataUrl = null; 
+                    currentPasswordInput.value = ''; 
+                    newPasswordInput.value = '';
+                    confirmPasswordInput.value = '';
+                    newPasswordFieldsContainer.classList.remove('visible'); 
+                    console.log('Updated local currentUserData:', currentUserData);
+                // } else { /* Handle backend errors */ }
+            } catch (error) { showMessage('An error occurred while updating.', 'error'); }
+        });
+        
+        // --- Initial Page Load ---
+        window.onload = function() {
+            loadUserData(); 
+            profilePicturePreview.onerror = function() {
+                this.onerror = null; 
+                this.src = DEFAULT_PROFILE_PICTURE_URL.replace('AP', 'Error'); 
+                console.error("Main profile image failed to load. Reverted to error placeholder.");
+            };
+        };
+    </script>
+</body>
+</html>

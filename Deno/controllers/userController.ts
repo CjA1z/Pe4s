@@ -7,10 +7,8 @@ interface User {
   middle_name?: string;
   last_name: string;
   email?: string;
-  username?: string;
-  role?: string;
+  role_id?: number;
   created_at?: Date;
-  updated_at?: Date;
 }
 
 /**
@@ -32,9 +30,9 @@ export const getCurrentUser = async (ctx: Context) => {
     }
     
     const result = await client.queryObject(
-      `SELECT id, first_name, middle_name, last_name, email, username, role, created_at, updated_at
+      `SELECT id, first_name, middle_name, last_name, email, role_id, created_at
        FROM users 
-       WHERE id = $1 AND deleted_at IS NULL`,
+       WHERE id = $1`,
       [userId]
     );
     
@@ -78,9 +76,9 @@ export const getUserById = async (ctx: Context) => {
     }
     
     const result = await client.queryObject(
-      `SELECT id, first_name, middle_name, last_name, email, username, role, created_at, updated_at
+      `SELECT id, first_name, middle_name, last_name, email, role_id, created_at
        FROM users 
-       WHERE id = $1 AND deleted_at IS NULL`,
+       WHERE id = $1`,
       [id]
     );
     
@@ -111,28 +109,11 @@ export const getUserById = async (ctx: Context) => {
  */
 export const handleGetUserProfile = async (req: Request): Promise<Response> => {
   try {
-    // In a production app, extract user ID from auth token or session
-    // For testing purposes, we'll support a query parameter
+    // Extract user ID from query parameters
     const url = new URL(req.url);
     const userId = url.searchParams.get("userId");
     
     if (!userId) {
-      // For testing/development, if no userId provided, return a mock user
-      if (url.searchParams.get("mock") === "true") {
-        return new Response(JSON.stringify({
-          id: "mock-user-id",
-          first_name: "Maria",
-          middle_name: "Santos",
-          last_name: "Garcia",
-          email: "maria.garcia@example.com",
-          username: "mgarcia",
-          role: "user"
-        }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" }
-        });
-      }
-      
       return new Response(JSON.stringify({ 
         error: "User not authenticated" 
       }), {
@@ -142,9 +123,9 @@ export const handleGetUserProfile = async (req: Request): Promise<Response> => {
     }
     
     const result = await client.queryObject(
-      `SELECT id, first_name, middle_name, last_name, email, username, role, created_at, updated_at
+      `SELECT id, first_name, middle_name, last_name, email, role_id, created_at
        FROM users 
-       WHERE id = $1 AND deleted_at IS NULL`,
+       WHERE id = $1`,
       [userId]
     );
     

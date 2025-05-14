@@ -99,7 +99,7 @@
         html {
             height: 100%;
             margin: 0;
-            cursor: url('peas.ico'), auto; /* Custom cursor for the whole page */
+            cursor: url('/components/images/peas-ico.png'), auto; /* Custom cursor for the whole page */
             scroll-behavior: smooth; /* Add smooth scrolling */
         }
 
@@ -639,8 +639,8 @@
                                 <div class="carousel-item absolute inset-0 opacity-0 scale-95 p-1 rounded-[2rem] overflow-hidden">
                                     <img src="/components/images/1.jpg" class="block w-full h-full object-cover" alt="Research Initiative Photo 1" onerror="this.onerror=null;this.src='https://placehold.co/800x600/e2e8f0/94a3b8?text=Image+1+Not+Found';">
                                 </div>
-                                <div class="/components/images/carousel-item absolute inset-0 opacity-0 scale-95 p-1 rounded-[2rem] overflow-hidden">
-                                    <img src="2.jpg" class="block w-full h-full object-cover" alt="Research Initiative Photo 2" onerror="this.onerror=null;this.src='https://placehold.co/800x600/e2e8f0/94a3b8?text=Image+2+Not+Found';">
+                                <div class="carousel-item absolute inset-0 opacity-0 scale-95 p-1 rounded-[2rem] overflow-hidden">
+                                    <img src="/components/images/2.jpg" class="block w-full h-full object-cover" alt="Research Initiative Photo 2" onerror="this.onerror=null;this.src='https://placehold.co/800x600/e2e8f0/94a3b8?text=Image+2+Not+Found';">
                                 </div>
                                 <div class="carousel-item absolute inset-0 opacity-0 scale-95 p-1 rounded-[2rem] overflow-hidden">
                                     <img src="/components/images/3.jpg" class="block w-full h-full object-cover" alt="Research Initiative Photo 3" onerror="this.onerror=null;this.src='https://placehold.co/800x600/e2e8f0/94a3b8?text=Image+3+Not+Found';">
@@ -1017,6 +1017,12 @@
             }
             
             // Record page visit for the home page
+            if (typeof recordPageVisit !== 'function') {
+                // Define a placeholder if the function doesn't exist
+                window.recordPageVisit = function() {
+                    console.log('Page visit recording is not implemented yet');
+                };
+            }
             recordPageVisit();
         });
     </script>

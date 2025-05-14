@@ -532,7 +532,7 @@
                     csvContent += `Uploaded Documents,${documentStats.uploaded},${timeRange}\r\n`;
                     csvContent += `Active Documents,${documentStats.active},${timeRange}\r\n`;
                     csvContent += `Archived Documents,${documentStats.archived},${timeRange}\r\n`;
-                    
+            
                     // Create download link
             const encodedUri = encodeURI(csvContent);
             const link = document.createElement("a");
@@ -565,8 +565,8 @@
                 // If using the 'all' time range, use our main fetch function which tries all endpoints
                 if (timeRange === 'all') {
                     return await fetchDocumentStats();
-                }
-                
+        }
+        
                 // For specific time ranges, first try the simplified API
                 // (Note: This doesn't support time filtering but we'll try it anyway)
                 try {
@@ -617,9 +617,9 @@
                         console.log(`${timeRange} statistics from API:`, documentStats);
                         
                         // Update the UI
-                        updateCounts();
-                        renderStatusChart();
-                        
+            updateCounts();
+            renderStatusChart();
+
                         showMessage(`${timeRange} statistics updated`, "success");
                         return true;
                     } else {
