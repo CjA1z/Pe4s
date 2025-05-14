@@ -1,0 +1,1397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Summary</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        :root {
+            --theme-gold: #FDB813;
+            --theme-gold-darker: #EAA10F;
+            --theme-gold-light-bg: rgba(253, 184, 19, 0.2);
+            --theme-gold-lighter-bg: rgba(253, 184, 19, 0.1);
+            --theme-gold-highlight: rgba(253, 184, 19, 0.4);
+            --theme-green-dark: #006A4E;
+            --theme-green-darker-text: #00523D;
+            --theme-green-light-bg: rgba(0, 106, 78, 0.3);
+            --theme-green-lighter-bg: rgba(0, 106, 78, 0.15);
+            --theme-green-border: rgba(0, 106, 78, 0.7);
+            --theme-page-bg: #F9F6EE;
+            --neutral-border-color: #e5e7eb;
+            --input-border-color: #d1d5db;
+            --placeholder-text-color: #9ca3af;
+            --text-on-gold: #000000;
+            --text-on-green: #FFFFFF;
+            --primary-text-color: #1f2937;
+            --secondary-text-color: #4b5563;
+            --tertiary-text-color: #6b7280;
+            --theme-accent-gray: #6b7280;
+            --pastel-gold: #FFF5CC;
+            --pastel-green: #D0EAD0;
+            --footer-glass-bg-color: rgba(255, 255, 255, 0.25);
+            --footer-glass-border-color: rgba(255, 255, 255, 0.4);
+            --footer-glass-blur-radius: 6px;
+        }
+
+        html {
+            height: 100%;
+            box-sizing: border-box;
+        }
+        *, *:before, *:after {
+            box-sizing: inherit;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--theme-page-bg);
+            background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23D3CBBF' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            color: var(--primary-text-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            margin: 0;
+        }
+
+        .page-wrapper {
+            flex-grow: 1;
+            padding-top: 2.5rem;
+        }
+        @media (min-width: 768px) {
+            .page-wrapper {
+                padding-top: 4rem;
+            }
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Inter', sans-serif;
+            color: var(--primary-text-color);
+            font-weight: 600;
+            margin-top: 0;
+        }
+
+        .font-libre { font-family: 'Libre Baskerville', serif; }
+        .font-inter { font-family: 'Inter', sans-serif; }
+
+        .container {
+            width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+        @media (min-width: 640px) { .container { max-width: 640px; padding-left: 1.5rem; padding-right: 1.5rem; } }
+        @media (min-width: 768px) { .container { max-width: 768px; } }
+        @media (min-width: 1024px) { .container { max-width: 1024px; padding-left: 2rem; padding-right: 2rem; } }
+        @media (min-width: 1280px) { .container { max-width: 1280px; } }
+        @media (min-width: 1536px) { .container { max-width: 1536px; } }
+
+        .page-header {
+            position: relative;
+            overflow: hidden;
+            background-color: var(--theme-green-dark);
+            color: var(--text-on-green);
+            padding-top: 3rem;
+            padding-bottom: 3rem;
+            margin-bottom: 3rem;
+        }
+
+        @keyframes headerGradientAnimation {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .page-header::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 0;
+            background-image: linear-gradient(135deg,
+                rgba(220, 38, 38, 0.25), rgba(253, 184, 19, 0.25),
+                rgba(220, 38, 38, 0.28), rgba(253, 184, 19, 0.28));
+            background-size: 400% 400%;
+            animation: headerGradientAnimation 25s ease infinite;
+            opacity: 0.8;
+        }
+        .page-header .header-content {
+            position: relative;
+            z-index: 1;
+            text-align: left;
+        }
+        .page-header .header-content h1 {
+            color: var(--text-on-green);
+            font-weight: 700;
+            font-size: 1.875rem;
+            line-height: 1.2;
+            margin-bottom: 0.5rem;
+        }
+        .page-header .header-content p {
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 1.125rem;
+            margin-bottom: 0.25rem;
+        }
+        .page-header .header-content p:last-of-type {
+            font-size: 1rem;
+            margin-bottom: 0;
+        }
+        @media (min-width: 640px) {
+            .page-header .header-content h1 { font-size: 2.25rem; }
+            .page-header .header-content p { font-size: 1.25rem; }
+            .page-header .header-content p:last-of-type { font-size: 1.125rem; }
+        }
+        @media (min-width: 1024px) {
+            .page-header .header-content h1 { font-size: 3rem; }
+        }
+
+        .document-item-base {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            background-color: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(16px) saturate(140%);
+            -webkit-backdrop-filter: blur(16px) saturate(140%);
+            border: 1px solid rgba(229, 231, 235, 0.35);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .document-item-base:hover {
+            transform: translateY(-2px) scale(1.01);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        .document-item-base.mb-12 { margin-bottom: 3rem; }
+        @media (min-width: 640px) { .document-item-base { padding: 2rem; } }
+        @media (min-width: 1024px) { .document-item-base { padding: 2.5rem; } }
+
+        .document-item-base h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.25rem;
+            border-bottom: 1px solid var(--neutral-border-color);
+            padding-bottom: 1rem;
+        }
+        @media (min-width: 640px) { .document-item-base h2 { font-size: 1.875rem; } }
+
+        .document-item-base .abstract-text {
+            color: var(--secondary-text-color);
+            line-height: 1.625;
+            text-align: justify;
+            font-size: 1rem;
+            margin-top: 1rem;
+        }
+        @media (min-width: 640px) { .document-item-base .abstract-text { font-size: 1.125rem; } }
+        
+        .document-item-base .keywords-section {
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(var(--neutral-border-color), 0.5);
+        }
+        .document-item-base .keywords-section h3 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+        }
+        .document-item-base .keywords-container-flex {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .doc-info-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem 0;
+            font-size: 1rem;
+            margin-top: 1rem;
+        }
+        .doc-info-grid > div {
+            line-height: 1.5;
+        }
+        .doc-info-grid strong {
+            display: block;
+            margin-bottom: 0.125rem;
+            color: var(--primary-text-color);
+            font-weight: 500;
+        }
+        .doc-info-grid span, .doc-info-grid a {
+            color: var(--secondary-text-color);
+        }
+        .doc-info-grid .opacity-90 { opacity: 0.9; }
+
+        .btn {
+            padding: 0.65rem 1.25rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            text-align: center;
+            transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.3s ease, transform 0.3s ease, box-shadow 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            font-size: 0.9375rem;
+            line-height: 1.375rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            cursor: pointer;
+            text-decoration: none;
+            border: 1px solid transparent;
+        }
+        .btn:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            transform: translateY(-1px);
+        }
+        .btn-primary {
+            background-color: var(--theme-green-dark);
+            color: var(--text-on-green);
+            border-color: var(--theme-green-dark);
+        }
+        .btn-primary:hover {
+            background-color: var(--theme-green-darker-text);
+            border-color: var(--theme-green-darker-text);
+        }
+        .btn-secondary {
+            background-color: var(--theme-gold);
+            color: var(--text-on-gold);
+            border-color: var(--theme-gold);
+        }
+        .btn-secondary:hover {
+            background-color: var(--theme-gold-darker);
+            border-color: var(--theme-gold-darker);
+        }
+        .btn i, .btn svg {
+            width: 1.25rem;
+            height: 1.25rem;
+            font-size: 1em;
+        }
+
+        .clickable-meta {
+            cursor: pointer;
+            text-decoration: none;
+            color: var(--primary-text-color);
+            opacity: 0.9;
+            margin-right: 0.25rem;
+            display: inline-block;
+            transition: color 0.2s ease, text-decoration-color 0.2s ease, opacity 0.2s ease;
+        }
+        .clickable-meta:hover {
+            text-decoration: underline;
+            text-decoration-color: var(--theme-green-dark);
+            color: var(--theme-green-dark);
+            opacity: 1;
+        }
+        .clickable-author:hover {
+            color: var(--theme-green-darker-text);
+            text-decoration-color: var(--theme-green-darker-text);
+        }
+        .clickable-keyword:hover {
+            color: var(--theme-gold-darker);
+            text-decoration-color: var(--theme-gold-darker);
+        }
+
+        .floating-action-container {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            padding: 0.75rem 1rem;
+            background-color: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(10px) saturate(180%);
+            -webkit-backdrop-filter: blur(10px) saturate(180%);
+            border-radius: 0.75rem;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1), 0 4px 8px rgba(0,0,0,0.07);
+            border: 1px solid rgba(229, 231, 235, 0.4);
+            display: flex;
+            gap: 0.75rem;
+            transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.3s ease;
+            opacity: 1;
+            visibility: visible;
+        }
+        .floating-action-container.hidden {
+            opacity: 0;
+            visibility: hidden;
+            transform: translateX(-50%) translateY(10px);
+            pointer-events: none;
+        }
+
+        .tag-pill {
+            display: inline-block;
+            background-color: var(--theme-gold-light-bg);
+            color: var(--text-on-gold);
+            padding: 0.3rem 0.8rem;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+            border: 1px solid var(--theme-gold-darker);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            text-decoration: none;
+        }
+        .tag-pill:hover {
+            background-color: var(--theme-gold);
+            color: var(--text-on-gold);
+            border-color: var(--theme-gold-darker);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.07);
+        }
+
+        @keyframes subtleGradientAnimation {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .footer-wrapper {
+            margin-top: auto;
+            width: 100%;
+        }
+        .site-footer {
+            position: relative;
+            overflow: hidden;
+            background-color: var(--footer-glass-bg-color);
+            -webkit-backdrop-filter: blur(var(--footer-glass-blur-radius));
+            backdrop-filter: blur(var(--footer-glass-blur-radius));
+            border-top: 1px solid var(--footer-glass-border-color);
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+            color: #374151;
+        }
+        .site-footer::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: -1;
+            background: linear-gradient(45deg, var(--pastel-gold), var(--pastel-green), var(--pastel-gold));
+            background-size: 200% 200%;
+            animation: subtleGradientAnimation 18s ease infinite;
+            opacity: 0.7;
+        }
+        .footer-content-padding {
+            position: relative;
+            z-index: 1;
+            padding: 2rem 1.5rem;
+            max-width: 80rem;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        @media (min-width: 640px) { .footer-content-padding { padding-left: 2rem; padding-right: 2rem; } }
+        @media (min-width: 1024px) { .footer-content-padding { padding-left: 2.5rem; padding-right: 2.5rem; } }
+
+        .footer-layout {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2rem;
+            text-align: center;
+        }
+        @media (min-width: 1024px) {
+            .footer-layout {
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: flex-start;
+                text-align: left;
+            }
+        }
+
+        .footer-logo-section { flex-shrink: 0; }
+        .footer-logo-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            margin-bottom: 0.75rem;
+        }
+        @media (min-width: 640px) {
+            .footer-logo-container { align-items: flex-start; text-align: left; }
+        }
+        @media (min-width: 1024px) {
+             .footer-logo-container { align-items: flex-start; }
+        }
+        .footer-logo-container img {
+            height: 4rem;
+            width: auto;
+            margin-bottom: 0.5rem;
+        }
+        @media (min-width: 640px) { .footer-logo-container img { height: 5rem; margin-bottom: 0; } }
+
+        .footer-nav {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+        }
+        @media (min-width: 1024px) { .footer-nav { align-items: flex-start; } }
+
+        .footer-link {
+            color: var(--theme-green-dark);
+            transition: color 0.2s ease-in-out, opacity 0.2s ease-in-out;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .footer-link:hover {
+            color: var(--theme-gold);
+            opacity: 0.85;
+        }
+        .copyright-text {
+            color: #6b7280;
+            font-size: 0.75rem;
+        }
+
+        .message-box-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .message-box-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        .message-box-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            max-width: 90%;
+            width: 400px;
+            text-align: center;
+            position: relative;
+        }
+        .message-box-text {
+            font-size: 1.125rem;
+            color: var(--primary-text-color);
+            margin-bottom: 1rem;
+        }
+        .message-box-close-btn {
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+            background: transparent;
+            border: none;
+            font-size: 1.5rem;
+            line-height: 1;
+            cursor: pointer;
+            color: #9ca3af;
+            padding: 0.25rem;
+        }
+        .message-box-close-btn:hover { color: #6b7280; }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #09f;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        /* Read Later button states */
+        #read-later-btn.saved {
+            background-color: var(--theme-green-light-bg);
+            color: var(--theme-green-darker-text);
+            border-color: var(--theme-green-border);
+        }
+        #read-later-btn.saved:hover {
+            background-color: var(--theme-green-lighter-bg);
+        }
+
+    </style>
+</head>
+<body>
+    <!-- Navbar will be loaded here -->
+    <div id="navbarContainer"></div>
+
+    <div class="page-wrapper">
+
+        <header class="page-header" role="banner">
+            <div class="header-content container">
+                <h1 id="document-title-header">Loading document...</h1>
+                <p id="document-author-header-container">
+                    <a id="document-author-header" href="#" class="author-link" style="color: inherit; text-decoration: underline; cursor: pointer;">Please wait</a>
+                </p>
+                <p id="document-year-header"></p>
+            </div>
+        </header>
+
+        <div class="container">
+            <main class="document-container">
+                <!-- Loading indicator -->
+                <div id="loadingIndicator" style="display: flex; align-items: center; justify-content: center; padding: 2rem; text-align: center; width: 100%;">
+                    <div>
+                        <div class="spinner" style="border: 4px solid rgba(0, 0, 0, 0.1); width: 36px; height: 36px; border-radius: 50%; border-left-color: #09f; animation: spin 1s linear infinite; margin: 0 auto 1rem;"></div>
+                        <p>Loading document...</p>
+                    </div>
+                </div>
+                
+                <!-- Document content will be displayed here -->
+                <div id="documentContent"></div>
+            </main>
+            </div>
+
+    </div>
+
+    <div class="footer-wrapper">
+        <footer id="site-footer-element" class="site-footer" role="contentinfo">
+            <div class="footer-content-padding">
+                <div class="footer-layout">
+                    <div class="footer-logo-section">
+                        <div class="footer-logo-container">
+                            <img
+                                src="../Components/images/peas_logo.png"
+                                alt="PeAS Logo"
+                                onerror="this.onerror=null; this.src='https://placehold.co/200x80/cccccc/ffffff?text=Logo+Error';">
+                        </div>
+                        <p class="copyright-text">&copy; <span id="footerCurrentYear"></span> PeAS. All Rights Reserved.</p>
+                    </div>
+                    <nav class="footer-nav" role="navigation" aria-label="Footer Navigation">
+                        <a href="#" class="footer-link">Home</a>
+                        <a href="#" class="footer-link">Contact</a>
+                        <a href="#" class="footer-link">Terms & Conditions</a>
+                        <a href="#" class="footer-link">Privacy Policy</a>
+                    </nav>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <div id="message-box-overlay" class="message-box-overlay" aria-hidden="true">
+        <div class="message-box-content" role="alertdialog" aria-labelledby="message-box-text">
+            <button id="message-box-close" class="message-box-close-btn" aria-label="Close message">&times;</button>
+            <p id="message-box-text" class="message-box-text"></p>
+        </div>
+    </div>
+
+    <!-- Load the navbar module -->
+    <script src="/Components/js/navbar-loader.js"></script>
+    
+    <!-- Define the saveForLater function in the global scope -->
+    <script>
+        // Make saveForLater globally accessible
+        function saveForLater(event, documentId) {
+            event.preventDefault();
+            
+            // Get user authentication information
+            let userInfo;
+            try {
+                userInfo = JSON.parse(sessionStorage.getItem('userInfo') || localStorage.getItem('userInfo'));
+                if (!userInfo || !userInfo.isLoggedIn || !userInfo.token) {
+                    showMessage('Please log in to add documents to your library', 'error');
+                    return;
+                }
+            } catch (e) {
+                console.error('Error getting user auth info:', e);
+                showMessage('Authentication error. Please log in again.', 'error');
+                return;
+            }
+            
+            // Show feedback to the user
+            const readLaterBtn = document.getElementById('read-later-btn');
+            if (readLaterBtn) {
+                readLaterBtn.innerHTML = `
+                    <svg class="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Adding...
+                `;
+                readLaterBtn.disabled = true;
+            }
+            
+            // Add document to user's library via API
+            fetch('/api/user/library', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${userInfo.token}`
+                },
+                body: JSON.stringify({
+                    documentId: documentId
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    if (response.status === 409) {
+                        // Document already in library
+                        throw new Error('This document is already in your library');
+                    } else {
+                        throw new Error(`Server error: ${response.status}`);
+                    }
+                }
+                return response.json();
+            })
+            .then(data => {
+                showMessage('Document added to your library!', 'success');
+                
+                // Update button to show it's saved
+                if (readLaterBtn) {
+                    readLaterBtn.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
+                        </svg>
+                        Added to Library
+                    `;
+                    readLaterBtn.disabled = true;
+                    readLaterBtn.classList.add('saved');
+                }
+                
+                // Update library count in navbar if possible
+                if (window.NavbarModule && typeof window.NavbarModule.updateLibraryCount === 'function') {
+                    window.NavbarModule.updateLibraryCount(data.count || null);
+                }
+                
+                // Also update our basic localStorage fallback
+                try {
+                    const savedItems = JSON.parse(localStorage.getItem('savedForLater') || '[]');
+                    if (!savedItems.includes(documentId)) {
+                        savedItems.push(documentId);
+                        localStorage.setItem('savedForLater', JSON.stringify(savedItems));
+                    }
+                } catch (e) {
+                    console.warn('Could not update localStorage fallback:', e);
+                }
+            })
+            .catch(error => {
+                console.error('Error adding document to library:', error);
+                showMessage(error.message || 'Failed to add document to library', 'error');
+                
+                // Reset button
+                if (readLaterBtn) {
+                    readLaterBtn.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-13a.75.75 0 0 0-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 0 0 0-1.5h-3.25V5Z" clip-rule="evenodd" />
+                        </svg>
+                        Read Later
+                    `;
+                    readLaterBtn.disabled = false;
+                }
+            });
+        }
+
+        // Also define the showMessage function globally
+        function showMessage(message, type = 'info') {
+            const messageBoxOverlay = document.getElementById('message-box-overlay');
+            const messageBoxText = document.getElementById('message-box-text');
+            
+            if (messageBoxOverlay && messageBoxText) {
+                messageBoxText.textContent = message;
+                messageBoxOverlay.classList.add('visible');
+                
+                // Add class based on message type
+                messageBoxText.className = `message-box-text message-${type}`;
+                
+                // Auto-hide after 3 seconds
+                setTimeout(() => {
+                    messageBoxOverlay.classList.remove('visible');
+                }, 3000);
+            } else {
+                alert(message);
+            }
+        }
+    </script>
+    
+    <!-- Initialize the navbar module -->
+    <script>
+        // Initialize the navbar when the page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if the NavbarModule exists
+            if (window.NavbarModule) {
+                window.NavbarModule.init();
+            } else {
+                console.error('NavbarModule not found! Make sure navbar-loader.js is loaded correctly.');
+            }
+            
+            // No document fetching here - moved to single script below
+        });
+    </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Function to extract and pass URL parameters
+            function getDocumentIdFromUrl() {
+                const urlParams = new URLSearchParams(window.location.search);
+                return urlParams.get('id');
+            }
+            
+            // Helper function to get author display name from document data
+            function getAuthorDisplayName(data) {
+                console.log('Getting author display name from data:', data);
+                
+                // Check enhancedAuthors first (this is how compiled documents get their author data)
+                if (data.enhancedAuthors && Array.isArray(data.enhancedAuthors) && data.enhancedAuthors.length > 0) {
+                    console.log('Using enhancedAuthors array', data.enhancedAuthors);
+                    return data.enhancedAuthors.map(author => {
+                        return author.full_name || author.name || 
+                               (author.first_name && author.last_name ? `${author.first_name} ${author.last_name}` : 
+                               author.id ? `ID: ${author.id}` : 'Unknown');
+                    }).join(', ');
+                }
+                
+                // Check for document_authors relation
+                if (data.document_authors && Array.isArray(data.document_authors) && data.document_authors.length > 0) {
+                    console.log('Using document_authors relation', data.document_authors);
+                    return data.document_authors.map(docAuthor => {
+                        const author = docAuthor.author || docAuthor;
+                        return author.full_name || author.name || 
+                               (author.first_name && author.last_name ? `${author.first_name} ${author.last_name}` : 
+                               `ID: ${author.id || docAuthor.author_id}`);
+                    }).join(', ');
+                }
+                
+                // Then check for author object
+                if (data.author && typeof data.author === 'object') {
+                    const author = data.author;
+                    return author.full_name || author.name || 
+                           (author.first_name && author.last_name ? `${author.first_name} ${author.last_name}` : 
+                           author.id ? `ID: ${author.id}` : 'Unknown Author');
+                }
+                
+                // Then check various author name fields
+                if (data.author_name) return data.author_name;
+                if (data.author && typeof data.author === 'string') return data.author;
+                if (data.authors) {
+                    if (Array.isArray(data.authors)) {
+                        return data.authors.map(author => {
+                            if (typeof author === 'object') {
+                                return author.full_name || author.name || 
+                                       (author.first_name && author.last_name ? `${author.first_name} ${author.last_name}` : 
+                                       author.id ? `ID: ${author.id}` : 'Unknown');
+                            }
+                            return author;
+                        }).join(', ');
+                    }
+                    return data.authors;
+                }
+                
+                // If nothing found, return Unknown
+                return 'Unknown Author';
+            }
+            
+            // Helper function to get author ID from document data
+            function getAuthorIdFromDocument(data) {
+                // Try to get the first author ID from enhancedAuthors
+                if (data.enhancedAuthors && Array.isArray(data.enhancedAuthors) && data.enhancedAuthors.length > 0) {
+                    const firstAuthor = data.enhancedAuthors[0];
+                    if (firstAuthor.id) {
+                        console.log(`Found author ID in enhancedAuthors: ${firstAuthor.id}`);
+                        return firstAuthor.id;
+                    }
+                }
+                
+                // Try to get from document_authors
+                if (data.document_authors && Array.isArray(data.document_authors) && data.document_authors.length > 0) {
+                    const firstDocAuthor = data.document_authors[0];
+                    if (firstDocAuthor.author && firstDocAuthor.author.id) {
+                        console.log(`Found author ID in document_authors: ${firstDocAuthor.author.id}`);
+                        return firstDocAuthor.author.id;
+                    }
+                    if (firstDocAuthor.author_id) {
+                        console.log(`Found author_id in document_authors: ${firstDocAuthor.author_id}`);
+                        return firstDocAuthor.author_id;
+                    }
+                }
+                
+                // Try to get from direct author_id field
+                if (data.author_id) {
+                    console.log(`Found direct author_id field: ${data.author_id}`);
+                    return data.author_id;
+                }
+                
+                // Try to get from author object
+                if (data.author && typeof data.author === 'object' && data.author.id) {
+                    console.log(`Found author.id: ${data.author.id}`);
+                    return data.author.id;
+                }
+                
+                console.warn('No author ID found in document data');
+                return null;
+            }
+            
+            // Get document ID and use it to fetch document data
+            const documentId = getDocumentIdFromUrl();
+            if (documentId) {
+                console.log(`Loading document with ID: ${documentId}`);
+                fetchSingleDocumentData(documentId);
+            } else {
+                console.warn('No document ID provided in URL');
+                showError('No document ID provided');
+            }
+
+            // Function to fetch single document data
+            async function fetchSingleDocumentData(docId) {
+                try {
+                    // Show loading state
+                    showLoading(true);
+                    
+                    let documentData;
+                    let foundInCompiledDocuments = false;
+                    
+                    // First check if this is a compiled document
+                    try {
+                        console.log(`Checking if document ${docId} is a compiled document...`);
+                        const compiledResponse = await fetch(`/api/compiled-documents/${docId}`);
+                        if (compiledResponse.ok) {
+                            console.log(`Document ${docId} is a compiled document, redirecting...`);
+                            foundInCompiledDocuments = true;
+                            // Redirect to compiled document page
+                            window.location.href = `/pages/user-compiled.html?id=${docId}`;
+                            return;
+                        } else {
+                            console.log(`Document ${docId} is not a compiled document (status: ${compiledResponse.status})`);
+                        }
+                    } catch (err) {
+                        console.warn('Network error when checking compiled documents:', err);
+                        // Continue to next approach - don't stop if this fails
+                    }
+                    
+                    // If not found in compiled documents, try the regular documents API
+                    if (!foundInCompiledDocuments) {
+                        // Attempt to fetch from regular documents API
+                        console.log(`Fetching document ${docId} from regular documents API...`);
+                        try {
+                            const response = await fetch(`/api/documents/${docId}`);
+                            
+                            if (response.ok) {
+                                documentData = await response.json();
+                                console.log(`Document data received:`, documentData);
+                                
+                                // ALWAYS try to fetch additional author data regardless of what's in the document
+                                try {
+                                    console.log(`Fetching author information specifically for document ${docId}...`);
+                                    const authorResponse = await fetch(`/api/document-authors/${docId}`);
+                                    
+                                    if (authorResponse.ok) {
+                                        const authorData = await authorResponse.json();
+                                        console.log(`Author data received from document-authors API:`, authorData);
+                                        
+                                        // Add author data to document data
+                                        if (authorData.authors && Array.isArray(authorData.authors)) {
+                                            console.log(`Found ${authorData.authors.length} authors for document ${docId}`);
+                                            documentData.enhancedAuthors = authorData.authors;
+                                            documentData.document_authors = authorData.authors.map(author => ({
+                                                author_id: author.id,
+                                                author: author
+                                            }));
+                                        } else {
+                                            console.warn(`No authors array found in response from document-authors API`);
+                                        }
+                                    } else {
+                                        console.warn(`Could not fetch author details: ${authorResponse.status} ${authorResponse.statusText}`);
+                                    }
+                                } catch (authorErr) {
+                                    console.warn(`Error fetching author details:`, authorErr);
+                                }
+                                
+                                // Double-check if this is actually a compiled document
+                                const isCompiled = documentData.is_compiled === true || 
+                                                documentData.document_type?.toLowerCase() === 'compiled' || 
+                                                documentData.child_count > 0;
+                                                
+                                if (isCompiled) {
+                                    console.warn('This document is a compiled document');
+                                    // Redirect to compiled document page
+                                    window.location.href = `/pages/user-compiled.html?id=${docId}`;
+                                    return;
+                                }
+                                
+                                // Display the document data on the page
+                                displayDocument(documentData);
+                                
+                                // Track document visit
+                                trackDocumentVisit(docId);
+                            } else if (response.status === 404) {
+                                // Handle 404 specifically
+                                console.error(`Document ${docId} not found (404)`);
+                                throw new Error(`Document not found. The document with ID ${docId} may have been removed or is not accessible.`);
+                            } else {
+                                console.error(`Failed to fetch document ${docId}: ${response.status} ${response.statusText}`);
+                                throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`);
+                            }
+                        } catch (networkErr) {
+                            console.error('Network error when fetching document:', networkErr);
+                            throw new Error(`Network error: ${networkErr.message}. Please check your connection and try again.`);
+                        }
+                    }
+                    
+                    // Hide loading indicators
+                    showLoading(false);
+                    
+                } catch (error) {
+                    console.error('Error fetching document data:', error);
+                    document.getElementById('documentContent').innerHTML = `
+                        <div class="document-item-base" style="text-align: center; padding: 2rem;">
+                            <div style="color: #dc2626; margin-bottom: 1rem;">
+                                <i class="fas fa-exclamation-circle" style="font-size: 3rem;"></i>
+                            </div>
+                            <h2 style="color: #dc2626; margin-bottom: 1rem;">Unable to Load Document</h2>
+                            <p style="margin-bottom: 1.5rem;">${error.message}</p>
+                            <button class="btn btn-secondary" onclick="location.reload()">Try Again</button>
+                            <a href="/pages/user-home.html" class="btn btn-primary" style="margin-left: 0.5rem;">Return to Home</a>
+                        </div>
+                    `;
+                    // Update header to show error state
+                    const titleHeader = document.getElementById('document-title-header');
+                    const authorHeader = document.getElementById('document-author-header');
+                    if (titleHeader) titleHeader.textContent = 'Error Loading Document';
+                    if (authorHeader) authorHeader.textContent = '';
+                    
+                    // Hide loading spinner
+                    showLoading(false);
+                }
+            }
+            
+            // Function to show or hide loading indicators
+            function showLoading(isLoading) {
+                const loadingElement = document.getElementById('loadingIndicator');
+                if (loadingElement) {
+                    loadingElement.style.display = isLoading ? 'flex' : 'none';
+                }
+                
+                // You can also add/remove loading classes from other elements
+                const pageHeader = document.querySelector('.page-header');
+                if (pageHeader) {
+                    if (isLoading) {
+                        pageHeader.classList.add('loading');
+                    } else {
+                        pageHeader.classList.remove('loading');
+                    }
+                }
+            }
+            
+            // Function to check if a document is in user's library
+            async function checkIfInLibrary(documentId) {
+                try {
+                    // Get user auth info
+                    let userInfo;
+                    try {
+                        userInfo = JSON.parse(sessionStorage.getItem('userInfo') || localStorage.getItem('userInfo'));
+                        if (!userInfo || !userInfo.isLoggedIn) {
+                            return false;
+                        }
+                    } catch (e) {
+                        console.warn('Error parsing user info:', e);
+                        return false;
+                    }
+
+                    // Try API check first
+                    try {
+                        const response = await fetch(`/api/user/library/check?documentId=${documentId}`, {
+                            headers: {
+                                'Authorization': `Bearer ${userInfo.token}`
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            return data.inLibrary === true;
+                        }
+                    } catch (apiError) {
+                        console.warn('API error checking library status:', apiError);
+                    }
+                    
+                    // Fallback to localStorage
+                    const savedItems = JSON.parse(localStorage.getItem('savedForLater') || '[]');
+                    return savedItems.includes(documentId);
+                } catch (error) {
+                    console.error('Error checking library status:', error);
+                    return false;
+                }
+            }
+            
+            function displayDocument(data) {
+                // Skip if no data returned
+                if (!data) {
+                    console.error('No data received to display');
+                    showError('No document data received from server');
+                    return;
+                }
+                
+                // Log received data for debugging
+                console.log('Processing document data:', data);
+                
+                // Check if we received mock data (some APIs return a default when data isn't found)
+                if (data.mock === true || data.is_mock === true) {
+                    console.warn('Received mock data instead of real document data');
+                    showError('The requested document was not found in the database');
+                    return;
+                }
+                
+                // Check if received data contains minimum required fields
+                if (!data.id || (!data.title && !data.abstract && !data.description)) {
+                    console.warn('Document data is missing critical fields:', data);
+                    
+                    // Still try to display what we have, but show warning
+                    contentElement.innerHTML = `
+                        <div class="document-item-base" style="border-left: 4px solid #f59e0b;">
+                            <div style="background-color: rgba(245, 158, 11, 0.1); padding: 1rem; margin-bottom: 1rem; border-radius: 0.5rem;">
+                                <p><i class="fas fa-exclamation-triangle" style="color: #f59e0b;"></i> Warning: Document data appears to be incomplete. Some information may be missing.</p>
+                            </div>
+                            ${data.title ? `<h1>${data.title}</h1>` : '<h1>Untitled Document</h1>'}
+                            ${data.abstract || data.description ? `<p>${data.abstract || data.description}</p>` : '<p>No additional information available for this document.</p>'}
+                        </div>
+                    `;
+                    
+                    // Still update the page title
+                    document.title = `${data.title || 'Document'} | sPEAS`;
+                    return;
+                }
+                
+                // Update header information
+                const titleHeader = document.getElementById('document-title-header');
+                const authorHeader = document.getElementById('document-author-header');
+                const yearHeader = document.getElementById('document-year-header');
+                
+                if (titleHeader) titleHeader.textContent = data.title || 'Untitled Document';
+                if (authorHeader) {
+                    authorHeader.textContent = getAuthorDisplayName(data);
+                    
+                    // Set the author profile URL
+                    const authorId = getAuthorIdFromDocument(data);
+                    if (authorId) {
+                        authorHeader.href = `/pages/authorprofile.html?id=${authorId}`;
+                        
+                        // Add click tracking
+                        authorHeader.onclick = function(e) {
+                            console.log(`Navigating to author profile: ${authorId}`);
+                        };
+                    } else {
+                        authorHeader.href = '#';
+                        authorHeader.style.textDecoration = 'none';
+                        authorHeader.style.cursor = 'default';
+                    }
+                }
+                if (yearHeader) yearHeader.textContent = data.publication_year || '';
+                
+                // Create HTML structure for document display
+                const contentElement = document.getElementById('documentContent');
+                if (!contentElement) return;
+                
+                // Check if document is in library (for Read Later button state)
+                checkIfInLibrary(data.id).then(isInLibrary => {
+                    // Build the HTML structure
+                    const documentHtml = `
+                        <article class="document-item-base">
+                            <section class="abstract">
+                                <h2>Abstract</h2>
+                                <p>${data.abstract || data.description || 'No abstract available.'}</p>
+                            </section>
+                            
+                            ${data.keywords ? `
+                            <section class="keywords-section">
+                                <h3>Keywords</h3>
+                                <div class="keywords-container-flex">
+                                    ${Array.isArray(data.keywords) ? 
+                                        data.keywords.map(kw => `<a href="#" class="tag-pill">${kw}</a>`).join('') :
+                                        (typeof data.keywords === 'string' ? 
+                                            data.keywords.split(',').map(kw => `<a href="#" class="tag-pill">${kw.trim()}</a>`).join('') :
+                                            '<span>No keywords available</span>')}
+                                </div>
+                            </section>
+                            ` : ''}
+                            
+                            <article class="document-item-base mb-12">
+                                <header>
+                                    <h2>Document Information</h2>
+                                </header>
+                                <section class="doc-info-grid">
+                                    <div>
+                                        <strong>Title:</strong>
+                                        <span id="info-title">${data.title || 'Untitled'}</span>
+                                    </div>
+                                    <div>
+                                        <strong>Author(s):</strong>
+                                        <a href="/pages/authorprofile.html?id=${getAuthorIdFromDocument(data) || ''}" class="clickable-meta clickable-author" id="info-author">
+                                            ${getAuthorDisplayName(data)}
+                                        </a>
+                                    </div>
+                                    ${data.editor ? `
+                                    <div>
+                                        <strong>Editor(s):</strong>
+                                        <span class="opacity-90" id="info-editor">${data.editor}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${data.publication_year ? `
+                                    <div>
+                                        <strong>Publication Year:</strong>
+                                        <span id="info-year">${data.publication_year}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${data.volume ? `
+                                    <div>
+                                        <strong>Volume:</strong>
+                                        <span id="info-volume">${data.volume}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${data.pages ? `
+                                    <div>
+                                        <strong>Number of Pages:</strong>
+                                        <span id="info-pages">${data.pages}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${data.category || data.document_type ? `
+                                    <div>
+                                        <strong>Category:</strong>
+                                        <span class="opacity-90" id="info-category">${data.category || data.document_type}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${data.research_agenda ? `
+                                    <div>
+                                        <strong>Research Agenda:</strong>
+                                        <span class="opacity-90" id="info-agenda">${data.research_agenda}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${data.upload_date ? `
+                                    <div>
+                                        <strong>Date Uploaded:</strong>
+                                        <span id="info-date-uploaded">${new Date(data.upload_date).toLocaleDateString('en-US', {year: 'numeric', month: 'long', day: 'numeric'})}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${data.keywords ? `
+                                    <div>
+                                        <strong>Keywords:</strong>
+                                        <span id="info-keywords">
+                                            ${Array.isArray(data.keywords) ? 
+                                                data.keywords.map(kw => `<a href="#" class="clickable-meta clickable-keyword">${kw}</a>`).join(', ') :
+                                                (typeof data.keywords === 'string' ? 
+                                                    data.keywords.split(',').map(kw => `<a href="#" class="clickable-meta clickable-keyword">${kw.trim()}</a>`).join(', ') :
+                                                    'No keywords available')}
+                                        </span>
+                                    </div>
+                                    ` : ''}
+                                </section>
+                            </article>
+                            
+                            ${data.content ? `
+                            <section class="document-content">
+                                <h2>Content</h2>
+                                <div class="content-viewer">${data.content}</div>
+                            </section>
+                            ` : ''}
+                        </article>
+                        
+                        <div id="floating-buttons" class="floating-action-container">
+                            ${data.file_path ? `
+                            <a id="read-doc-btn" href="${data.file_path}" class="btn btn-primary" target="_blank">
+                                <i class="fas fa-eye" aria-hidden="true"></i>
+                                Read Document
+                            </a>
+                            ` : ''}
+                            <a id="read-later-btn" href="#" class="btn btn-secondary ${isInLibrary ? 'saved' : ''}" onclick="saveForLater(event, '${data.id}')">
+                                ${isInLibrary ? 
+                                    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
+                                    </svg>
+                                    Added to Library` :
+                                    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-13a.75.75 0 0 0-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 0 0 0-1.5h-3.25V5Z" clip-rule="evenodd" />
+                                    </svg>
+                                    Read Later`
+                                }
+                            </a>
+                        </div>
+                    `;
+                    
+                    // Update the content
+                    contentElement.innerHTML = documentHtml;
+                    
+                    // If already in library, disable the button
+                    if (isInLibrary) {
+                        const readLaterBtn = document.getElementById('read-later-btn');
+                        if (readLaterBtn) {
+                            readLaterBtn.disabled = true;
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking library status:', error);
+                    // Continue with default state (not in library)
+                    // This is the same code as above but without the library check
+                    const documentHtml = `
+                        <article class="document-item-base">
+                            <section class="abstract">
+                                <h2>Abstract</h2>
+                                <p>${data.abstract || data.description || 'No abstract available.'}</p>
+                            </section>
+                            
+                            ${data.keywords ? `
+                            <section class="keywords-section">
+                                <h3>Keywords</h3>
+                                <div class="keywords-container-flex">
+                                    ${Array.isArray(data.keywords) ? 
+                                        data.keywords.map(kw => `<a href="#" class="tag-pill">${kw}</a>`).join('') :
+                                        (typeof data.keywords === 'string' ? 
+                                            data.keywords.split(',').map(kw => `<a href="#" class="tag-pill">${kw.trim()}</a>`).join('') :
+                                            '<span>No keywords available</span>')}
+                                </div>
+                            </section>
+                            ` : ''}
+                            
+                            <article class="document-item-base mb-12">
+                                <header>
+                                    <h2>Document Information</h2>
+                                </header>
+                                <section class="doc-info-grid">
+                                    <div>
+                                        <strong>Title:</strong>
+                                        <span id="info-title">${data.title || 'Untitled'}</span>
+                                    </div>
+                                    <div>
+                                        <strong>Author(s):</strong>
+                                        <a href="/pages/authorprofile.html?id=${getAuthorIdFromDocument(data) || ''}" class="clickable-meta clickable-author" id="info-author">
+                                            ${getAuthorDisplayName(data)}
+                                        </a>
+                                    </div>
+                                    ${data.editor ? `
+                                    <div>
+                                        <strong>Editor(s):</strong>
+                                        <span class="opacity-90" id="info-editor">${data.editor}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${data.publication_year ? `
+                                    <div>
+                                        <strong>Publication Year:</strong>
+                                        <span id="info-year">${data.publication_year}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${data.volume ? `
+                                    <div>
+                                        <strong>Volume:</strong>
+                                        <span id="info-volume">${data.volume}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${data.pages ? `
+                                    <div>
+                                        <strong>Number of Pages:</strong>
+                                        <span id="info-pages">${data.pages}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${data.category || data.document_type ? `
+                                    <div>
+                                        <strong>Category:</strong>
+                                        <span class="opacity-90" id="info-category">${data.category || data.document_type}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${data.research_agenda ? `
+                                    <div>
+                                        <strong>Research Agenda:</strong>
+                                        <span class="opacity-90" id="info-agenda">${data.research_agenda}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${data.upload_date ? `
+                                    <div>
+                                        <strong>Date Uploaded:</strong>
+                                        <span id="info-date-uploaded">${new Date(data.upload_date).toLocaleDateString('en-US', {year: 'numeric', month: 'long', day: 'numeric'})}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${data.keywords ? `
+                                    <div>
+                                        <strong>Keywords:</strong>
+                                        <span id="info-keywords">
+                                            ${Array.isArray(data.keywords) ? 
+                                                data.keywords.map(kw => `<a href="#" class="clickable-meta clickable-keyword">${kw}</a>`).join(', ') :
+                                                (typeof data.keywords === 'string' ? 
+                                                    data.keywords.split(',').map(kw => `<a href="#" class="clickable-meta clickable-keyword">${kw.trim()}</a>`).join(', ') :
+                                                    'No keywords available')}
+                                        </span>
+                                    </div>
+                                    ` : ''}
+                                </section>
+                            </article>
+                            
+                            ${data.content ? `
+                            <section class="document-content">
+                                <h2>Content</h2>
+                                <div class="content-viewer">${data.content}</div>
+                            </section>
+                            ` : ''}
+                        </article>
+                        
+                        <div id="floating-buttons" class="floating-action-container">
+                            ${data.file_path ? `
+                            <a id="read-doc-btn" href="${data.file_path}" class="btn btn-primary" target="_blank">
+                                <i class="fas fa-eye" aria-hidden="true"></i>
+                                Read Document
+                            </a>
+                            ` : ''}
+                            <a id="read-later-btn" href="#" class="btn btn-secondary" onclick="saveForLater(event, '${data.id}')">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-13a.75.75 0 0 0-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 0 0 0-1.5h-3.25V5Z" clip-rule="evenodd" />
+                                </svg>
+                                Read Later
+                            </a>
+                        </div>
+                    `;
+                    
+                    // Update the content
+                    contentElement.innerHTML = documentHtml;
+                });
+                
+                // Update page title
+                document.title = `${data.title || 'Document'} | sPEAS`;
+            }
+
+            function trackDocumentVisit(docId) {
+                // Initialize document visit tracking for single documents
+                if (window.DocumentTracker) {
+                    // Check if using the new counter-based approach
+                    if (typeof window.DocumentTracker.initSingleDocumentTracking === 'function') {
+                        window.DocumentTracker.initSingleDocumentTracking(docId);
+                    } else if (typeof window.DocumentTracker.recordVisit === 'function') {
+                        // Determine visitor type (guest or user)
+                        let userInfo = null;
+                        try {
+                            userInfo = JSON.parse(sessionStorage.getItem('userInfo'));
+                        } catch (e) {
+                            console.log('No user info found or invalid format');
+                        }
+                        const visitorType = userInfo?.isLoggedIn ? 'user' : 'guest';
+                        
+                        // Record visit with visitor type
+                        window.DocumentTracker.recordVisit(docId, visitorType);
+                    } else {
+                        console.error('No compatible document tracking method found');
+                    }
+                } else {
+                    console.error('DocumentTracker not found! Make sure document-visit-tracker.js is loaded correctly.');
+                }
+            }
+
+            function showError(message) {
+                showMessage(message, 'error');
+            }
+
+            // Setup message box close button
+            const messageBoxClose = document.getElementById('message-box-close');
+            if (messageBoxClose) {
+                messageBoxClose.addEventListener('click', function() {
+                    const messageBoxOverlay = document.getElementById('message-box-overlay');
+                    if (messageBoxOverlay) {
+                        messageBoxOverlay.classList.remove('visible');
+                    }
+                });
+            }
+
+            // Set footer year
+            const footerYearElement = document.getElementById('footerCurrentYear');
+            if (footerYearElement) {
+                footerYearElement.textContent = new Date().getFullYear();
+            }
+        });
+    </script>
+    
+    <!-- Document Visit Tracking -->
+    <script src="/Components/js/document-visit-tracker.js"></script>
+
+</body>
+</html>
+

@@ -27,7 +27,7 @@ async function recordPageVisit(ctx: RouterContext<string>) {
     // Get client IP address
     const ipAddress = ctx.request.ip;
     
-    // Record the visit
+    // Record the visit in both counter and legacy tables
     const visit = await PageVisitsModel.recordVisit(
       body.pageUrl,
       visitorType,
@@ -55,36 +55,29 @@ async function recordPageVisit(ctx: RouterContext<string>) {
 }
 
 /**
- * Get total page visit statistics
- * GET /api/page-visits/stats
+ * Get visit stats for documents
+ * GET /api/page-visits/documents/:documentId
  */
-async function getVisitStats(ctx: RouterContext<string>) {
+async function getDocumentVisitStats(ctx: RouterContext<string>) {
   try {
-    // Get total visit stats
-    const stats = await PageVisitsModel.getTotalVisitStats();
+    const documentId = ctx.params.documentId;
+    
+    if (!documentId) {
+      ctx.response.status = 400;
+      ctx.response.body = { error: "Document ID is required" };
+      return;
+    }
+    
+    // Get days parameter, default to 30
+    const days = parseInt(ctx.request.url.searchParams.get("days") || "30");
+    
+    // Get the visit stats from counter table
+    const visitStats = await PageVisitsModel.getDocumentVisitCounters(documentId, days);
     
     ctx.response.status = 200;
-    ctx.response.body = { stats };
+    ctx.response.body = visitStats;
   } catch (error) {
-    console.error("Error in getVisitStats:", error);
-    ctx.response.status = 500;
-    ctx.response.body = { error: "Internal server error" };
-  }
-}
-
-/**
- * Get home page visit statistics
- * GET /api/page-visits/home-stats
- */
-async function getHomePageVisitStats(ctx: RouterContext<string>) {
-  try {
-    // Get homepage visit stats
-    const stats = await PageVisitsModel.getHomePageVisitStats();
-    
-    ctx.response.status = 200;
-    ctx.response.body = { stats };
-  } catch (error) {
-    console.error("Error in getHomePageVisitStats:", error);
+    console.error(`Error getting document visit stats:`, error);
     ctx.response.status = 500;
     ctx.response.body = { error: "Internal server error" };
   }
@@ -93,147 +86,283 @@ async function getHomePageVisitStats(ctx: RouterContext<string>) {
 /**
  * Get most visited documents
  * GET /api/page-visits/most-visited-documents
- * Query params: limit (default 10), days (optional)
  */
 async function getMostVisitedDocuments(ctx: RouterContext<string>) {
   try {
-    // Parse query parameters
-    const url = new URL(ctx.request.url);
-    const limitParam = url.searchParams.get('limit');
-    const daysParam = url.searchParams.get('days');
+    // Get limit parameter, default to 10
+    const limit = parseInt(ctx.request.url.searchParams.get("limit") || "10");
     
-    // Parse limit (default to 10)
-    const limit = limitParam ? parseInt(limitParam) : 10;
+    // Get days parameter, default to 30
+    const days = parseInt(ctx.request.url.searchParams.get("days") || "30");
     
-    // Parse days (optional)
-    const days = daysParam ? parseInt(daysParam) : undefined;
-    
-    // Get document information if available
-    let documentInfo: Record<string, any> = {};
-    try {
-      // Try to get document details from database
-      const detailsQuery = `
-        SELECT id, title, document_type, publication_date, start_year, end_year, keywords 
-        FROM documents 
-        WHERE id = ANY($1)
-      `;
-      
-      // First get the most visited documents
-      const mostVisited = await PageVisitsModel.getMostVisitedDocuments(limit, days);
-      
-      // Extract document IDs
-      const documentIds = mostVisited.map(doc => doc.document_id);
-      
-      // If we have document IDs, fetch their details
-      if (documentIds.length > 0) {
-        const detailsResult = await ctx.state.client?.queryObject(
-          detailsQuery,
-          [documentIds]
-        );
-        
-        if (detailsResult?.rows) {
-          detailsResult.rows.forEach((row: any) => {
-            // Parse keywords properly from the database
-            let parsedKeywords = [];
-            if (row.keywords) {
-              try {
-                // Keywords might be stored in different formats
-                if (Array.isArray(row.keywords)) {
-                  parsedKeywords = row.keywords;
-                } else if (typeof row.keywords === 'string') {
-                  // Try to parse as JSON first, fall back to comma-separated if that fails
-                  try {
-                    parsedKeywords = JSON.parse(row.keywords);
-                  } catch (e) {
-                    // If not valid JSON, treat as comma-separated
-                    parsedKeywords = row.keywords.split(',').map((k: string) => k.trim()).filter((k: string) => k);
-                  }
-                } else if (typeof row.keywords === 'object') {
-                  // If it's already an object but not an array, get its values
-                  parsedKeywords = Object.values(row.keywords);
-                }
-              } catch (e) {
-                console.error(`Error parsing keywords for document ${row.id}:`, e);
-                parsedKeywords = [];
-              }
-            }
-            
-            documentInfo[row.id] = {
-              title: row.title,
-              document_type: row.document_type,
-              keywords: parsedKeywords
-            };
-          });
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching document details:", error);
-      // Continue without details - non-critical error
-    }
-    
-    // Get most visited documents
+    // Get the most visited documents
     const documents = await PageVisitsModel.getMostVisitedDocuments(limit, days);
     
-    // Add details if available
-    const documentsWithDetails = documents.map(doc => {
-      const details = documentInfo[doc.document_id] || {};
-      return {
-        ...doc,
-        title: details.title,
-        document_type: details.document_type,
-        keywords: details.keywords
-      };
-    });
-    
     ctx.response.status = 200;
-    ctx.response.body = { 
-      documents: documentsWithDetails,
-      count: documentsWithDetails.length,
-      timeframe: days ? `${days} days` : 'all time'
-    };
+    ctx.response.body = { documents };
   } catch (error) {
-    console.error("Error in getMostVisitedDocuments:", error);
+    console.error(`Error getting most visited documents:`, error);
     ctx.response.status = 500;
     ctx.response.body = { error: "Internal server error" };
   }
 }
 
 /**
- * Get visit statistics for a specific document
- * GET /api/page-visits/document/:id
+ * Get most visited pages
+ * GET /api/page-visits/most-visited-pages
  */
-async function getDocumentVisitStats(ctx: RouterContext<string>) {
+async function getMostVisitedPages(ctx: RouterContext<string>) {
   try {
-    const documentId = ctx.params.id;
+    // Get limit parameter, default to 10
+    const limit = parseInt(ctx.request.url.searchParams.get("limit") || "10");
     
-    if (!documentId) {
-      ctx.response.status = 400;
-      ctx.response.body = { error: "Document ID is required" };
-      return;
-    }
+    // Get days parameter, default to 30
+    const days = parseInt(ctx.request.url.searchParams.get("days") || "30");
     
-    // Get document visit stats
-    const stats = await PageVisitsModel.getDocumentVisitStats(documentId);
+    // Get the most visited pages
+    const pages = await PageVisitsModel.getMostVisitedPages(limit, days);
     
     ctx.response.status = 200;
-    ctx.response.body = { 
-      document_id: documentId,
-      stats 
-    };
+    ctx.response.body = { pages };
   } catch (error) {
-    console.error(`Error in getDocumentVisitStats for document ${ctx.params.id}:`, error);
+    console.error(`Error getting most visited pages:`, error);
     ctx.response.status = 500;
     ctx.response.body = { error: "Internal server error" };
   }
 }
 
-// Define routes
-router.post("/api/page-visits", recordPageVisit);
-router.get("/api/page-visits/stats", getVisitStats);
-router.get("/api/page-visits/home-stats", getHomePageVisitStats);
-router.get("/api/page-visits/most-visited-documents", getMostVisitedDocuments);
-router.get("/api/page-visits/document/:id", getDocumentVisitStats);
+/**
+ * Purge old visit data
+ * DELETE /api/page-visits/purge
+ * Query params: ?olderThan=365
+ */
+async function purgeOldVisitData(ctx: RouterContext<string>) {
+  try {
+    // Get olderThan parameter, default to 365 days
+    const olderThan = parseInt(ctx.request.url.searchParams.get("olderThan") || "365");
+    
+    // Purge old visit data
+    const result = await PageVisitsModel.purgeOldVisitData(olderThan);
+    
+    ctx.response.status = 200;
+    ctx.response.body = { 
+      success: true,
+      message: `Purged visit data older than ${olderThan} days`,
+      result
+    };
+  } catch (error) {
+    console.error(`Error purging old visit data:`, error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Internal server error" };
+  }
+}
 
-// Export the routes
+/**
+ * COMPATIBILITY: Get most visited documents for the dashboard
+ * GET /api/most-visited-documents
+ */
+async function compatGetMostVisitedDocuments(ctx: RouterContext<string>) {
+  try {
+    // Extract query parameters
+    const period = parseInt(ctx.request.url.searchParams.get("period") || "30");
+    const limit = parseInt(ctx.request.url.searchParams.get("limit") || "10");
+    
+    // Get the most visited documents using our counter system
+    const documents = await PageVisitsModel.getMostVisitedDocuments(limit, period);
+    
+    // Format the response for dashboard compatibility
+    ctx.response.status = 200;
+    ctx.response.body = { 
+      success: true,
+      documents: documents.map(doc => ({
+        id: doc.doc_id,
+        visits: doc.total_visits
+      })),
+      period: period
+    };
+  } catch (error) {
+    console.error(`Error in compatibility getMostVisitedDocuments:`, error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Internal server error" };
+  }
+}
+
+/**
+ * COMPATIBILITY: Get visit statistics by timeframe for dashboard charts
+ * GET /api/page-visits/stats/:timeframe
+ */
+async function compatGetVisitStatsByTimeframe(ctx: RouterContext<string>) {
+  try {
+    const timeframe = ctx.params.timeframe || "daily";
+    
+    // Default days based on timeframe
+    let days = 30;
+    if (timeframe === "weekly") days = 90;
+    if (timeframe === "monthly") days = 365;
+    
+    // Get visit stats for home pages as a representative sample
+    const homePaths = ['/', '/index.html', '/index'];
+    let totalVisits = 0;
+    let guestVisits = 0;
+    let userVisits = 0;
+    let dailyData: {date: string, count: number, guest: number, user: number}[] = [];
+    
+    for (const path of homePaths) {
+      const stats = await PageVisitsModel.getPageVisitCounters(path, days);
+      totalVisits += stats.total;
+      guestVisits += stats.guest;
+      userVisits += stats.user;
+      
+      // Combine daily data
+      stats.daily.forEach(dayStats => {
+        const existingDay = dailyData.find(d => d.date === dayStats.date);
+        if (existingDay) {
+          existingDay.count += dayStats.count;
+          existingDay.guest += dayStats.guest;
+          existingDay.user += dayStats.user;
+        } else {
+          dailyData.push({...dayStats});
+        }
+      });
+    }
+    
+    // Sort by date
+    dailyData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+    // Format for chart
+    const chartData = dailyData.map(day => ({
+      date: day.date,
+      guest_visits: day.guest,
+      user_visits: day.user
+    }));
+    
+    ctx.response.status = 200;
+    ctx.response.body = { 
+      success: true,
+      stats: {
+        total: totalVisits,
+        guest: guestVisits,
+        user: userVisits,
+        chart_data: chartData,
+        timeframe: timeframe
+      }
+    };
+  } catch (error) {
+    console.error(`Error in compatibility getVisitStatsByTimeframe:`, error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Internal server error" };
+  }
+}
+
+/**
+ * COMPATIBILITY: Get general visit statistics for dashboard
+ * GET /api/page-visits/stats
+ */
+async function compatGetGeneralVisitStats(ctx: RouterContext<string>) {
+  try {
+    // Default to 30 days
+    const days = 30;
+    
+    // Get top pages to get an overall picture
+    const topPages = await PageVisitsModel.getMostVisitedPages(100, days);
+    
+    // Calculate total visits and get breakdown
+    let totalVisits = 0;
+    let guestVisits = 0;
+    let userVisits = 0;
+    
+    // Get visit stats for home pages to get an overall site view
+    const homePaths = ['/', '/index.html', '/index'];
+    for (const path of homePaths) {
+      const stats = await PageVisitsModel.getPageVisitCounters(path, days);
+      totalVisits += stats.total;
+      guestVisits += stats.guest;
+      userVisits += stats.user;
+    }
+    
+    ctx.response.status = 200;
+    ctx.response.body = { 
+      success: true,
+      stats: {
+        total: totalVisits,
+        guest: guestVisits,
+        user: userVisits
+      }
+    };
+  } catch (error) {
+    console.error(`Error in compatibility getGeneralVisitStats:`, error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Internal server error" };
+  }
+}
+
+/**
+ * COMPATIBILITY: Get home page visit statistics
+ * GET /api/page-visits/home-stats
+ */
+async function compatGetHomePageVisitStats(ctx: RouterContext<string>) {
+  try {
+    // Default to 30 days
+    const days = 30;
+    
+    // Get visits for home page paths
+    const homePaths = ['/', '/index.html', '/index'];
+    let totalVisits = 0;
+    let guestVisits = 0;
+    let userVisits = 0;
+    
+    // Check if any of the home paths have visits in our counter system
+    for (const path of homePaths) {
+      const stats = await PageVisitsModel.getPageVisitCounters(path, days);
+      totalVisits += stats.total;
+      guestVisits += stats.guest;
+      userVisits += stats.user;
+    }
+    
+    ctx.response.status = 200;
+    ctx.response.body = { 
+      success: true,
+      stats: {
+        total: totalVisits,
+        guest: guestVisits,
+        user: userVisits
+      }
+    };
+  } catch (error) {
+    console.error(`Error in compatibility getHomePageVisitStats:`, error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Internal server error" };
+  }
+}
+
+// Get (detailed) document visit stats with backward compatibility
+router.get("/api/page-visits/documents/:documentId", getDocumentVisitStats);
+
+// Get top visited documents
+router.get("/api/page-visits/most-visited-documents", getMostVisitedDocuments);
+
+// Get top visited pages
+router.get("/api/page-visits/most-visited-pages", getMostVisitedPages);
+
+// Purge old visit data
+router.delete("/api/page-visits/purge", purgeOldVisitData);
+
+// Record a visit
+router.post("/api/page-visits", recordPageVisit);
+
+// COMPATIBILITY ROUTES FOR DASHBOARD
+// Get most visited documents for dashboard
+router.get("/api/most-visited-documents", compatGetMostVisitedDocuments);
+
+// Get visit stats by timeframe for dashboard
+router.get("/api/page-visits/stats/:timeframe", compatGetVisitStatsByTimeframe);
+
+// Get general visit statistics
+router.get("/api/page-visits/stats", compatGetGeneralVisitStats);
+
+// Get home page visit statistics
+router.get("/api/page-visits/home-stats", compatGetHomePageVisitStats);
+
+// Export the router
 export const pageVisitsRoutes = router.routes();
 export const pageVisitsAllowedMethods = router.allowedMethods(); 

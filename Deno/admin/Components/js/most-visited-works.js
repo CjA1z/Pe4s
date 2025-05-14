@@ -106,24 +106,24 @@ async function fetchRegularDocuments() {
 
 // Function to get icon path for document type
 function getDocumentTypeIcon(type) {
-    if (!type) return '/components/icons/category-icons/default.png';
+    if (!type) return '/admin/Components/icons/Category-icons/default_category_icon.png';
     
     type = type.toLowerCase();
     
     switch (type) {
         case 'thesis':
-            return '/components/icons/category-icons/thesis.png';
+            return '/admin/Components/icons/Category-icons/thesis.png';
         case 'dissertation':
-            return '/components/icons/category-icons/dissertation.png';
+            return '/admin/Components/icons/Category-icons/dissertation.png';
         case 'confluence':
-            return '/components/icons/category-icons/confluence.png';
+            return '/admin/Components/icons/Category-icons/confluence.png';
         case 'synergy':
-            return '/components/icons/category-icons/synergy.png';
+            return '/admin/Components/icons/Category-icons/synergy.png';
         case 'compiled':
-            return '/components/icons/category-icons/confluence.png'; // Use confluence icon for compiled
+            return '/admin/Components/icons/Category-icons/confluence.png'; // Use confluence icon for compiled
         case 'single':
         default:
-            return '/components/icons/category-icons/thesis.png'; // Use thesis icon as default
+            return '/admin/Components/icons/Category-icons/thesis.png'; // Use thesis icon as default
     }
 }
 

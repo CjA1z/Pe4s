@@ -111,10 +111,51 @@ function initCompiledDocumentTracking() {
     recordDocumentVisit(documentId, 'compiled');
 }
 
+/**
+ * Gets visit statistics for a document
+ * @param {string} documentId - The ID of the document
+ * @param {number} days - Number of days to look back (default: 30)
+ * @returns {Promise<Object>} Visit statistics
+ */
+async function getDocumentVisitStats(documentId, days = 30) {
+    try {
+        if (!documentId) {
+            console.warn('Cannot get document visit stats: Missing document ID');
+            return null;
+        }
+        
+        // Get user info for possible authentication
+        let userInfo = null;
+        try {
+            userInfo = JSON.parse(sessionStorage.getItem('userInfo') || localStorage.getItem('userInfo'));
+        } catch (e) {
+            console.log('No user info found or invalid format');
+        }
+        
+        // Fetch document visit stats
+        const response = await fetch(`/api/page-visits/documents/${documentId}?days=${days}`, {
+            headers: {
+                ...(userInfo?.token ? {'Authorization': `Bearer ${userInfo.token}`} : {})
+            }
+        });
+        
+        if (!response.ok) {
+            console.warn(`Failed to get document visit stats: ${response.status} ${response.statusText}`);
+            return null;
+        }
+        
+        return await response.json();
+    } catch (error) {
+        console.error(`Error getting document visit stats:`, error);
+        return null;
+    }
+}
+
 // Export functionality so it can be used from the individual pages
 window.DocumentTracker = {
     initSingleDocumentTracking,
     initCompiledDocumentTracking,
     recordDocumentVisit,
-    getDocumentIdFromUrl
+    getDocumentIdFromUrl,
+    getDocumentVisitStats
 }; 

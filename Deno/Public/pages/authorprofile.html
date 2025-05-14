@@ -960,15 +960,24 @@
                 console.log('No user info found or invalid format');
             }
             
-            // Prepare visit data
+            // Determine visitor type (guest or user)
+            const visitorType = userInfo?.isLoggedIn ? 'user' : 'guest';
+            
+            // Prepare visit data - ensure all expected parameters are provided
             const visitData = {
                 authorId: authorId,
-                visitorType: userInfo?.isLoggedIn ? 'user' : 'guest',
+                visitorType: visitorType,  // This is critical for the counter table (author_id, date, visitor_type)
                 userId: userInfo?.isLoggedIn ? userInfo.id : undefined
             };
             
+            console.log('Recording author visit to counter table:', visitData);
+            
             // Send the visit data to the API
-            const response = await fetch(`${API_BASE_URL}/author-visits`, {
+            // Use the path that exactly matches what's registered in authorVisitsRoutes.ts
+            const url = '/api/author-visits';
+            console.log(`Sending POST request to: ${url}`);
+            
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -979,12 +988,23 @@
             
             if (!response.ok) {
                 console.warn(`Failed to record author visit: ${response.status} ${response.statusText}`);
+                // Log request details for debugging
+                console.log('Request details:', {
+                    url: url,
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': userInfo?.token ? 'Bearer [token-hidden]' : 'none'
+                    },
+                    body: visitData
+                });
                 return;
             }
             
-            console.log('Author visit recorded successfully');
+            const data = await response.json();
+            console.log('Author visit recorded successfully in counter table:', data);
         } catch (error) {
-            console.error('Error recording author visit:', error);
+            console.error('Error recording author visit to counter table:', error);
             // Non-critical error, don't disrupt the user experience
         }
     }

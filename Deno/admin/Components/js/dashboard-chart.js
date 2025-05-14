@@ -28,22 +28,123 @@ async function fetchVisitorData(period) {
                 apiEndpoint = '/api/page-visits/stats/daily'; // Default to daily
         }
         
+        // Try the specific period endpoint first
         const response = await fetch(apiEndpoint);
         
-        if (!response.ok) {
-            console.error(`HTTP error fetching visitor data: ${response.status}`);
-            return { labels: [], userVisits: [], guestVisits: [] };
+        if (response.ok) {
+            const data = await response.json();
+            console.log(`Visitor data received for ${period}:`, data);
+            
+            if (data && data.data && data.data.length > 0) {
+                return formatApiData(data, period);
+            }
         }
         
-        const data = await response.json();
-        console.log(`Visitor data received for ${period}:`, data);
+        // If specific period endpoint fails, try the general stats endpoint
+        console.log(`Specific ${period} endpoint failed, trying general stats...`);
+        const generalResponse = await fetch('/api/page-visits/stats');
         
-        if (!data || !data.data || data.data.length === 0) {
-            console.error(`No visitor data available for ${period}`);
-            return { labels: [], userVisits: [], guestVisits: [] };
+        if (generalResponse.ok) {
+            const generalData = await generalResponse.json();
+            console.log('General visitor stats received:', generalData);
+            
+            // Try to extract data from general stats
+            if (generalData) {
+                // Try different formats that might be returned by the API
+                
+                // Format 1: If period data is directly available
+                if (generalData[period] && Array.isArray(generalData[period])) {
+                    console.log(`Found ${period} data in general stats`);
+                    return formatApiData({ data: generalData[period] }, period);
+                }
+                
+                // Format 2: If data is in stats property
+                if (generalData.stats) {
+                    console.log('Found stats data in general response');
+                    
+                    // If we have the total/guest/user format like in the visits-column
+                    if (typeof generalData.stats.total !== 'undefined' && 
+                        typeof generalData.stats.guest !== 'undefined' && 
+                        typeof generalData.stats.user !== 'undefined') {
+                        
+                        console.log('Converting total/guest/user stats to chart format');
+                        
+                        // Generate a simple one-point dataset
+                        const today = new Date();
+                        const formattedDate = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                        
+                        return {
+                            labels: [formattedDate],
+                            userVisits: [generalData.stats.user],
+                            guestVisits: [generalData.stats.guest]
+                        };
+                    }
+                }
+                
+                // Format 3: If historical data exists
+                if (generalData.history && Array.isArray(generalData.history)) {
+                    console.log('Found history data in general stats');
+                    return formatApiData({ data: generalData.history }, period);
+                }
+                
+                // Format 4: Try to use daily_stats, weekly_stats, or monthly_stats if available
+                const altFieldName = `${period}_stats`;
+                if (generalData[altFieldName] && Array.isArray(generalData[altFieldName])) {
+                    console.log(`Found ${altFieldName} in general stats`);
+                    return formatApiData({ data: generalData[altFieldName] }, period);
+                }
+                
+                // Format 5: If there's a data array at the root
+                if (Array.isArray(generalData.data)) {
+                    console.log('Found data array in general stats');
+                    return formatApiData({ data: generalData.data }, period);
+                }
+                
+                // Last resort - if we have any numeric data, create a simple chart
+                if (generalData.stats && (
+                    typeof generalData.stats.total === 'number' || 
+                    typeof generalData.stats.guest === 'number' || 
+                    typeof generalData.stats.user === 'number'
+                )) {
+                    console.log('Creating simple chart from available stats');
+                    
+                    // Use home page stats to create a simple one-point dataset
+                    const today = new Date();
+                    const formattedDate = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    
+                    return {
+                        labels: ['Current'],
+                        userVisits: [generalData.stats.user || 0],
+                        guestVisits: [generalData.stats.guest || 0]
+                    };
+                }
+            }
         }
         
-        return formatApiData(data, period);
+        // Try the home-stats endpoint as a last resort (this is what visits-column uses)
+        console.log('Trying home-stats endpoint as last resort...');
+        const homeStatsResponse = await fetch('/api/page-visits/home-stats');
+        
+        if (homeStatsResponse.ok) {
+            const homeStatsData = await homeStatsResponse.json();
+            console.log('Home stats data received:', homeStatsData);
+            
+            if (homeStatsData && homeStatsData.stats) {
+                // Use home page stats to create a simple one-point dataset
+                const today = new Date();
+                const formattedDate = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                
+                return {
+                    labels: ['Current'],
+                    userVisits: [homeStatsData.stats.user || 0],
+                    guestVisits: [homeStatsData.stats.guest || 0]
+                };
+            }
+        }
+        
+        // If all API calls fail, return empty data
+        console.log('All API calls failed, returning empty data');
+        return { labels: [], userVisits: [], guestVisits: [] };
     } catch (error) {
         console.error(`Error fetching visitor data for ${period}:`, error);
         return { labels: [], userVisits: [], guestVisits: [] };
@@ -105,7 +206,58 @@ async function updateVisitorChart(period = 'daily') {
             visitorChart.destroy();
         }
         
-        // Create new chart
+        // Check if we received any data
+        if (chartData.labels.length === 0) {
+            // Display a "No Data Available" message on the canvas
+            visitorChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['No Data'],
+                    datasets: [{
+                        data: [0],
+                        backgroundColor: 'rgba(0,0,0,0)',
+                        borderColor: 'rgba(0,0,0,0)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        title: {
+                            display: true,
+                            text: 'No Data Available',
+                            color: '#666',
+                            font: {
+                                size: 16
+                            }
+                        },
+                        tooltip: {
+                            enabled: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: false
+                        },
+                        y: {
+                            display: false
+                        }
+                    }
+                }
+            });
+            
+            // Update button active state
+            const buttons = document.querySelectorAll('.chart-header button');
+            buttons.forEach(button => button.classList.remove('active'));
+            document.querySelector(`.chart-header button[data-period="${period}"]`).classList.add('active');
+            
+            return;
+        }
+        
+        // Create new chart with real data
         visitorChart = new Chart(ctx, {
             type: 'line',
             data: {
@@ -199,6 +351,53 @@ async function updateVisitorChart(period = 'daily') {
         document.querySelector(`.chart-header button[data-period="${period}"]`).classList.add('active');
     } catch (error) {
         console.error('Error updating visitor chart:', error);
+        // Display error in chart
+        try {
+            const ctx = document.getElementById('visitorChart').getContext('2d');
+            if (visitorChart) visitorChart.destroy();
+            
+            visitorChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Error'],
+                    datasets: [{
+                        data: [0],
+                        backgroundColor: 'rgba(0,0,0,0)',
+                        borderColor: 'rgba(0,0,0,0)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        title: {
+                            display: true,
+                            text: 'Error Loading Chart Data',
+                            color: '#d32f2f',
+                            font: {
+                                size: 16
+                            }
+                        },
+                        tooltip: {
+                            enabled: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: false
+                        },
+                        y: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        } catch (chartError) {
+            console.error('Failed to display error in chart:', chartError);
+        }
     }
 }
 
@@ -206,14 +405,55 @@ async function updateVisitorChart(period = 'daily') {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Initializing visitor chart...');
     
-    // Initial chart update with default period (daily)
-    updateVisitorChart('daily');
-    
-    // Add event listeners to period buttons
-    document.querySelectorAll('.chart-header button').forEach(button => {
-        button.addEventListener('click', (event) => {
-            const period = event.target.getAttribute('data-period');
-            updateVisitorChart(period);
+    // Add a small delay to ensure Chart.js is fully loaded
+    setTimeout(() => {
+        // Initial chart update with default period (daily)
+        updateVisitorChart('daily');
+        
+        // Add event listeners to period buttons
+        document.querySelectorAll('.chart-header button').forEach(button => {
+            button.addEventListener('click', (event) => {
+                const period = event.target.getAttribute('data-period');
+                updateVisitorChart(period);
+            });
         });
-    });
-}); 
+    }, 300); // Small delay to ensure Chart.js and DOM are fully loaded
+});
+
+// Retry chart rendering if it fails or canvas is not ready
+function retryChartRendering() {
+    const canvas = document.getElementById('visitorChart');
+    if (!canvas) {
+        console.warn('Canvas element not found for visitor chart, will retry...');
+        setTimeout(() => updateVisitorChart('daily'), 500);
+        return;
+    }
+    
+    // Check if Chart.js is available
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js not available yet, will retry...');
+        setTimeout(() => updateVisitorChart('daily'), 500);
+        return;
+    }
+    
+    updateVisitorChart('daily');
+}
+
+// Add a global error handler to retry the chart if it fails to render
+window.addEventListener('error', function(event) {
+    if (event.message && event.message.includes('Chart') && visitorChart === null) {
+        console.warn('Error initializing chart, attempting recovery:', event.message);
+        setTimeout(retryChartRendering, 1000);
+    }
+});
+
+// Add a fallback timeout to ensure chart renders even if DOMContentLoaded doesn't fire properly
+setTimeout(() => {
+    if (visitorChart === null) {
+        console.warn('Chart not initialized after 1 second, attempting recovery...');
+        retryChartRendering();
+    }
+}, 1000);
+
+// Expose updateVisitorChart to the global scope for debugging
+window.updateVisitorChart = updateVisitorChart; 

@@ -626,7 +626,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                 </svg>
                 <input type="text" id="searchInputOverlay" placeholder="Search articles, documents..." autocomplete="off" class=""/>
-                <button id="clearSearchInputButton" type="button" aria-label="Clear search input">Clear</button>
+                <button id="clearSearchInputButton" type="button" aria-label="Clear search input" onclick="document.getElementById('searchInputOverlay').value=''; this.classList.remove('visible'); if(typeof performSearchOverlay === 'function') performSearchOverlay(); document.getElementById('searchInputOverlay').focus(); return false;">Clear</button>
                  <div id="loadingSpinnerOverlay" aria-label="Loading search results">
                     <svg viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                 </div>
@@ -901,7 +901,7 @@
                     
                     // Extract year from publication_date
                     if (doc.publication_date) {
-                        try {
+        try {
                             const year = new Date(doc.publication_date).getFullYear();
                             if (!isNaN(year)) {
                                 years.add(year.toString());
@@ -985,7 +985,7 @@
             if (filters.author) url.searchParams.append('author', filters.author);
             if (filters.keywords) url.searchParams.append('keyword', filters.keywords);
             if (filters.year) url.searchParams.append('year', filters.year);
-            
+
             // Add pagination
             url.searchParams.append('limit', '10');
             url.searchParams.append('page', '1');
@@ -994,7 +994,26 @@
             
             // Fetch documents
             const documentData = await fetchData(url.toString());
-            const documents = documentData?.documents || [];
+            let documents = documentData?.documents || [];
+            
+            // Process documents to add correct URLs based on document type
+            documents = documents.map(doc => {
+                // Determine if this is a compiled document
+                const isCompiled = doc.is_compiled === true || 
+                                  doc.document_type?.toLowerCase() === 'compiled' || 
+                                  doc.child_count > 0;
+                
+                // For guest/default navbar, direct to the appropriate page
+                // We always direct to guest pages in the default navbar
+                const documentUrl = isCompiled 
+                    ? `/pages/guest-compiled.html?id=${doc.id}` 
+                    : `/pages/guest-single.html?id=${doc.id}`;
+                
+                return {
+                    ...doc,
+                    url: documentUrl
+                };
+            });
             
             // Fetch matching authors if we have a search query
             let authorHits = [];
@@ -1688,7 +1707,7 @@
                     resultElement.href = item.url || '#';
                     resultElement.classList.add('search-result-item');
                     if (catInfo.itemClass) resultElement.classList.add(catInfo.itemClass);
-                    resultElement.target = (item.url && item.url !== '#') ? "_blank" : "_self";
+                    resultElement.target = "_self";
                     resultElement.rel = (item.url && item.url !== '#') ? "noopener noreferrer" : "";
                     resultElement.innerHTML = catInfo.itemRenderer(item, queryToHighlight);
                     sectionDiv.appendChild(resultElement);
@@ -1914,11 +1933,34 @@
             searchInputOverlay = newSearchInput;
         }
         if (clearSearchInputButton) {
-            clearSearchInputButton.addEventListener('click', () => {
+            // Instead of cloning, directly add the event listener
+            clearSearchInputButton.addEventListener('click', function(event) {
+                event.preventDefault();
+                event.stopPropagation();
+                
+                // Directly update the input value using DOM methods
+                if (searchInputOverlay) {
+                    // Clear the input field directly
                 searchInputOverlay.value = '';
-                clearSearchInputButton.classList.remove(VISIBLE_CLASS);
-                performSearchOverlay();
+                    
+                    // Update the DOM input value to ensure it's properly cleared
+                    searchInputOverlay.setAttribute('value', '');
+                    
+                    // Use both property and DOM ways to clear
+                    searchInputOverlay.innerText = '';
+                    
+                    // Manually trigger input event to update state
+                    searchInputOverlay.dispatchEvent(new Event('input', { bubbles: true }));
+                    
+                    // Hide the clear button
+                    this.classList.remove(VISIBLE_CLASS);
+                    
+                    // Force focus
                 searchInputOverlay.focus();
+                    
+                    // Trigger search update with empty query
+                    performSearchOverlay();
+                }
             });
         }
         [authorFilterOverlay, keywordsFilterOverlay, yearFilterOverlay].forEach(filterElement => {

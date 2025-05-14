@@ -622,7 +622,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                 </svg>
                 <input type="text" id="searchInputOverlay" placeholder="Search articles, documents..." autocomplete="off" class=""/>
-                <button id="clearSearchInputButton" type="button" aria-label="Clear search input">Clear</button>
+                <button id="clearSearchInputButton" type="button" aria-label="Clear search input" onclick="document.getElementById('searchInputOverlay').value=''; this.classList.remove('visible'); if(typeof performSearchOverlay === 'function') performSearchOverlay(); document.getElementById('searchInputOverlay').focus(); return false;">Clear</button>
                  <div id="loadingSpinnerOverlay" aria-label="Loading search results">
                     <svg viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                 </div>
@@ -937,7 +937,7 @@
             };
         }
     }
-
+    
     async function fetchTopKeywords() {
         try {
             // First try trending keywords endpoint
@@ -961,7 +961,7 @@
             return { top_keywords: [] };
         }
     }
-
+    
     async function performSearch(searchQuery, filters) {
         try {
             const url = new URL(API.documents, window.location.origin);
@@ -970,7 +970,7 @@
             if (searchQuery) url.searchParams.append('search', searchQuery);
             
             // Add category filter (as document_type)
-            if (filters.category && filters.category.length > 0) {
+                    if (filters.category && filters.category.length > 0) {
                 filters.category.forEach(category => {
                     // Document types are uppercase in the API
                     url.searchParams.append('type', category.toUpperCase());
@@ -990,7 +990,25 @@
             
             // Fetch documents
             const documentData = await fetchData(url.toString());
-            const documents = documentData?.documents || [];
+            let documents = documentData?.documents || [];
+            
+            // Process documents to add correct URLs based on document type
+            documents = documents.map(doc => {
+                // Determine if this is a compiled document
+                const isCompiled = doc.is_compiled === true || 
+                                  doc.document_type?.toLowerCase() === 'compiled' || 
+                                  doc.child_count > 0;
+                
+                // For user navbar, direct to the appropriate user page
+                const documentUrl = isCompiled 
+                    ? `/pages/user-compiled.html?id=${doc.id}` 
+                    : `/pages/user-single.html?id=${doc.id}`;
+                
+                return {
+                    ...doc,
+                    url: documentUrl
+                };
+            });
             
             // Fetch matching authors if we have a search query
             let authorHits = [];
@@ -1062,9 +1080,9 @@
             };
         } catch (error) {
             console.error("Error performing search:", error);
-            return {
-                query: searchQuery,
-                results: {
+            return { 
+                query: searchQuery, 
+                results: { 
                     documents: { label: "Documents", hits: [], count: 0 },
                     authors: { label: "Authors", hits: [], count: 0 },
                     keywords: { label: "Matching Keywords", hits: [], count: 0 }
@@ -1157,19 +1175,19 @@
                 <span id="user-name-part" class="greeting-name">${displayName}</span>
             </div>
             <div class="py-1" role="none">
-                <a href="#" class="group text-gray-700 flex items-center px-4 py-2 text-sm hover:bg-amber-100 hover:text-green-800 rounded-md mx-1" role="menuitem" tabindex="-1">
+                <a href="/pages/userProfile.html" class="group text-gray-700 flex items-center px-4 py-2 text-sm hover:bg-amber-100 hover:text-green-800 rounded-md mx-1" role="menuitem" tabindex="-1">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" class="w-5 h-5 mr-3">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                     </svg>
                     Profile
                 </a>
-                <a href="#" class="group text-gray-700 flex items-center px-4 py-2 text-sm hover:bg-amber-100 hover:text-green-800 rounded-md mx-1" role="menuitem" tabindex="-1">
+                <a href="/pages/userHistory.html" class="group text-gray-700 flex items-center px-4 py-2 text-sm hover:bg-amber-100 hover:text-green-800 rounded-md mx-1" role="menuitem" tabindex="-1">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" class="w-5 h-5 mr-3">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     History
                 </a>
-                <a href="#" class="group text-gray-700 flex items-center px-4 py-2 text-sm hover:bg-amber-100 hover:text-green-800 rounded-md mx-1" role="menuitem" tabindex="-1">
+                <a href="/pages/savedDocuments.html" class="group text-gray-700 flex items-center px-4 py-2 text-sm hover:bg-amber-100 hover:text-green-800 rounded-md mx-1" role="menuitem" tabindex="-1">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" class="w-5 h-5 mr-3">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
                     </svg>
@@ -1233,9 +1251,9 @@
                 </div>
             </div>
             <div class="mt-3 px-2 space-y-1">
-                <a href="#" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-amber-100 hover:text-green-800">Profile</a>
-                <a href="#" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-amber-100 hover:text-green-800">History</a>
-                <a href="#" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-amber-100 hover:text-green-800">
+                <a href="/pages/userProfile.html" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-amber-100 hover:text-green-800">Profile</a>
+                <a href="/pages/userHistory.html" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-amber-100 hover:text-green-800">History</a>
+                <a href="/pages/savedDocuments.html" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-amber-100 hover:text-green-800">
                     Library ${user.libraryCount > 0 ? `<span class="ml-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-green-800">${user.libraryCount}</span>` : ''}
                 </a>
                 <button type="button" id="logout-button-mobile" class="w-full text-left block px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-red-200 hover:text-red-800">Log Out</button>
@@ -1455,10 +1473,10 @@
             // Apply filters data to UI
             if (filtersData) {
                 // Populate select dropdowns
-                if (filtersData.authors) populateSelectWithOptions(authorFilterOverlay, filtersData.authors);
-                if (filtersData.keywords) populateSelectWithOptions(keywordsFilterOverlay, filtersData.keywords);
-                if (filtersData.years) populateSelectWithOptions(yearFilterOverlay, filtersData.years);
-                
+            if (filtersData.authors) populateSelectWithOptions(authorFilterOverlay, filtersData.authors);
+            if (filtersData.keywords) populateSelectWithOptions(keywordsFilterOverlay, filtersData.keywords);
+            if (filtersData.years) populateSelectWithOptions(yearFilterOverlay, filtersData.years);
+
                 // Populate category buttons with real counts
                 if (filtersData.categoryCounts) {
                     populateCategoryButtons(
@@ -1661,7 +1679,7 @@
                     resultElement.href = item.url || '#';
                     resultElement.classList.add('search-result-item');
                     if (catInfo.itemClass) resultElement.classList.add(catInfo.itemClass);
-                    resultElement.target = (item.url && item.url !== '#') ? "_blank" : "_self";
+                    resultElement.target = "_self";
                     resultElement.rel = (item.url && item.url !== '#') ? "noopener noreferrer" : "";
                     resultElement.innerHTML = catInfo.itemRenderer(item, queryToHighlight);
                     sectionDiv.appendChild(resultElement);
@@ -1683,8 +1701,8 @@
             showAllResultsContainer.classList.remove(HIDDEN_CLASS);
         }
     }
-    async function checkAuthStatusAndSetupUI() {
-        try {
+    async function checkAuthStatusAndSetupUI() { 
+        try { 
             // Check if we're loaded via navbar-loader.js
             const isLoadedViaNavbarLoader = window.NavbarModule && window.NavbarModule.userInfo;
 
@@ -1696,8 +1714,8 @@
                     isAuthenticated: window.NavbarModule.userInfo.isLoggedIn,
                     user: window.NavbarModule.userInfo
                 };
-                currentUser = authData.user;
-            } else {
+                currentUser = authData.user; 
+            } else { 
                 // Directly access sessionStorage as fallback (for standalone usage)
                 try {
                     const userInfoStr = sessionStorage.getItem('userInfo');
@@ -1762,8 +1780,8 @@
                 if (!isLoadedViaNavbarLoader) {
                     window.location.href = '/login.html';
                 }
-            }
-        } catch (error) {
+            } 
+        } catch (error) { 
             console.error("Error in auth check and UI setup:", error);
             // If loaded directly, redirect to login
             if (!(window.NavbarModule && window.NavbarModule.userInfo)) {
@@ -1829,7 +1847,7 @@
         
         // Update mobile menu profile section if it exists
         if (mobileUserAuthContainer) {
-            mobileUserAuthContainer.innerHTML = '';
+        mobileUserAuthContainer.innerHTML = ''; 
             mobileUserAuthContainer.appendChild(createMobileProfileSection(user));
             
             // Add event listener to mobile logout button
@@ -1957,11 +1975,34 @@
         }
         
         if (clearSearchInputButton) { 
-            clearSearchInputButton.addEventListener('click', () => { 
+            // Instead of cloning, directly add the event listener
+            clearSearchInputButton.addEventListener('click', function(event) {
+                event.preventDefault();
+                event.stopPropagation();
+                
+                // Directly update the input value using DOM methods
+                if (searchInputOverlay) {
+                    // Clear the input field directly
                 searchInputOverlay.value = ''; 
-                clearSearchInputButton.classList.remove(VISIBLE_CLASS); 
-                performSearchOverlay(); 
+                    
+                    // Update the DOM input value to ensure it's properly cleared
+                    searchInputOverlay.setAttribute('value', '');
+                    
+                    // Use both property and DOM ways to clear
+                    searchInputOverlay.innerText = '';
+                    
+                    // Manually trigger input event to update state
+                    searchInputOverlay.dispatchEvent(new Event('input', { bubbles: true }));
+                    
+                    // Hide the clear button
+                    this.classList.remove(VISIBLE_CLASS); 
+                    
+                    // Force focus
                 searchInputOverlay.focus(); 
+                    
+                    // Trigger search update with empty query
+                    performSearchOverlay(); 
+                }
             }); 
         }
         
@@ -2262,4 +2303,5 @@
 })(); // IIFE End
 </script>
 </body>
+<script src="/Components/NavBar/dropdown-fix.js"></script>
 </html>

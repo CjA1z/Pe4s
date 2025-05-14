@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compiled Document</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        :root {
+            --theme-gold: #FDB813;
+            --theme-gold-darker: #EAA10F;
+            --theme-gold-light-bg: rgba(253, 184, 19, 0.2);
+            --theme-gold-lighter-bg: rgba(253, 184, 19, 0.1);
+            --theme-gold-highlight: rgba(253, 184, 19, 0.4);
+            --theme-green-dark: #006A4E;
+            --theme-green-darker-text: #00523D;
+            --theme-green-light-bg: rgba(0, 106, 78, 0.3);
+            --theme-green-lighter-bg: rgba(0, 106, 78, 0.15);
+            --theme-green-border: rgba(0, 106, 78, 0.7);
+            --theme-page-bg: #F9F6EE;
+            --neutral-border-color: #e5e7eb;
+            --primary-text-color: #1f2937;
+            --secondary-text-color: #4b5563;
+            --tertiary-text-color: #6b7280;
+        }
+
+        html, body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--theme-page-bg);
+            color: var(--primary-text-color);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+
+        .page-wrapper {
+            padding-top: 2rem;
+            padding-bottom: 4rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+
+        h1, h2, h3 {
+            color: var(--theme-green-dark);
+        }
+
+        .compiled-header {
+            background-color: var(--theme-green-dark);
+            color: white;
+            padding: 3rem 1rem;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .compiled-header h1 {
+            color: white;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .compiled-content {
+            background-color: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .compiled-toc {
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .compiled-toc h2 {
+            border-bottom: 2px solid var(--theme-gold);
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .toc-list {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        .toc-list li {
+            margin-bottom: 0.5rem;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            transition: background-color 0.2s;
+        }
+
+        .toc-list li:hover {
+            background-color: var(--theme-gold-light-bg);
+        }
+
+        .toc-list a {
+            color: var(--theme-green-dark);
+            text-decoration: none;
+            display: block;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            background-color: var(--theme-green-dark);
+            color: white;
+            border-radius: 0.375rem;
+            text-decoration: none;
+            transition: background-color 0.2s;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background-color: var(--theme-green-dark);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--theme-green-darker-text);
+        }
+
+        .btn-secondary {
+            background-color: var(--theme-gold);
+            color: black;
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--theme-gold-darker);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem 0;
+            font-size: 1.2rem;
+            color: var(--tertiary-text-color);
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #09f;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        .doc-type-label {
+            display: inline-block;
+            font-size: 0.7rem;
+            font-weight: bold;
+            background-color: var(--theme-gold);
+            color: black;
+            padding: 0.1rem 0.4rem;
+            border-radius: 0.25rem;
+            margin-right: 0.5rem;
+            vertical-align: middle;
+            text-transform: uppercase;
+        }
+        
+        .toc-doc-type {
+            display: inline-block;
+            font-size: 0.65rem;
+            font-weight: bold;
+            background-color: var(--theme-gold-lighter-bg);
+            color: var(--theme-green-darker-text);
+            padding: 0.1rem 0.3rem;
+            border-radius: 0.25rem;
+            margin-right: 0.4rem;
+            vertical-align: middle;
+            text-transform: uppercase;
+            border: 1px solid var(--theme-gold);
+        }
+        
+        /* Make each child document stand out more */
+        .child-document-item {
+            border: 1px solid var(--neutral-border-color);
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            background-color: white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            transition: box-shadow 0.2s ease-in-out;
+        }
+        
+        .child-document-item:hover {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .child-document-item header h3 {
+            margin-top: 0;
+            font-size: 1.25rem;
+        }
+        
+        .child-document-item header h3 a {
+            color: var(--theme-green-dark);
+            text-decoration: none;
+        }
+        
+        .child-document-item header h3 a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar will be loaded here -->
+    <div id="navbarContainer"></div>
+
+    <div class="page-wrapper">
+        <header class="compiled-header">
+            <div class="container">
+                <h1>Compiled Document Title</h1>
+                <p>A collection of related documents compiled into a single volume</p>
+            </div>
+        </header>
+
+        <main class="container">
+            <section class="compiled-toc">
+                <h2>Table of Contents</h2>
+                <ul class="toc-list" id="tableOfContents">
+                    <li><a href="#section1">Loading Table of Contents...</a></li>
+                </ul>
+            </section>
+
+            <section class="compiled-content" id="compiledContent">
+                <div class="container">
+                    <main class="document-container">
+                        <!-- Loading indicator -->
+                        <div id="loadingIndicator" style="display: none; align-items: center; justify-content: center; padding: 2rem; text-align: center; width: 100%;">
+                            <div>
+                                <div class="spinner" style="border: 4px solid rgba(0, 0, 0, 0.1); width: 36px; height: 36px; border-radius: 50%; border-left-color: #09f; animation: spin 1s linear infinite; margin: 0 auto 1rem;"></div>
+                                <p>Loading compiled document...</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Compiled document content will be displayed here -->
+                        <div id="compiledContent"></div>
+                    </main>
+                </div>
+            </section>
+
+            <div class="action-buttons">
+                <a href="#" class="btn btn-primary" id="readBtn">
+                    <i class="fas fa-book-open"></i> Read Full Document
+                </a>
+                <a href="#" class="btn btn-secondary" id="saveBtn">
+                    <i class="fas fa-bookmark"></i> Save for Later
+                </a>
+            </div>
+        </main>
+    </div>
+
+    <!-- Navbar loading script -->
+    <script src="/Components/js/navbar-loader.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize the navbar
+            if (window.NavbarModule) {
+                window.NavbarModule.init();
+            } else {
+                console.error('NavbarModule not found! Make sure navbar-loader.js is loaded correctly.');
+            }
+            
+            // Get user information from storage
+            function getUserInfo() {
+                try {
+                    // Check sessionStorage first, then localStorage
+                    const sessionUserInfo = sessionStorage.getItem('userInfo');
+                    const localUserInfo = localStorage.getItem('userInfo');
+                    
+                    // Parse the stored JSON data
+                    if (sessionUserInfo) {
+                        try {
+                            const userInfo = JSON.parse(sessionUserInfo);
+                            return userInfo;
+                        } catch (parseError) {
+                            console.error('Error parsing sessionStorage user info:', parseError);
+                            return null;
+                        }
+                    } else if (localUserInfo) {
+                        try {
+                            const userInfo = JSON.parse(localUserInfo);
+                            return userInfo;
+                        } catch (parseError) {
+                            console.error('Error parsing localStorage user info:', parseError);
+                            return null;
+                        }
+                    }
+                    
+                    return null;
+                } catch (error) {
+                    console.error('Error retrieving user info:', error);
+                    return null;
+                }
+            }
+
+            // Check if user is logged in
+            function isUserLoggedIn(userInfo) {
+                if (!userInfo) {
+                    return false;
+                }
+                
+                // Check for token validity
+                if (!userInfo.token) {
+                    return false;
+                }
+                
+                // Check for login timestamp and validate it's not too old (24 hours)
+                if (userInfo.loginTime) {
+                    const loginTime = new Date(userInfo.loginTime);
+                    const currentTime = new Date();
+                    const hoursSinceLogin = (currentTime - loginTime) / (1000 * 60 * 60);
+                    
+                    if (hoursSinceLogin > 24) {
+                        return false;
+                    }
+                }
+                
+                // Final check for essential properties - ensuring isLoggedIn is explicitly true
+                return userInfo.isLoggedIn === true && userInfo.token && userInfo.token.length > 0;
+            }
+            
+            // Get document ID from URL
+            function getDocumentIdFromUrl() {
+                const urlParams = new URLSearchParams(window.location.search);
+                return urlParams.get('id');
+            }
+            
+            const documentId = getDocumentIdFromUrl();
+            if (documentId) {
+                console.log(`Loading compiled document with ID: ${documentId}`);
+                // Fetch the compiled document data
+                fetchCompiledDocumentData(documentId);
+            } else {
+                console.warn('No document ID provided in URL');
+                document.getElementById('compiledContent').innerHTML = `
+                    <div class="loading" style="color: orange;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p>No document ID provided. Please provide a valid document ID.</p>
+                    </div>
+                `;
+            }
+
+            // Function to fetch compiled document data
+            async function fetchCompiledDocumentData(docId) {
+                try {
+                    // Show loading state
+                    showLoading(true);
+                    
+                    let mainDocData;
+                    let foundInCompiledDocuments = false;
+                    
+                    // First attempt to fetch from compiled-documents API
+                    try {
+                        const mainDocResponse = await fetch(`/api/compiled-documents/${docId}`);
+                        
+                        if (mainDocResponse.ok) {
+                            mainDocData = await mainDocResponse.json();
+                            foundInCompiledDocuments = true;
+                        }
+                    } catch (compiledError) {
+                        console.warn('Error fetching from compiled-documents API:', compiledError);
+                    }
+                    
+                    // If not found in compiled documents, try regular documents endpoint
+                    if (!foundInCompiledDocuments) {
+                        try {
+                            const fallbackResponse = await fetch(`/api/documents/${docId}`);
+                            if (fallbackResponse.ok) {
+                                mainDocData = await fallbackResponse.json();
+                                console.log('Using regular documents API as fallback');
+                                
+                                // Check if this regular document has compiled document properties
+                                const isCompiled = mainDocData.is_compiled === true || 
+                                                 mainDocData.document_type?.toLowerCase() === 'compiled' ||
+                                                 mainDocData.child_count > 0;
+                                                 
+                                if (!isCompiled) {
+                                    console.warn('This document is not a compiled document');
+                                    // Redirect to single document page
+                                    window.location.href = `/pages/user-single.html?id=${docId}`;
+                                    return;
+                                }
+                            } else {
+                                throw new Error(`Failed to fetch document: ${fallbackResponse.status} ${fallbackResponse.statusText}`);
+                            }
+                        } catch (docError) {
+                            throw new Error(`Failed to fetch document: ${docError.message}`);
+                        }
+                    }
+                    
+                    if (!mainDocData) {
+                        throw new Error('Document not found in either compiled-documents or regular documents');
+                    }
+                    
+                    // Update page header with document title and info
+                    updateHeader(mainDocData);
+                    
+                    // Fetch child documents if any
+                    let childDocuments = [];
+                    
+                    // Look for children in different possible API formats
+                    if (mainDocData.children && Array.isArray(mainDocData.children)) {
+                        childDocuments = mainDocData.children;
+                    } else if (mainDocData.child_documents && Array.isArray(mainDocData.child_documents)) {
+                        childDocuments = mainDocData.child_documents;
+                    } else {
+                        // Fetch children separately if not included in main response
+                        let foundChildren = false;
+                        
+                        // Try compiled-documents children endpoint first if we found the main doc there
+                        if (foundInCompiledDocuments) {
+                            try {
+                                const childrenResponse = await fetch(`/api/compiled-documents/${docId}/children`);
+                                if (childrenResponse.ok) {
+                                    const childrenData = await childrenResponse.json();
+                                    if (Array.isArray(childrenData)) {
+                                        childDocuments = childrenData;
+                                        foundChildren = true;
+                                    } else if (childrenData.documents && Array.isArray(childrenData.documents)) {
+                                        childDocuments = childrenData.documents;
+                                        foundChildren = true;
+                                    } else if (childrenData.children && Array.isArray(childrenData.children)) {
+                                        childDocuments = childrenData.children;
+                                        foundChildren = true;
+                                    }
+                                }
+                            } catch (childError) {
+                                console.error('Error fetching child documents from compiled-documents API:', childError);
+                            }
+                        }
+                        
+                        // If no children found yet, try regular documents endpoint
+                        if (!foundChildren) {
+                            try {
+                                const fallbackChildrenResponse = await fetch(`/api/documents/${docId}/children`);
+                                if (fallbackChildrenResponse.ok) {
+                                    const fallbackData = await fallbackChildrenResponse.json();
+                                    if (Array.isArray(fallbackData)) {
+                                        childDocuments = fallbackData;
+                                    } else if (fallbackData.documents && Array.isArray(fallbackData.documents)) {
+                                        childDocuments = fallbackData.documents;
+                                    } else {
+                                        console.error('Could not parse child documents from response');
+                                    }
+                                } else {
+                                    console.error('Could not fetch child documents');
+                                }
+                            } catch (childError) {
+                                console.error('Error fetching child documents:', childError);
+                            }
+                        }
+                    }
+                    
+                    // Now, fetch complete details for each child document to ensure we have author and abstract data
+                    const enhancedChildDocuments = [];
+                    if (childDocuments.length > 0) {
+                        // Show loading indicator while fetching detailed child data
+                        const contentElement = document.getElementById('compiledContent');
+                        if (contentElement) {
+                            contentElement.innerHTML = `
+                                <div class="loading" style="display: flex; align-items: center; justify-content: center; padding: 2rem;">
+                                    <div class="spinner"></div>
+                                    <p style="margin-left: 1rem;">Loading document details...</p>
+                                </div>
+                            `;
+                        }
+                        
+                        // Fetch detailed information for each child document
+                        for (const child of childDocuments) {
+                            if (child.id) {
+                                try {
+                                    // Fetch detailed document data
+                                    const childResponse = await fetch(`/api/documents/${child.id}`);
+                                    if (childResponse.ok) {
+                                        const detailedChild = await childResponse.json();
+                                        console.log(`Fetched detailed data for child document ${child.id}:`, detailedChild);
+                                        
+                                        // If we have document_authors relation in the response, use that
+                                        if (detailedChild.document_authors && Array.isArray(detailedChild.document_authors) && 
+                                            detailedChild.document_authors.length > 0) {
+                                            console.log(`Document has document_authors relation: ${detailedChild.document_authors.length} authors`);
+                                        }
+                                        
+                                        // Try to fetch author data specifically for this document
+                                        try {
+                                            const authorResponse = await fetch(`/api/document-authors/${child.id}`);
+                                            if (authorResponse.ok) {
+                                                const authorData = await authorResponse.json();
+                                                console.log(`Fetched author data for document ${child.id}:`, authorData);
+                                                
+                                                // Add the authors data to our child document
+                                                if (authorData.authors && Array.isArray(authorData.authors)) {
+                                                    detailedChild.enhancedAuthors = authorData.authors;
+                                                }
+                                            }
+                                        } catch (authorError) {
+                                            console.error(`Error fetching author data for document ${child.id}:`, authorError);
+                                        }
+                                        
+                                        enhancedChildDocuments.push({
+                                            ...child,  // Keep original properties
+                                            ...detailedChild  // Override with detailed properties
+                                        });
+                                    } else {
+                                        console.error(`Failed to fetch detailed data for child document ${child.id}`);
+                                        enhancedChildDocuments.push(child);
+                                    }
+                                } catch (error) {
+                                    console.error(`Error fetching detailed data for child document ${child.id}:`, error);
+                                    enhancedChildDocuments.push(child);
+                                }
+                            } else {
+                                enhancedChildDocuments.push(child);
+                            }
+                        }
+                    }
+                    
+                    // Display the compiled document content with enhanced child documents
+                    displayCompiledDocument(mainDocData, enhancedChildDocuments.length > 0 ? enhancedChildDocuments : childDocuments);
+                    
+                    // Track document visit
+                    trackDocumentVisit(docId);
+                    
+                    // Hide loading indicators
+                    showLoading(false);
+                } catch (error) {
+                    console.error('Error loading compiled document:', error);
+                    document.getElementById('compiledContent').innerHTML = `
+                        <div class="loading" style="color: red;">
+                            <i class="fas fa-times-circle"></i>
+                            <p>Error loading document: ${error.message}</p>
+                        </div>
+                    `;
+                    showLoading(false);
+                }
+            }
+
+            // Show or hide loading indicators
+            function showLoading(isLoading) {
+                const loadingElement = document.getElementById('loadingIndicator');
+                if (loadingElement) {
+                    loadingElement.style.display = isLoading ? 'flex' : 'none';
+                }
+                
+                // You can also add/remove loading classes from other elements
+                const pageHeader = document.querySelector('.page-header');
+                if (pageHeader) {
+                    if (isLoading) {
+                        pageHeader.classList.add('loading');
+                    } else {
+                        pageHeader.classList.remove('loading');
+                    }
+                }
+            }
+
+            // Update page header with document information
+            function updateHeader(documentData) {
+                // Update page title
+                document.title = documentData.title || 'Compiled Document';
+                
+                // Update header content
+                const headerTitle = document.querySelector('.compiled-header h1');
+                const headerDescription = document.querySelector('.compiled-header p');
+                
+                if (headerTitle) {
+                    headerTitle.textContent = documentData.title || 'Compiled Document';
+                }
+                
+                if (headerDescription) {
+                    let description = 'A collection of related documents';
+                    
+                    if (documentData.description || documentData.abstract) {
+                        description = documentData.description || documentData.abstract;
+                        // Truncate if too long
+                        if (description.length > 200) {
+                            description = description.substring(0, 197) + '...';
+                        }
+                    }
+                    
+                    headerDescription.textContent = description;
+                }
+            }
+
+            // Display the compiled document and its child documents
+            function displayCompiledDocument(mainDoc, childDocs) {
+                // Get the content container
+                const contentElement = document.getElementById('compiledContent');
+                if (!contentElement) return;
+                
+                // First, display the main compiled document info
+                let html = `
+                    <article class="document-item-base">
+                        <header>
+                            <h1 class="document-title">${extractTitle(mainDoc.title) || ''}</h1>
+                            <div class="document-meta">
+                                ${mainDoc.publication_year ? `<span class="year">${mainDoc.publication_year}</span>` : ''}
+                            </div>
+                        </header>
+                        
+                        <section class="abstract">
+                            <h2>Abstract</h2>
+                            <p>${mainDoc.abstract_foreword || mainDoc.abstract || mainDoc.description || 'No abstract available for this compiled document.'}</p>
+                        </section>
+                        
+                        ${mainDoc.keywords ? `
+                        <section class="keywords-section">
+                            <h3>Keywords</h3>
+                            <div class="keywords-container-flex">
+                                ${Array.isArray(mainDoc.keywords) ? 
+                                    mainDoc.keywords.map(kw => `<a href="#" class="tag-pill">${extractText(kw)}</a>`).join('') :
+                                    (typeof mainDoc.keywords === 'string' ? 
+                                        mainDoc.keywords.split(',').map(kw => `<a href="#" class="tag-pill">${kw.trim()}</a>`).join('') :
+                                        '<span>No keywords available</span>')}
+                            </div>
+                        </section>
+                        ` : ''}
+                        
+                        <article class="document-item-base mb-12">
+                            <header>
+                                <h2>Document Information</h2>
+                            </header>
+                            <section class="doc-info-grid">
+                                <div>
+                                    <strong>Number of Documents:</strong>
+                                    <span id="info-child-count">${childDocs.length}</span>
+                                </div>
+                                ${mainDoc.category ? `
+                                <div>
+                                    <strong>Category:</strong>
+                                    <span class="opacity-90" id="info-category">${extractText(mainDoc.category)}</span>
+                                </div>
+                                ` : ''}
+                                ${mainDoc.research_agenda ? `
+                                <div>
+                                    <strong>Research Agenda:</strong>
+                                    <span class="opacity-90" id="info-agenda">${extractText(mainDoc.research_agenda)}</span>
+                                </div>
+                                ` : ''}
+                                ${mainDoc.publication_year ? `
+                                <div>
+                                    <strong>Publication Year:</strong>
+                                    <span id="info-year">${mainDoc.publication_year}</span>
+                                </div>
+                                ` : ''}
+                                ${mainDoc.upload_date ? `
+                                <div>
+                                    <strong>Date Compiled:</strong>
+                                    <span id="info-date-uploaded">${new Date(mainDoc.upload_date).toLocaleDateString('en-US', {year: 'numeric', month: 'long', day: 'numeric'})}</span>
+                                </div>
+                                ` : ''}
+                            </section>
+                        </article>
+                    </article>
+                `;
+                
+                // Now, add the child documents section
+                if (childDocs && childDocs.length > 0) {
+                    html += `
+                        <section class="child-documents">
+                            <h2>Included Documents (${childDocs.length})</h2>
+                            <div class="child-documents-list">
+                    `;
+                    
+                    childDocs.forEach((child, index) => {
+                        // Try to extract author information from various possible sources
+                        let authorDisplay = '';
+                        
+                        // Debug: Log the author-related properties
+                        console.log(`Child document ${index} (ID: ${child.id}) author data:`, {
+                            author_name: child.author_name,
+                            author: child.author,
+                            authors: child.authors,
+                            authorId: child.author_id,
+                            hasAuthors: child.authors ? true : false,
+                            authorsType: child.authors ? typeof child.authors : 'undefined',
+                            authorsIsArray: child.authors && Array.isArray(child.authors)
+                        });
+                        
+                        if (child.enhancedAuthors && Array.isArray(child.enhancedAuthors) && child.enhancedAuthors.length > 0) {
+                            // Use the enhanced authors data from the document-authors endpoint
+                            authorDisplay = child.enhancedAuthors.map(author => {
+                                return extractText(author.full_name || author.name || `ID: ${author.id}`);
+                            }).join(', ');
+                            console.log(`Using enhancedAuthors array: ${authorDisplay}`);
+                        } else if (child.document_authors && Array.isArray(child.document_authors) && child.document_authors.length > 0) {
+                            // Use document_authors relation
+                            authorDisplay = child.document_authors.map(docAuthor => {
+                                const author = docAuthor.author || docAuthor;
+                                return extractText(author.full_name || author.name || `ID: ${author.id || docAuthor.author_id}`);
+                            }).join(', ');
+                            console.log(`Using document_authors relation: ${authorDisplay}`);
+                        } else if (child.author_name) {
+                            authorDisplay = extractText(child.author_name);
+                            console.log(`Using author_name: ${authorDisplay}`);
+                        } else if (child.author) {
+                            authorDisplay = extractText(child.author);
+                            console.log(`Using author: ${authorDisplay}`);
+                        } else if (child.authors && Array.isArray(child.authors) && child.authors.length > 0) {
+                            // Enhanced author extraction from array
+                            authorDisplay = child.authors.map(author => {
+                                if (typeof author === 'object') {
+                                    // Try all possible property names for author names
+                                    return extractText(author.full_name || author.name || author.author_name || 
+                                        (author.id ? `ID: ${author.id}` : JSON.stringify(author)));
+                                } else {
+                                    return extractText(author);
+                                }
+                            }).join(', ');
+                            console.log(`Using authors array: ${authorDisplay}`);
+                        } else if (typeof child.authors === 'string') {
+                            authorDisplay = extractText(child.authors);
+                            console.log(`Using authors string: ${authorDisplay}`);
+                        } else if (child.author_id) {
+                            // If we have only an author ID, show it as a fallback
+                            authorDisplay = `ID: ${child.author_id}`;
+                            console.log(`Using author_id as fallback: ${authorDisplay}`);
+                        } else {
+                            console.log(`No author information found for document ${child.id || index}`);
+                        }
+                        
+                        // Get abstract specifically from documents table's abstract column
+                        // Log the available properties to help debug
+                        console.log('Child document properties:', Object.keys(child));
+                        
+                        // Prioritize abstract from documents table
+                        let abstract = '';
+                        if (child.abstract) {
+                            // This is from the documents table's abstract column
+                            abstract = child.abstract;
+                            console.log('Using child.abstract for document', child.id);
+                        } else if (child.description) {
+                            abstract = child.description;
+                            console.log('Falling back to child.description for document', child.id);
+                        } else {
+                            abstract = 'No abstract available.';
+                            console.log('No abstract or description found for document', child.id);
+                        }
+                        
+                        // Clean up the title
+                        const childTitle = extractTitle(child.title) || `Document ${index + 1}`;
+                        
+                        html += `
+                            <article class="child-document-item" id="child-doc-${child.id || index}">
+                                <header>
+                                    <div class="document-title">
+                                        <p><strong>Title:</strong> <a href="/pages/user-single.html?id=${child.id}">${childTitle}</a></p>
+                                    </div>
+                                </header>
+                                
+                                <!-- Author section -->
+                                <section class="child-author">
+                                    <p><strong>Author:</strong> ${authorDisplay || 'Unknown'}</p>
+                                </section>
+                                
+                                <section class="child-abstract">
+                                    <p>${abstract}</p>
+                                </section>
+                                
+                                <div class="document-actions">
+                                    <a href="/pages/user-single.html?id=${child.id}" class="btn btn-secondary btn-sm">View Details</a>
+                                    ${child.file_path ? `<a href="${child.file_path}" class="btn btn-primary btn-sm" target="_blank">Read Document</a>` : ''}
+                                </div>
+                            </article>
+                        `;
+                    });
+                    
+                    html += `
+                            </div>
+                        </section>
+                    `;
+                } else {
+                    html += `
+                        <div class="no-child-documents">
+                            <p>This compiled document doesn't have any child documents.</p>
+                        </div>
+                    `;
+                }
+                
+                // Update the content
+                contentElement.innerHTML = html;
+                
+                // Update the table of contents with child documents
+                updateTableOfContents(mainDoc, childDocs);
+                
+                // Update page title
+                document.title = `${extractTitle(mainDoc.title) || 'Compiled Document'} | sPEAS`;
+                
+                // Update the existing action buttons instead of adding new ones
+                const readBtn = document.getElementById('readBtn');
+                if (readBtn && mainDoc.file_path) {
+                    readBtn.href = mainDoc.file_path;
+                    readBtn.target = "_blank"; // Open in new tab
+                }
+                
+                const saveBtn = document.getElementById('saveBtn');
+                if (saveBtn) {
+                    const documentId = mainDoc.id;
+                    saveBtn.onclick = function(e) {
+                        e.preventDefault();
+                        saveForLater(e, documentId);
+                    };
+                }
+            }
+
+            // Helper function to clean up titles
+            function extractTitle(title) {
+                if (!title) return '';
+                
+                // If title is an object, try to convert to string
+                if (typeof title === 'object') {
+                    try {
+                        return String(title).replace(/\[object Object\]/g, '').trim();
+                    } catch (e) {
+                        return '';
+                    }
+                }
+                
+                // Clean up title string
+                const titleString = String(title);
+                
+                // Remove any references to CONFLUENCE, Vol, Compiled Document
+                return titleString
+                    .replace(/CONFLUENCE/g, '')
+                    .replace(/Vol\.\s*\d+\s*\(\d+-\d+\)/g, '')
+                    .replace(/\(\d+-\d+\)/g, '')
+                    .replace(/Compiled Document/g, '')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+            }
+            
+            // Helper function to clean up text fields
+            function extractText(text) {
+                if (!text) return '';
+                
+                // If text is an object, try to convert to string
+                if (typeof text === 'object') {
+                    try {
+                        return String(text).replace(/\[object Object\]/g, '').trim();
+                    } catch (e) {
+                        return '';
+                    }
+                }
+                
+                return String(text).replace(/\[object Object\]/g, '').trim();
+            }
+            
+            // Update table of contents with document structure
+            function updateTableOfContents(mainDoc, childDocs) {
+                const tocList = document.getElementById('tableOfContents');
+                if (!tocList) return;
+                
+                let tocHtml = '';
+                
+                // Only add child document entries
+                if (childDocs && childDocs.length > 0) {
+                    childDocs.forEach((child, index) => {
+                        const childId = child.id || index;
+                        const childTitle = extractTitle(child.title) || `Document ${index + 1}`;
+                        // Simple list item without special formatting
+                        tocHtml += `<li class="toc-child"><a href="#child-doc-${childId}">${childTitle}</a></li>`;
+                    });
+                } else {
+                    // If no child documents, show a message
+                    tocHtml = '<li class="toc-empty">No documents available</li>';
+                }
+                
+                tocList.innerHTML = tocHtml;
+            }
+
+            // Save document for later reading
+            function saveForLater(event, documentId) {
+                event.preventDefault();
+                
+                // Implementation for saving the document for later reading
+                // This could use localStorage or send a request to server
+                
+                const savedItems = JSON.parse(localStorage.getItem('savedForLater') || '[]');
+                if (!savedItems.includes(documentId)) {
+                    savedItems.push(documentId);
+                    localStorage.setItem('savedForLater', JSON.stringify(savedItems));
+                    alert('Document saved for later reading!');
+                } else {
+                    alert('This document is already in your reading list.');
+                }
+            }
+            
+            // Track document visit
+            function trackDocumentVisit(docId) {
+                // Initialize document visit tracking for compiled documents
+                if (window.DocumentTracker) {
+                    // Use initCompiledDocumentTracking instead of trackVisit
+                    if (typeof window.DocumentTracker.initCompiledDocumentTracking === 'function') {
+                        window.DocumentTracker.initCompiledDocumentTracking(docId);
+                    } else {
+                        console.error('DocumentTracker.initCompiledDocumentTracking method not found!');
+                    }
+                } else {
+                    console.error('DocumentTracker not found! Make sure document-visit-tracker.js is loaded correctly.');
+                }
+            }
+            
+            // Setup button event listeners
+            document.getElementById('readBtn').addEventListener('click', function(e) {
+                // Only prevent default if there's no href set
+                if (!this.getAttribute('href') || this.getAttribute('href') === '#') {
+                    e.preventDefault();
+                    
+                    if (!documentId) {
+                        alert('No document ID provided');
+                        return;
+                    }
+                    
+                    // Check if user is logged in
+                    const userInfo = getUserInfo();
+                    const isLoggedIn = isUserLoggedIn(userInfo);
+                    
+                    if (!isLoggedIn) {
+                        // User is not logged in, redirect to document request form
+                        window.location.href = `/requestForm/documentRequestForm.html?document_id=${documentId}`;
+                        return;
+                    }
+                    
+                    // User is logged in, but no document URL is available
+                    alert('Document file is not available');
+                }
+            });
+            
+            document.getElementById('saveBtn').addEventListener('click', function(e) {
+                e.preventDefault();
+                if (!documentId) {
+                    alert('No document ID provided');
+                    return;
+                }
+                saveForLater(e, documentId);
+            });
+        });
+    </script>
+
+    <!-- Document Visit Tracking -->
+    <script src="/Components/js/document-visit-tracker.js"></script>
+    <script>
+        // Initialize document visit tracking when the page is fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            // This initialization is now handled in the main script
+            // No need for duplicate initialization
+        });
+    </script>
+</body>
+</html>

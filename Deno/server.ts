@@ -50,6 +50,7 @@ import keywordsRoutes from "./routes/keywordsRoutes.ts"; // Import keywords rout
 import { getCompiledDocument } from "./api/compiledDocument.ts";
 import { handleGetUserProfileForNavbar } from "./api/user.ts"; // Import user profile handler
 import { handleLogout } from "./routes/logout.ts"; // Import logout handler
+import { handleLibraryRequest } from "./api/userLibrary.ts"; // Import user library handler
 // Import the document view controller
 // TODO: Fix DocumentViewController implementation
 // import { DocumentViewController } from "./controllers/documentViewController.ts";
@@ -69,6 +70,57 @@ const app = new Application();
 const router = new Router();
 // Record when the server started
 export const SERVER_START_TIME = Date.now();
+
+// Setup visit counters tables if needed
+async function ensureVisitCounterTablesExist() {
+  try {
+    console.log("Checking if visit counter tables exist and creating them if needed...");
+    
+    // Document visits table
+    await client.queryObject(`
+      CREATE TABLE IF NOT EXISTS document_visits (
+        doc_id VARCHAR(50),
+        date DATE DEFAULT CURRENT_DATE,
+        visitor_type VARCHAR(10) NOT NULL CHECK (visitor_type IN ('guest', 'user')),
+        visit_count INT DEFAULT 1,
+        PRIMARY KEY (doc_id, date, visitor_type)
+      )
+    `);
+    
+    // Author visits counter table
+    await client.queryObject(`
+      CREATE TABLE IF NOT EXISTS author_visits_counter (
+        author_id VARCHAR(50),
+        date DATE DEFAULT CURRENT_DATE,
+        visitor_type VARCHAR(10) NOT NULL CHECK (visitor_type IN ('guest', 'user')),
+        visit_count INT DEFAULT 1,
+        PRIMARY KEY (author_id, date, visitor_type)
+      )
+    `);
+    
+    // Page visits counter table
+    await client.queryObject(`
+      CREATE TABLE IF NOT EXISTS page_visits_counter (
+        page_path VARCHAR(255),
+        date DATE DEFAULT CURRENT_DATE,
+        visitor_type VARCHAR(10) NOT NULL CHECK (visitor_type IN ('guest', 'user')),
+        visit_count INT DEFAULT 1,
+        PRIMARY KEY (page_path, date, visitor_type)
+      )
+    `);
+    
+    // Create indexes for performance
+    await client.queryObject(`
+      CREATE INDEX IF NOT EXISTS idx_document_visits_date ON document_visits(date);
+      CREATE INDEX IF NOT EXISTS idx_author_visits_counter_date ON author_visits_counter(date);
+      CREATE INDEX IF NOT EXISTS idx_page_visits_counter_date ON page_visits_counter(date);
+    `);
+    
+    console.log("✅ Visit counter tables are ready");
+  } catch (error) {
+    console.error("❌ Error setting up visit counter tables:", error);
+  }
+}
 
 // Update the cachedServerStartTime in authRoutes if possible
 try {
@@ -1150,6 +1202,9 @@ async function startServer() {
     // Run database diagnostics
     await diagnoseDatabaseIssues();
     
+    // Ensure the visit counter tables exist
+    await ensureVisitCounterTablesExist();
+    
     // Register routes with the application
     app.use(router.routes());
     app.use(router.allowedMethods());
@@ -1685,34 +1740,113 @@ router.get("/api/compiled-documents/:id/foreword", async (ctx) => {
     
     if (!forewordResult.rowCount || forewordResult.rowCount === 0) {
       ctx.response.status = 404;
-      ctx.response.body = { error: `Foreword not found for document with ID ${id}` };
+      ctx.response.body = { error: `Foreword for compiled document with ID ${id} not found` };
       return;
     }
     
+    // Get the foreword path
     const forewordPath = (forewordResult.rows[0] as any).foreword;
     
     if (!forewordPath) {
       ctx.response.status = 404;
-      ctx.response.body = { error: `No foreword file path found for document with ID ${id}` };
+      ctx.response.body = { error: `No foreword file path defined for compiled document with ID ${id}` };
       return;
     }
     
-    console.log(`Found foreword at path: ${forewordPath} for ${category} document ID: ${id}`);
+    console.log(`Found foreword file path: ${forewordPath}`);
     
-    ctx.response.status = 200;
-    ctx.response.body = { 
-      id,
-      category,
-      foreword: forewordPath
-    };
+    // Try to load the foreword file
+    try {
+      // Get the workspace root directory (parent of Deno directory)
+      const workspaceRoot = Deno.cwd().replace(/[\\/]Deno$/, '');
+      
+      // Remove any leading slash from the path if present
+      const normalizedPath = forewordPath.startsWith('/') ? forewordPath.substring(1) : forewordPath;
+      
+      // Create absolute path from workspace root
+      const absolutePath = join(workspaceRoot, normalizedPath);
+      console.log(`Attempting to read foreword from: ${absolutePath}`);
+      
+      // Read the file
+      const forewordContent = await Deno.readTextFile(absolutePath);
+      
+      // Return the foreword content
+      ctx.response.status = 200;
+      ctx.response.body = {
+        category: category,
+        foreword: forewordContent,
+        foreword_path: forewordPath
+      };
+    } catch (fileError) {
+      console.error(`Error reading foreword file: ${fileError instanceof Error ? fileError.message : String(fileError)}`);
+      ctx.response.status = 404;
+      ctx.response.body = { 
+        error: `Failed to read foreword file for compiled document ${id}`,
+        details: fileError instanceof Error ? fileError.message : String(fileError)
+      };
+    }
   } catch (error) {
-    console.error(`Error fetching foreword for compiled document ${id}:`, error);
+    console.error(`Error fetching foreword for compiled document ${id}:`, error instanceof Error ? error.message : String(error));
     ctx.response.status = 500;
-    ctx.response.body = { 
-      error: "Failed to fetch foreword", 
-      details: error instanceof Error ? error.message : String(error) 
+    ctx.response.body = {
+      error: "Failed to fetch foreword for compiled document",
+      details: error instanceof Error ? error.message : String(error)
     };
   }
 });
 
-startServer();
+// Add route for user library
+router.all("/api/user/library(/.*)?", async (ctx) => {
+  try {
+    console.log(`[SERVER] Processing ${ctx.request.method} request to ${ctx.request.url.pathname}`);
+    
+    // Convert Oak request to standard Request
+    const headers = new Headers(ctx.request.headers);
+    
+    // Create body if needed
+    let body = null;
+    if (ctx.request.hasBody) {
+      const reqBody = ctx.request.body({ type: "json" });
+      body = await reqBody.value;
+    }
+    
+    // Create a Request object
+    const request = new Request(ctx.request.url.toString(), {
+      method: ctx.request.method,
+      headers: headers,
+      body: body ? JSON.stringify(body) : undefined
+    });
+    
+    // Process through the API handler
+    const response = await handleLibraryRequest(request);
+    
+    // Set status and headers
+    ctx.response.status = response.status;
+    for (const [key, value] of response.headers.entries()) {
+      ctx.response.headers.set(key, value);
+    }
+    
+    // Set body
+    if (response.status !== 204) {
+      const responseBody = await response.text();
+      try {
+        // Try to parse as JSON first
+        const jsonBody = JSON.parse(responseBody);
+        ctx.response.body = jsonBody;
+      } catch {
+        // If not JSON, use as is
+        ctx.response.body = responseBody;
+      }
+    }
+  } catch (error) {
+    console.error(`[SERVER] Error handling user library request:`, error);
+    ctx.response.status = 500;
+    ctx.response.body = {
+      error: "Internal server error processing user library request",
+      details: error instanceof Error ? error.message : String(error)
+    };
+  }
+});
+
+// Start the server
+await startServer();

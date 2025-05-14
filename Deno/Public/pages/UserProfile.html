@@ -34,6 +34,17 @@
             font-family: 'Inter', sans-serif;
             background-image: linear-gradient(to bottom right, #fdfae8, #e6f4ea);
             color: #1f2937; 
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .page-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem 1rem;
+            margin-top: 1rem; /* Add space below navbar */
         }
         .profile-card {
             background-color: #ffffff;
@@ -255,33 +266,110 @@
         .cropper-view-box, .cropper-face { border-radius: 50%; }
         #cropperImageInModal.cropper-hidden { max-width: 100%; max-height: 350px; }
         hr { border: none; height: 1px; background-color: var(--neutral-border-color); margin: 1.5rem 0; }
+        
+        /* Navbar integration styles */
+        #navbar-container {
+            position: relative;
+            z-index: 30; /* Lower than modal (which is 1000) but higher than other content */
+        }
+        
+        /* Ensure modals appear above navbar */
+        .modal-overlay {
+            z-index: 1000; /* Higher than navbar */
+        }
+        
+        /* Message box should appear above everything */
+        .message-box {
+            z-index: 1001; /* Higher than both navbar and modal */
+        }
+        
+        /* Navbar dropdown styles */
+        #dropdown-menu {
+            transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+        }
+        
+        .dropdown-greeting-container {
+            padding: 1rem 1.25rem;
+            background-color: #f9fafb;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .greeting-text {
+            display: block;
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+        
+        .greeting-name {
+            display: block;
+            font-weight: 600;
+            font-size: 1.125rem;
+            color: #111827;
+            margin-top: 0.25rem;
+        }
+        
+        .dropdown-divider {
+            height: 1px;
+            margin: 0.5rem 0;
+            background-color: #e5e7eb;
+        }
+        
+        .count-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 1.25rem;
+            height: 1.25rem;
+            padding: 0 0.375rem;
+            background-color: #fee2e2;
+            color: #b91c1c;
+            border-radius: 9999px;
+            font-weight: 600;
+            font-size: 0.75rem;
+            line-height: 1;
+            margin-left: 0.5rem;
+        }
+        
+        /* Add styles for search bar placeholder */
+        .search-bar-placeholder-text {
+            margin-left: 0.5rem;
+        }
+        
+        .search-bar-icon {
+            color: var(--theme-green-dark);
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js" defer></script>
 </head>
-<body class="flex items-center justify-center min-h-screen p-4 sm:p-6 md:p-8">
+<body>
+    <div id="navbarContainer">
+        <!-- The navbar will be dynamically loaded here by navbar-loader.js -->
+    </div>
 
+    <div class="page-container">
     <div class="profile-card p-6 sm:p-8 md:p-10 w-full max-w-xl">
         <h1 class="page-title">User Profile</h1>
 
         <div class="flex flex-col items-center mb-6"> 
             <div class="image-preview-container">
                 <img id="profilePicturePreview" 
-                     src="https://placehold.co/150x150/A0AEC0/FFFFFF?text=AP" 
+                     src="" 
                      alt="Profile Picture"
-                     onerror="this.onerror=null; this.src='https://placehold.co/150x150/A0AEC0/FFFFFF?text=Error';">
+                     data-use-avatar="true">
                 <label for="profilePictureInput" class="edit-picture-hover-overlay" title="Change profile picture">
-                    <i class="fas fa-pencil-alt"></i>
-                    <span>Edit</span>
+                        <i class="fas fa-camera"></i>
+                        <span>Change<br>Photo</span>
                 </label>
             </div>
             <input type="file" id="profilePictureInput" accept="image/*">
+                <p class="profile-info-text">Upload a profile picture<br><strong>JPG or PNG, max 5MB</strong></p>
 
             <div class="mt-2 text-center space-y-1"> 
                 <p id="displayUserId" class="profile-info-text">
-                    <strong>ID:</strong> <span>USER12345XYZ</span>
+                        <strong>ID:</strong> <span>Loading...</span>
                 </p>
                 <p id="displayEmail" class="profile-info-text">
-                    <strong>Email:</strong> <span>user.email@example.com</span>
+                        <strong>Email:</strong> <span>Loading...</span>
                 </p>
             </div>
         </div>
@@ -330,6 +418,7 @@
                 </button>
             </div>
         </form>
+        </div>
     </div>
 
     <div id="cropModal" class="modal-overlay">
@@ -361,15 +450,299 @@
         <span id="messageText"></span>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js" defer></script>
+
+    <!-- Navbar Manager: Dynamically loads the appropriate navbar based on user role -->
+    <script src="/Components/js/navbar-loader.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Debug logging
+            console.log('DEBUG: Starting navbar initialization');
+            console.log('DEBUG: localStorage userInfo =', localStorage.getItem('userInfo'));
+            console.log('DEBUG: sessionStorage userInfo =', sessionStorage.getItem('userInfo'));
+            console.log('DEBUG: Checking NavbarModule constants:');
+            if (window.NavbarModule) {
+                console.log('DEBUG: NavbarModule found');
+                
+                // Fix path case sensitivity issues
+                if (window.NavbarModule.USER_NAVBAR_URL === '/components/NavBar/user-Navbar.html') {
+                    window.NavbarModule.USER_NAVBAR_URL = '/Components/NavBar/user-Navbar.html';
+                    console.log('DEBUG: Fixed USER_NAVBAR_URL case sensitivity');
+                }
+            } else {
+                console.error('DEBUG: NavbarModule not found - script might not be loading correctly');
+            }
+            
+            // Initialize the navbar
+            if (window.NavbarModule) {
+                window.NavbarModule.init();
+
+                // Add element existence check after initialization
+                setTimeout(function() {
+                    console.log("DEBUG: Checking if navbar elements exist:");
+                    const searchButton = document.getElementById('search-open-button');
+                    console.log("- Search button exists:", !!searchButton);
+                    if (searchButton) {
+                        console.log("  - Search button display:", window.getComputedStyle(searchButton).display);
+                        console.log("  - Search button visibility:", window.getComputedStyle(searchButton).visibility);
+                        console.log("  - Search button z-index:", window.getComputedStyle(searchButton).zIndex);
+                    }
+                    
+                    const userAuthContainer = document.getElementById('user-auth-container');
+                    console.log("- User auth container exists:", !!userAuthContainer);
+                    if (userAuthContainer) {
+                        console.log("  - User auth container children count:", userAuthContainer.children.length);
+                        console.log("  - User auth container display:", window.getComputedStyle(userAuthContainer).display);
+                        console.log("  - User auth container visibility:", window.getComputedStyle(userAuthContainer).visibility);
+                    }
+                    
+                    const profileBadgeContainer = document.getElementById('profile-badge-container-dynamic');
+                    console.log("- Profile badge container exists:", !!profileBadgeContainer);
+                    
+                    const navbar = document.querySelector('nav');
+                    console.log("- Navbar exists:", !!navbar);
+                    if (navbar) {
+                        console.log("  - Navbar classes:", navbar.className);
+                        console.log("  - Navbar display:", window.getComputedStyle(navbar).display);
+                        console.log("  - Navbar z-index:", window.getComputedStyle(navbar).zIndex);
+                    }
+                    
+                    // Fix any potential CSS issues on this page
+                    if (userAuthContainer) {
+                        userAuthContainer.style.display = 'block';
+                        userAuthContainer.style.visibility = 'visible';
+                        userAuthContainer.style.zIndex = '100';
+                    }
+                    
+                    if (searchButton) {
+                        searchButton.style.display = 'flex';
+                        searchButton.style.visibility = 'visible';
+                    }
+                    
+                    // Implement manual creation of profile badge and search button if they don't exist
+                    const mdFlex = document.querySelector('.md\\:flex.md\\:items-center.md\\:ml-6');
+                    if (mdFlex) {
+                        console.log("Found navbar container, checking if elements need manual creation");
+                        
+                        // Check if search button exists and create it if not
+                        if (!searchButton) {
+                            console.log("Creating search button manually");
+                            const searchButtonContainer = document.createElement('div');
+                            searchButtonContainer.className = 'ml-4 flex items-center space-x-4';
+                            
+                            const newSearchButton = document.createElement('button');
+                            newSearchButton.id = 'search-open-button';
+                            newSearchButton.type = 'button';
+                            newSearchButton.className = 'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white focus:ring-green-600 flex items-center';
+                            newSearchButton.innerHTML = `
+                                <svg class="search-bar-icon h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+                                </svg>
+                                <span class="search-bar-placeholder-text">Search (Ctrl+K)</span>
+                            `;
+                            
+                            searchButtonContainer.appendChild(newSearchButton);
+                            mdFlex.appendChild(searchButtonContainer);
+                            
+                            // Add event listener to the search button
+                            newSearchButton.addEventListener('click', function() {
+                                if (typeof window.openSearch === 'function') {
+                                    window.openSearch();
+                                } else {
+                                    console.error("openSearch function not found");
+                                }
+                            });
+                        }
+                        
+                        // Check if user auth container exists with children
+                        if (!userAuthContainer || userAuthContainer.children.length === 0) {
+                            console.log("Creating profile badge manually");
+                            // Create a new container if needed
+                            if (!userAuthContainer) {
+                                userAuthContainer = document.createElement('div');
+                                userAuthContainer.id = 'user-auth-container';
+                                userAuthContainer.className = 'relative inline-block text-left';
+                                mdFlex.appendChild(userAuthContainer);
+                            }
+                            
+                            // Create profile badge
+                            try {
+                                // Get user info
+                                const userInfo = JSON.parse(sessionStorage.getItem('userInfo'));
+                                if (userInfo && userInfo.isLoggedIn) {
+                                    const user = {
+                                        id: userInfo.id,
+                                        username: userInfo.username,
+                                        email: userInfo.email,
+                                        first_name: userInfo.first_name,
+                                        last_name: userInfo.last_name,
+                                        display_name: userInfo.display_name || (userInfo.first_name ? `${userInfo.first_name} ${userInfo.last_name || ''}` : userInfo.username)
+                                    };
+                                    
+                                    // Create profile badge container
+                                    const profileBadgeContainer = document.createElement('div');
+                                    profileBadgeContainer.id = 'profile-badge-container-dynamic';
+                                    profileBadgeContainer.className = 'relative inline-block text-left';
+                                    
+                                    // Create button
+                                    const button = document.createElement('button');
+                                    button.type = 'button';
+                                    button.id = 'profile-badge-button';
+                                    button.className = 'flex items-center justify-center w-10 h-10 bg-green-600 rounded-full hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white focus:ring-green-600 profile-initials text-lg select-none';
+                                    
+                                    // Generate initials
+                                    let initials = '';
+                                    if (user.first_name && user.last_name) {
+                                        initials = user.first_name.charAt(0) + user.last_name.charAt(0);
+                                    } else if (user.first_name) {
+                                        initials = user.first_name.charAt(0);
+                                    } else if (user.username) {
+                                        initials = user.username.charAt(0);
+                                    } else {
+                                        initials = 'U';
+                                    }
+                                    
+                                    button.innerHTML = `<span class="text-white font-medium">${initials.toUpperCase()}</span>`;
+                                    
+                                    // Create dropdown menu
+                                    const dropdownMenu = document.createElement('div');
+                                    dropdownMenu.id = 'dropdown-menu';
+                                    dropdownMenu.className = 'dropdown-menu origin-top-right absolute right-0 mt-2 w-60 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none opacity-0 transform scale-95 pointer-events-none z-50 select-none';
+                                    
+                                    // Populate dropdown
+                                    dropdownMenu.innerHTML = `
+                                        <div class="dropdown-greeting-container" role="none">
+                                            <span id="greeting-part" class="greeting-text">Hello! 👋</span>
+                                            <span id="user-name-part" class="greeting-name">${user.display_name || user.first_name || user.username}</span>
+                                        </div>
+                                        <div class="py-1" role="none">
+                                            <a href="/pages/userProfile.html" class="group text-gray-700 flex items-center px-4 py-2 text-sm hover:bg-amber-100 hover:text-green-800 rounded-md mx-1" role="menuitem">
+                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-3">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                                                </svg>
+                                                Profile
+                                            </a>
+                                            <a href="/pages/userHistory.html" class="group text-gray-700 flex items-center px-4 py-2 text-sm hover:bg-amber-100 hover:text-green-800 rounded-md mx-1" role="menuitem">
+                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-3">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                                History
+                                            </a>
+                                            <button type="button" id="logout-button-desktop" class="group text-red-600 flex items-center px-4 py-2 text-sm hover:bg-red-200 hover:text-red-800 rounded-md mx-1 w-full text-left" role="menuitem">
+                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-3">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                                                </svg>
+                                                Log Out
+                                            </button>
+                                        </div>
+                                    `;
+                                    
+                                    // Assemble and append
+                                    profileBadgeContainer.appendChild(button);
+                                    profileBadgeContainer.appendChild(dropdownMenu);
+                                    userAuthContainer.appendChild(profileBadgeContainer);
+                                    
+                                    // Add toggle functionality
+                                    button.addEventListener('click', function(event) {
+                                        event.stopPropagation();
+                                        const isOpen = dropdownMenu.classList.contains('opacity-100');
+                                        
+                                        if (isOpen) {
+                                            dropdownMenu.classList.remove('opacity-100', 'scale-100', 'pointer-events-auto');
+                                            dropdownMenu.classList.add('opacity-0', 'scale-95', 'pointer-events-none');
+                                        } else {
+                                            dropdownMenu.classList.remove('opacity-0', 'scale-95', 'pointer-events-none');
+                                            dropdownMenu.classList.add('opacity-100', 'scale-100', 'pointer-events-auto');
+                                        }
+                                    });
+                                    
+                                    // Close dropdown when clicking outside
+                                    document.addEventListener('click', function(event) {
+                                        if (profileBadgeContainer && !profileBadgeContainer.contains(event.target)) {
+                                            if (dropdownMenu.classList.contains('opacity-100')) {
+                                                dropdownMenu.classList.remove('opacity-100', 'scale-100', 'pointer-events-auto');
+                                                dropdownMenu.classList.add('opacity-0', 'scale-95', 'pointer-events-none');
+                                            }
+                                        }
+                                    });
+                                    
+                                    // Add logout functionality
+                                    const logoutButton = document.getElementById('logout-button-desktop');
+                                    if (logoutButton) {
+                                        logoutButton.addEventListener('click', function() {
+                                            if (typeof window.logout === 'function') {
+                                                window.logout();
+                                            } else {
+                                                // Fallback logout
+                                                sessionStorage.removeItem('userInfo');
+                                                localStorage.removeItem('userInfo');
+                                                window.location.href = '/index.html?logout=true';
+                                            }
+                                        });
+                                    }
+                                }
+                            } catch (error) {
+                                console.error("Error creating profile badge:", error);
+                            }
+                        }
+                    } else {
+                        console.warn("Could not find navbar container for manual element creation");
+                    }
+                }, 1000); // Check after 1 second
+
+                // Add event listener to force navbar refresh when userInfo changes
+                window.addEventListener('storage', function(event) {
+                    if (event.key === 'userInfo') {
+                        console.log('User info changed, refreshing navbar...');
+                        window.NavbarModule.init();
+                    }
+                });
+                
+                // Force refresh on page load if coming from login
+                if (document.referrer.includes('log-in.html')) {
+                    console.log('Coming from login page, refreshing navbar...');
+                    setTimeout(() => window.NavbarModule.init(), 100);
+                }
+            } else {
+                console.error('NavbarModule not found! Make sure navbar-loader.js is loaded correctly.');
+            }
+            
+            // Record page visit
+            if (typeof window.recordPageVisit === 'function') {
+                window.recordPageVisit();
+            }
+        });
+    </script>
+    
+    <!-- User Profile Page Script -->
     <script>
         // --- Constants ---
-        const DEFAULT_PROFILE_PICTURE_URL = "https://placehold.co/150x150/A0AEC0/FFFFFF?text=AP";
-        const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024; 
+        const DEFAULT_PROFILE_PICTURE_URL = ""; // Will be generated dynamically based on user's name
+        const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
         const WEBP_OUTPUT_QUALITY = 0.8; 
         const CROPPED_IMAGE_SIZE = 150; 
+        const API_ENDPOINTS = {
+            profile: '/api/user/profile',
+            updateProfile: '/api/user/profile/update',
+            updatePassword: '/api/user/profile/password',
+            uploadProfilePicture: '/api/user/profile/picture'
+        };
 
         // --- DOM Elements ---
         const profilePicturePreview = document.getElementById('profilePicturePreview'); 
+        
+        // Setup image error handler after the function is defined
+        if (profilePicturePreview) {
+            profilePicturePreview.onerror = function() {
+                if (!this.getAttribute('data-error-handled')) {
+                    this.setAttribute('data-error-handled', 'true');
+                    const name = userData?.first_name || userData?.username || 'User';
+                    this.src = generateInitialAvatar(name);
+                }
+            };
+        }
+        
         const profilePictureInput = document.getElementById('profilePictureInput'); 
         const profileForm = document.getElementById('profileForm');
         const usernameInput = document.getElementById('username');
@@ -385,25 +758,310 @@
         const cropperImageInModal = document.getElementById('cropperImageInModal'); 
         const applyCropModalButton = document.getElementById('applyCropModalButton');
         const cancelCropModalButton = document.getElementById('cancelCropModalButton');
-        const liveCropPreview = document.getElementById('liveCropPreview'); // Live preview element
+        const liveCropPreview = document.getElementById('liveCropPreview');
+        const saveChangesButton = document.querySelector('.save-changes-button');
 
         // --- State ---
         let cropper = null; 
         let newProfilePicDataUrl = null; 
+        let userData = null;
+        let isLoading = false;
 
-        // --- Simulated User Data ---
-        let currentUserData = {
-            username: "ArchivistPro", userId: "ARCHSYS-007", email: "archivist.pro@system.local", 
-            profilePictureUrl: DEFAULT_PROFILE_PICTURE_URL 
-        };
+        // --- Helper Functions ---
+        
+        // Generate an initial-based avatar for the user
+        function generateInitialAvatar(name) {
+            name = name || 'User';
+            const initial = name.charAt(0).toUpperCase();
+            
+            // Generate a consistent color based on the name
+            const colors = [
+                '#1abc9c', '#2ecc71', '#3498db', '#9b59b6', '#34495e',
+                '#16a085', '#27ae60', '#2980b9', '#8e44ad', '#2c3e50',
+                '#f1c40f', '#e67e22', '#e74c3c', '#95a5a6', '#f39c12',
+                '#d35400', '#c0392b', '#bdc3c7', '#7f8c8d'
+            ];
+            
+            // Hash the name to get a consistent color
+            let hash = 0;
+            for (let i = 0; i < name.length; i++) {
+                hash = name.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            
+            const colorIndex = Math.abs(hash) % colors.length;
+            const bgColor = colors[colorIndex];
+            
+            // Create SVG
+            return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 150 150'%3E%3Ccircle cx='75' cy='75' r='75' fill='${encodeURIComponent(bgColor)}'/%3E%3Ctext x='50%25' y='50%25' dy='.1em' font-size='75' font-weight='bold' text-anchor='middle' dominant-baseline='middle' font-family='Arial' fill='%23FFFFFF'%3E${initial}%3C/text%3E%3C/svg%3E`;
+        }
 
-        // --- Core Functions ---
+        // --- API Functions ---
+        
+        // Get auth token from storage
+        function getAuthToken() {
+            try {
+                const userInfo = JSON.parse(sessionStorage.getItem('userInfo'));
+                return userInfo?.token || null;
+            } catch (error) {
+                console.error('Error getting auth token:', error);
+                return null;
+            }
+        }
+        
+        // Check if user is authenticated
+        function checkAuthentication() {
+            const token = getAuthToken();
+            if (!token) {
+                window.location.href = '/login.html?redirect=' + encodeURIComponent(window.location.pathname);
+                return false;
+            }
+            return true;
+        }
+        
+        // Fetch user profile data from backend
+        async function fetchUserProfile() {
+            // Get the token directly from sessionStorage
+            let userInfo;
+            try {
+                userInfo = JSON.parse(sessionStorage.getItem('userInfo'));
+                if (!userInfo || !userInfo.token || !userInfo.isLoggedIn) {
+                    console.error('Invalid or missing user authentication data');
+                    showMessage('Authentication error. Please log in again.', 'error');
+                    return null;
+                }
+                
+                // Start loading indicator
+                setLoading(true);
+                
+                // Add slight delay to ensure token is available
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                // Fetch user profile
+                const userId = userInfo.id || '';
+                const response = await fetch(`${API_ENDPOINTS.profile}?userId=${userId}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${userInfo.token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        console.warn('Using session data as fallback due to auth error');
+                        // Use userInfo data from sessionStorage as fallback
+                        return {
+                            id: userInfo.id,
+                            username: userInfo.username,
+                            email: userInfo.email,
+                            first_name: userInfo.first_name,
+                            last_name: userInfo.last_name
+                        };
+                    } else {
+                        throw new Error(`Failed to fetch profile: ${response.status}`);
+                    }
+                }
+                
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Error fetching user profile:', error);
+                showMessage('Failed to load profile data. Using session data instead.', 'error');
+                
+                // Use userInfo data from sessionStorage as fallback
+                if (userInfo) {
+                    return {
+                        id: userInfo.id,
+                        username: userInfo.username,
+                        email: userInfo.email,
+                        first_name: userInfo.first_name,
+                        last_name: userInfo.last_name
+                    };
+                }
+                return null;
+            } finally {
+                setLoading(false);
+            }
+        }
+        
+        // Update profile information
+        async function updateUserProfile(formData) {
+            if (!checkAuthentication()) return;
+            
+            // Get the token directly from sessionStorage
+            let userInfo;
+            try {
+                userInfo = JSON.parse(sessionStorage.getItem('userInfo'));
+                if (!userInfo || !userInfo.token || !userInfo.isLoggedIn) {
+                    throw new Error('Invalid or missing user authentication data');
+                }
+            } catch (error) {
+                console.error('Error parsing session user data:', error);
+                showMessage('Authentication error. Please log in again.', 'error');
+                return null;
+            }
+            
+            try {
+                setLoading(true);
+                // Include userId in the URL
+                const userId = userInfo.id || '';
+                const response = await fetch(`${API_ENDPOINTS.updateProfile}?userId=${userId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${userInfo.token}`
+                        // Content-Type is not set because FormData sets it automatically with boundary
+                    },
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.message || `Failed to update profile: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                setLoading(false);
+                return data;
+            } catch (error) {
+                console.error('Error updating profile:', error);
+                showMessage(error.message || 'Failed to update profile. Please try again.', 'error');
+                setLoading(false);
+                return null;
+            }
+        }
+        
+        // Update user password
+        async function updateUserPassword(currentPassword, newPassword) {
+            if (!checkAuthentication()) return;
+            
+            // Get the token directly from sessionStorage
+            let userInfo;
+            try {
+                userInfo = JSON.parse(sessionStorage.getItem('userInfo'));
+                if (!userInfo || !userInfo.token || !userInfo.isLoggedIn) {
+                    throw new Error('Invalid or missing user authentication data');
+                }
+            } catch (error) {
+                console.error('Error parsing session user data:', error);
+                showMessage('Authentication error. Please log in again.', 'error');
+                return null;
+            }
+            
+            try {
+                setLoading(true);
+                // Include userId in the URL
+                const userId = userInfo.id || '';
+                const response = await fetch(`${API_ENDPOINTS.updatePassword}?userId=${userId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${userInfo.token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        currentPassword,
+                        newPassword
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.message || `Failed to update password: ${response.status}`);
+                }
+                
+                setLoading(false);
+                return true;
+            } catch (error) {
+                console.error('Error updating password:', error);
+                showMessage(error.message || 'Failed to update password. Please try again.', 'error');
+                setLoading(false);
+                return false;
+            }
+        }
+        
+        // Upload profile picture
+        async function uploadProfilePicture(imageBlob) {
+            if (!checkAuthentication()) return;
+            
+            // Get the token directly from sessionStorage
+            let userInfo;
+            try {
+                userInfo = JSON.parse(sessionStorage.getItem('userInfo'));
+                if (!userInfo || !userInfo.token || !userInfo.isLoggedIn) {
+                    throw new Error('Invalid or missing user authentication data');
+                }
+            } catch (error) {
+                console.error('Error parsing session user data:', error);
+                showMessage('Authentication error. Please log in again.', 'error');
+                return null;
+            }
+            
+            const formData = new FormData();
+            formData.append('profilePicture', imageBlob, 'profile.webp');
+            
+            try {
+                setLoading(true);
+                // Include userId in the URL
+                const userId = userInfo.id || '';
+                const response = await fetch(`${API_ENDPOINTS.uploadProfilePicture}?userId=${userId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${userInfo.token}`
+                        // Content-Type is set automatically by FormData
+                    },
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.message || `Failed to upload picture: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                setLoading(false);
+                return data.pictureUrl; // Return the URL of the uploaded picture
+            } catch (error) {
+                console.error('Error uploading profile picture:', error);
+                showMessage(error.message || 'Failed to upload profile picture. Please try again.', 'error');
+                setLoading(false);
+                return null;
+            }
+        }
+        
+        // --- UI Helper Functions ---
+        
+        function setLoading(loading) {
+            isLoading = loading;
+            saveChangesButton.disabled = loading;
+            
+            if (loading) {
+                saveChangesButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+            } else {
+                saveChangesButton.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+            }
+        }
 
-        function loadUserData() {
-            usernameInput.value = currentUserData.username;
-            displayUserId.textContent = currentUserData.userId;
-            displayEmail.textContent = currentUserData.email;
-            profilePicturePreview.src = currentUserData.profilePictureUrl || DEFAULT_PROFILE_PICTURE_URL;
+        // Load user data from backend and populate UI
+        async function loadUserData() {
+            const data = await fetchUserProfile();
+            if (!data) return;
+            
+            userData = data;
+            usernameInput.value = data.username || '';
+            displayUserId.textContent = data.id || 'N/A';
+            displayEmail.textContent = data.email || 'N/A';
+            
+            // Set profile picture if available or use initial-based avatar
+            if (data.profilePictureUrl) {
+                profilePicturePreview.src = data.profilePictureUrl;
+            } else {
+                // Generate initial-based avatar from user's name or username
+                const name = data.first_name || data.username || 'User';
+                const initialAvatar = generateInitialAvatar(name);
+                profilePicturePreview.src = initialAvatar;
+                console.log("Using generated avatar for user:", name);
+            }
+            
+            // Reset form fields
             newProfilePicDataUrl = null; 
             currentPasswordInput.value = '';
             newPasswordInput.value = '';
@@ -424,10 +1082,13 @@
 
         function closeCropModal() {
             cropModal.classList.remove('active');
-            if (cropper) { cropper.destroy(); cropper = null; }
+            if (cropper) { 
+                cropper.destroy(); 
+                cropper = null; 
+            }
             profilePictureInput.value = ''; 
             document.body.style.overflow = ''; 
-            liveCropPreview.style.backgroundImage = 'none'; // Clear live preview on close
+            liveCropPreview.style.backgroundImage = 'none';
         }
 
         function togglePasswordVisibility(fieldId, toggleButton) {
@@ -473,20 +1134,18 @@
                     
                     cropper = new Cropper(cropperImageInModal, {
                         aspectRatio: 1 / 1, viewMode: 1, dragMode: 'move', background: true, 
-                        autoCropArea: 0.8, responsive: true, modal: false, guides: false, // Hide guides for cleaner look maybe?
-                        center: false, highlight: false, // Simplify visual elements
+                        autoCropArea: 0.8, responsive: true, modal: false, guides: false,
+                        center: false, highlight: false,
                         cropBoxMovable: true, cropBoxResizable: true,
                         toggleDragModeOnDblclick: false,
-                        // Add the 'crop' event listener for live preview
                         crop: function(event) {
                             if (!liveCropPreview) return;
                             const canvas = this.cropper.getCroppedCanvas({
-                                width: CROPPED_IMAGE_SIZE, // Preview size
+                                width: CROPPED_IMAGE_SIZE,
                                 height: CROPPED_IMAGE_SIZE,
-                                imageSmoothingEnabled: false // Faster preview rendering
+                                imageSmoothingEnabled: false
                             });
                             if (canvas) {
-                                // Update the background of the preview div
                                 liveCropPreview.style.backgroundImage = `url(${canvas.toDataURL()})`;
                             }
                         }
@@ -535,6 +1194,8 @@
 
         profileForm.addEventListener('submit', async function(event) { 
             event.preventDefault(); 
+            if (isLoading) return;
+            
             const newUsername = usernameInput.value.trim();
             const currentPassword = currentPasswordInput.value; 
             const newPassword = newPasswordInput.value;
@@ -551,50 +1212,102 @@
                 if (!currentPassword) { showMessage('Please enter current password to change it.', 'error'); currentPasswordInput.focus(); return; }
                 if (newPassword.length < 8) { showMessage('New password must be at least 8 characters.', 'error'); newPasswordInput.focus(); return; }
                 if (newPassword !== confirmPassword) { showMessage('New passwords do not match.', 'error'); confirmPasswordInput.focus(); return; }
-            } else if (currentPassword && !newPassword && !confirmPassword) {
-                 // Ignore if current pw entered but new/confirm are empty
             }
 
-            // Prepare data for backend
+            try {
+                // Handle profile picture upload first if needed
+                let newPictureUrl = null;
+                if (newProfilePicDataUrl) {
+                    const imageBlob = dataURLtoBlob(newProfilePicDataUrl);
+                    if (imageBlob) {
+                        newPictureUrl = await uploadProfilePicture(imageBlob);
+                        if (!newPictureUrl) {
+                            // Failed to upload picture but continue with other updates
+                            showMessage('Profile picture upload failed, but continuing with other updates', 'error');
+                        }
+                    }
+                }
+
+                // Update profile information
             const formData = new FormData();
             formData.append('username', newUsername);
+                if (newPictureUrl) {
+                    formData.append('profilePictureUrl', newPictureUrl);
+                }
+
+                const profileUpdateResult = await updateUserProfile(formData);
+                if (!profileUpdateResult) {
+                    showMessage('Failed to update profile information', 'error');
+                    return;
+                }
+
+                // Update password if needed
+                let passwordUpdateSuccess = true;
             if (isChangingPassword) {
-                formData.append('currentPassword', currentPassword);
-                formData.append('newPassword', newPassword);
-            }
-            if (newProfilePicDataUrl) {
-                 const imageBlob = dataURLtoBlob(newProfilePicDataUrl);
-                 if (imageBlob) formData.append('profilePicture', imageBlob, 'profile.webp'); 
-            }
-            
-            // Send Data to Backend (Replace with actual fetch)
-            console.log('Simulating sending FormData to backend...');
-            try {
-                // const response = await fetch('/api/profile', { method: 'PUT', body: formData });
-                // if (response.ok) {
-                    // Simulate Success
+                    passwordUpdateSuccess = await updateUserPassword(currentPassword, newPassword);
+                }
+
+                // Final result
+                if (profileUpdateResult && passwordUpdateSuccess) {
                     showMessage('Profile updated successfully!', 'success');
-                    currentUserData.username = newUsername; 
-                    if (newProfilePicDataUrl) currentUserData.profilePictureUrl = newProfilePicDataUrl; 
-                    newProfilePicDataUrl = null; 
+                    
+                    // Refresh user data
+                    await loadUserData();
+                    
+                    // Reset password fields
                     currentPasswordInput.value = ''; 
                     newPasswordInput.value = '';
                     confirmPasswordInput.value = '';
                     newPasswordFieldsContainer.classList.remove('visible'); 
-                    console.log('Updated local currentUserData:', currentUserData);
-                // } else { /* Handle backend errors */ }
-            } catch (error) { showMessage('An error occurred while updating.', 'error'); }
+                    newProfilePicDataUrl = null;
+                } else if (profileUpdateResult) {
+                    showMessage('Profile information updated, but password change failed', 'error');
+                }
+            } catch (error) {
+                console.error('Error during profile update:', error);
+                showMessage('An error occurred while updating profile', 'error');
+            }
         });
         
         // --- Initial Page Load ---
-        window.onload = function() {
-            loadUserData(); 
-            profilePicturePreview.onerror = function() {
-                this.onerror = null; 
-                this.src = DEFAULT_PROFILE_PICTURE_URL.replace('AP', 'Error'); 
-                console.error("Main profile image failed to load. Reverted to error placeholder.");
-            };
-        };
+        window.addEventListener('load', async function() {
+            // Get user info directly from session storage as a starting point
+            let sessionUserInfo;
+            try {
+                sessionUserInfo = JSON.parse(sessionStorage.getItem('userInfo'));
+                if (!sessionUserInfo || !sessionUserInfo.isLoggedIn) {
+                    console.warn('No valid user session found, redirecting to login');
+                    window.location.href = '/login.html?redirect=' + encodeURIComponent(window.location.pathname);
+                    return;
+                }
+                
+                // Initialize userData with session data as a fallback
+                userData = {
+                    id: sessionUserInfo.id,
+                    username: sessionUserInfo.username,
+                    email: sessionUserInfo.email,
+                    first_name: sessionUserInfo.first_name,
+                    last_name: sessionUserInfo.last_name
+                };
+                
+                // Pre-populate form with session data while we fetch from API
+                usernameInput.value = sessionUserInfo.username || '';
+                displayUserId.textContent = sessionUserInfo.id || 'N/A';
+                displayEmail.textContent = sessionUserInfo.email || 'N/A';
+                
+                // Generate initial avatar based on name from session
+                const name = sessionUserInfo.first_name || sessionUserInfo.username || 'User';
+                profilePicturePreview.src = generateInitialAvatar(name);
+                console.log("Initial avatar generated for:", name);
+            } catch (error) {
+                console.error('Error reading session data', error);
+                window.location.href = '/login.html?redirect=' + encodeURIComponent(window.location.pathname);
+                return;
+            }
+            
+            // Try to load user data from API
+            await loadUserData();
+        });
     </script>
 </body>
 </html>

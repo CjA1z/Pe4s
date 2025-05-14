@@ -210,7 +210,8 @@ function updateCategoryUI(categoryCounts) {
 async function updateTopAuthors() {
     try {
         console.log('Fetching top authors data...');
-        const response = await fetch('/api/author-visits/top-authors');
+        // Use the compatibility endpoint specifically for the dashboard
+        const response = await fetch('/api/author-visits/stats');
         
         if (!response.ok) {
             console.log(`HTTP error! status: ${response.status}`);
@@ -255,7 +256,7 @@ async function updateTopAuthors() {
         const data = await response.json();
         console.log('Top authors data received:', data);
         
-        // If we have top authors data but it's empty, try to fetch all authors
+        // Check if we have valid data
         if (!data.topAuthors || data.topAuthors.length === 0) {
             console.log('No top authors data, fetching all authors...');
             const allAuthorsResponse = await fetch('/api/authors/all');
