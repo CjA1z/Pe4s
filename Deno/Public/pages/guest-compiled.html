@@ -616,13 +616,15 @@
     </style>
 </head>
 <body>
+    <!-- Navbar will be loaded here -->
+    <div id="navbarContainer"></div>
+
     <div class="page-wrapper">
 
         <header class="page-header" role="banner">
             <div class="header-content container">
                 <h1 id="main-doc-title-header">Document Title</h1>
-                <p id="main-doc-author-header">Author/Publisher</p>
-                <p id="main-doc-year-header">Year</p>
+                <!-- Author and year elements removed as requested -->
             </div>
         </header>
 
@@ -660,14 +662,14 @@
                         <strong>Title:</strong>
                         <span id="info-title"></span>
                     </div>
-                    <div>
+                    <!-- <div>
                         <strong>Author(s):</strong>
                         <span id="info-author-container"></span>
                     </div>
                     <div>
                         <strong>Editor(s):</strong>
                         <span class="opacity-90" id="info-editor"></span>
-                    </div>
+                    </div> -->
                     <div>
                         <strong>Publication Year:</strong>
                         <span id="info-year"></span>
@@ -684,10 +686,10 @@
                         <strong>Category:</strong>
                         <span class="opacity-90" id="info-category"></span>
                     </div>
-                    <div>
+                    <!-- <div>
                         <strong>Research Agenda:</strong>
                         <span class="opacity-90" id="info-agenda"></span>
-                    </div>
+                    </div> -->
                     <div>
                         <strong>Date Uploaded:</strong>
                         <span id="info-date-uploaded"></span>
@@ -708,7 +710,7 @@
                     <div class="footer-logo-section">
                         <div class="footer-logo-container">
                             <img
-                                src="https://placehold.co/200x80/006A4E/FFFFFF?text=PeAS+Logo"
+                                src="../Components/images/peas_logo.png"
                                 alt="PeAS Logo"
                                 onerror="this.onerror=null; this.src='https://placehold.co/200x80/cccccc/ffffff?text=Logo+Error';">
                         </div>
@@ -861,12 +863,41 @@
         </div>
     </div>
 
+    <!-- Navbar loading script -->
+    <script src="/Components/js/navbar-loader.js"></script>
+    <script>
+        // Initialize the navbar with a check to prevent double initialization
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.NavbarModule) {
+                // Check if navbar is already initialized
+                if (!window.NavbarModule.isInitialized) {
+                    console.log('Initializing NavbarModule');
+                    window.NavbarModule.init();
+                } else {
+                    console.log('NavbarModule already initialized, skipping...');
+                }
+            } else {
+                console.error('NavbarModule not found! Make sure navbar-loader.js is loaded correctly.');
+                // Provide a basic fallback navigation if the navbar module fails
+                const navbarContainer = document.getElementById('navbarContainer');
+                if (navbarContainer) {
+                    navbarContainer.innerHTML = `
+                        <div style="background-color: #006A4E; padding: 1rem; text-align: center;">
+                            <a href="/" style="color: white; text-decoration: none; margin: 0 1rem;">Home</a>
+                            <a href="/about" style="color: white; text-decoration: none; margin: 0 1rem;">About</a>
+                            <a href="/contact" style="color: white; text-decoration: none; margin: 0 1rem;">Contact</a>
+                        </div>
+                    `;
+                }
+            }
+        });
+    </script>
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             // --- Cache DOM Elements ---
             const mainHeaderTitle = document.getElementById('main-doc-title-header');
-            const mainHeaderAuthor = document.getElementById('main-doc-author-header');
-            const mainHeaderYear = document.getElementById('main-doc-year-header');
+            // Removed references to header author and year elements
             const forewordTextElement = document.querySelector('#foreword-card .foreword-text');
             const infoTitle = document.getElementById('info-title');
             const infoAuthorContainer = document.getElementById('info-author-container');
@@ -948,14 +979,190 @@
                 const authorsRaw = authorString.split(/,\s*|\s+and\s+|\s*&\s*/).map(a => a.trim()).filter(a => a);
                 authorsRaw.forEach((authorEntry, index) => {
                     const link = document.createElement('a');
-                    link.href = `#/search/author/${encodeURIComponent(authorEntry)}`;
+                    // Update href to point to author profile
+                    link.href = `/authors/profile/${encodeURIComponent(authorEntry)}`;
                     link.className = linkClass;
                     link.textContent = authorEntry;
-                    link.onclick = (e) => { e.preventDefault(); e.stopPropagation(); searchByAuthor(authorEntry); };
+                    // Ensure proper navigation
+                    link.onclick = (e) => { 
+                        e.preventDefault(); 
+                        navigateToAuthorProfile(authorEntry); 
+                    };
                     containerElement.appendChild(link);
                     if (index < authorsRaw.length - 1) containerElement.appendChild(document.createTextNode(', '));
                 });
                 if (authorsRaw.length === 0 && containerElement.id === 'info-author-container') containerElement.textContent = 'N/A';
+            }
+
+            // Function to handle author profile display/navigation
+            function navigateToAuthorProfile(authorName, callback) {
+                console.log(`Author profile requested for: ${authorName}`);
+                
+                // Instead of navigating to a page that doesn't exist, show author info in the current page
+                showAuthorInfo(authorName);
+            }
+            
+            // Function to display author information in a modal/overlay
+            function showAuthorInfo(authorName) {
+                // Create modal/overlay if it doesn't exist yet
+                let authorInfoModal = document.getElementById('author-info-modal');
+                
+                if (!authorInfoModal) {
+                    // Create the modal structure
+                    authorInfoModal = document.createElement('div');
+                    authorInfoModal.id = 'author-info-modal';
+                    authorInfoModal.className = 'modal-overlay-form'; // Reuse existing modal styles
+                    
+                    // Create modal content
+                    authorInfoModal.innerHTML = `
+                        <div class="modal-content-form">
+                            <span class="close-button-form" id="close-author-modal">&times;</span>
+                            <h2 class="modal-title">Author Information</h2>
+                            <div id="author-info-content" style="margin-top: 1.5rem;">
+                                <div id="author-loading">Loading author information...</div>
+                                <div id="author-details" style="display: none;">
+                                    <h3 id="author-name" style="font-size: 1.3rem; margin-bottom: 1rem; color: var(--theme-green-dark);"></h3>
+                                    <div id="author-profile-content" style="line-height: 1.6;">
+                                        <p id="author-bio" style="margin-bottom: 1rem;"></p>
+                                        <div id="author-publications" style="margin-top: 1.5rem;">
+                                            <h4 style="font-size: 1rem; margin-bottom: 0.75rem; border-bottom: 1px solid var(--neutral-border-color); padding-bottom: 0.5rem;">Publications</h4>
+                                            <ul id="publications-list" style="padding-left: 1.25rem;"></ul>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="author-error" style="display: none; color: #dc3545; text-align: center; padding: 1rem;">
+                                    <p>Author profile information is not available at this time.</p>
+                                    <p style="margin-top: 0.5rem; font-size: 0.9rem;">Please check back later or contact the administrator.</p>
+                                </div>
+                            </div>
+                            <div style="display: flex; justify-content: center; margin-top: 1.5rem;">
+                                <button id="close-author-info-button" class="btn btn-secondary" style="padding: 0.5rem 1.5rem;">Close</button>
+                            </div>
+                        </div>
+                    `;
+                    
+                    document.body.appendChild(authorInfoModal);
+                    
+                    // Set up event listeners for closing the modal
+                    document.getElementById('close-author-modal').addEventListener('click', closeAuthorInfo);
+                    document.getElementById('close-author-info-button').addEventListener('click', closeAuthorInfo);
+                    authorInfoModal.addEventListener('click', function(e) {
+                        if (e.target === authorInfoModal) closeAuthorInfo();
+                    });
+                }
+                
+                // Show the modal
+                authorInfoModal.classList.add('visible');
+                
+                // Update content with the author name
+                const nameElement = document.getElementById('author-name');
+                if (nameElement) nameElement.textContent = authorName;
+                
+                // Show loading state
+                document.getElementById('author-loading').style.display = 'block';
+                document.getElementById('author-details').style.display = 'none';
+                document.getElementById('author-error').style.display = 'none';
+                
+                // Simulate loading author info (Replace this with actual API call if available)
+                setTimeout(() => {
+                    // Hide loading indicator
+                    document.getElementById('author-loading').style.display = 'none';
+                    
+                    // Check if we have any data about this author in mainDocumentData or child documents
+                    let authorInfo = findAuthorInDocumentData(authorName);
+                    
+                    if (authorInfo) {
+                        // Display author information
+                        const bioElement = document.getElementById('author-bio');
+                        if (bioElement) {
+                            bioElement.textContent = authorInfo.bio || 
+                                `${authorName} is a contributor to the PeAS Archive System. Additional biographical information is not available at this time.`;
+                        }
+                        
+                        // Display publications
+                        const publicationsList = document.getElementById('publications-list');
+                        if (publicationsList) {
+                            if (authorInfo.publications && authorInfo.publications.length > 0) {
+                                publicationsList.innerHTML = '';
+                                authorInfo.publications.forEach(pub => {
+                                    const li = document.createElement('li');
+                                    li.textContent = pub.title;
+                                    li.style.marginBottom = '0.5rem';
+                                    publicationsList.appendChild(li);
+                                });
+                            } else {
+                                // If we don't have specific publications but know the current document
+                                publicationsList.innerHTML = '';
+                                const li = document.createElement('li');
+                                li.innerHTML = mainDocumentData ? 
+                                    `<a href="#" style="color: var(--theme-green-dark);">${mainDocumentData.title || 'Current document'}</a>` : 
+                                    'Publication information not available';
+                                publicationsList.appendChild(li);
+                            }
+                        }
+                        
+                        // Show the details section
+                        document.getElementById('author-details').style.display = 'block';
+                    } else {
+                        // Show error state if no information available
+                        document.getElementById('author-error').style.display = 'block';
+                    }
+                }, 800);
+            }
+            
+            // Function to close the author info modal
+            function closeAuthorInfo() {
+                const modal = document.getElementById('author-info-modal');
+                if (modal) {
+                    modal.classList.remove('visible');
+                }
+            }
+            
+            // Helper function to find author info in document data
+            function findAuthorInDocumentData(authorName) {
+                // Default author info object
+                const authorInfo = {
+                    name: authorName,
+                    bio: null,
+                    publications: []
+                };
+                
+                // Look for enhanced author data in child documents
+                if (mainDocumentData && mainDocumentData.contained_documents) {
+                    // Add the main document as a publication
+                    authorInfo.publications.push({
+                        title: mainDocumentData.title || 'Main Document',
+                        id: mainDocumentData.doc_id || mainDocumentData.id
+                    });
+                    
+                    // Look through child documents for this author
+                    mainDocumentData.contained_documents.forEach(doc => {
+                        if (doc.enhancedAuthors && Array.isArray(doc.enhancedAuthors)) {
+                            // Look for this author in the enhanced authors
+                            const foundAuthor = doc.enhancedAuthors.find(author => {
+                                const authorFullName = author.full_name || author.name || '';
+                                return authorFullName.toLowerCase() === authorName.toLowerCase();
+                            });
+                            
+                            if (foundAuthor) {
+                                // Use any additional info from the author object
+                                if (foundAuthor.bio) authorInfo.bio = foundAuthor.bio;
+                                if (foundAuthor.affiliation) authorInfo.affiliation = foundAuthor.affiliation;
+                            }
+                        }
+                        
+                        // If this document is by this author, add it to publications
+                        if ((doc.author && doc.author.includes(authorName)) || 
+                            (doc.formattedAuthor && doc.formattedAuthor.includes(authorName))) {
+                            authorInfo.publications.push({
+                                title: doc.title || `Document ${doc.id || doc.doc_id}`,
+                                id: doc.id || doc.doc_id
+                            });
+                        }
+                    });
+                }
+                
+                return authorInfo;
             }
 
             // --- Update Floating Button Display based on localStorage ---
@@ -977,133 +1184,319 @@
 
             // --- Load Document Data ---
             async function loadDocumentData(docId) {
+                let documentData = null;
+                let errorMessages = [];
+                
                 try {
-                    let currentMockData;
-                    if (docId === 4) { // Main collection example
-                        currentMockData = {
-                            doc_id: "MAIN_COLLECTION_004", // Ensure main doc has an ID
-                            title: "The SPUD CONFLUENCE: 2020-2021, Vol. 11, No. 1",
-                            author: "St. Paul University Dumaguete",
-                            publication_year: "2020-2021",
-                            abstract: "This issue of Confluence presents research designs, an approach for answering research questions...", // Shortened for brevity
-                            keywords: ["Faculty Research", "Academic Journal", "Higher Education"],
-                            editor: { vp_academic_affairs: "SR HELEN MALUBAY, SPC", board_of_reviewers: ["Reviewer A", "Reviewer B"] },
-                            volume: "Vol. 11, No. 1", pages: "Multiple Articles", category: "Confluence",
-                            research_agenda: "Varied Academic Research", date_uploaded: "2021-06-01T00:00:00.000Z",
-                            contained_documents: [
-                                { doc_id: 401, title: "Research Designs Used by Students", author: "Roel Jumawan, et al.", abstract: "Study on research designs...", keywords: ["research designs", "students"] },
-                                { doc_id: 402, title: "Thematic Patterns in Editorials", author: "Sami Managbanag, et al.", abstract: "Analysis of thematic patterns...", keywords: ["discourse analysis", "editorials"] },
-                                { doc_id: 403, title: "Resiliency and Mental Health of Students", author: "Adah Balbon, et al.", abstract: "Assessment of student well-being...", keywords: ["resiliency", "mental health"] }
-                            ]
-                        };
-                    } else { // Fallback for unknown ID
-                        currentMockData = { doc_id: "UNKNOWN_DOC", title: "Document Not Found", abstract: "Details not available." };
-                    }
-                    mainDocumentData = currentMockData;
+                    // Show loading indicator
+                    if(forewordTextElement) forewordTextElement.textContent = 'Loading document data...';
+                    showGeneralMessage('Loading document...', false);
 
-                    await new Promise(resolve => setTimeout(resolve, 300));
+                    // Flag to track where the document was found
+                    let foundInCompiledDocuments = false;
+
+                    // First attempt to fetch from compiled-documents API
+                    try {
+                        const mainDocResponse = await fetch(`/api/compiled-documents/${docId}`);
+                        
+                        if (mainDocResponse.ok) {
+                            mainDocumentData = await mainDocResponse.json();
+                            foundInCompiledDocuments = true;
+                            console.log('Successfully fetched document from compiled-documents API:', mainDocumentData);
+                        } else {
+                            console.warn(`Error response from compiled-documents API: ${mainDocResponse.status} ${mainDocResponse.statusText}`);
+                        }
+                    } catch (compiledError) {
+                        console.warn('Error fetching from compiled-documents API:', compiledError);
+                    }
+                    
+                    // If not found in compiled documents, try regular documents endpoint
+                    if (!foundInCompiledDocuments) {
+                        try {
+                            const fallbackResponse = await fetch(`/api/documents/${docId}`);
+                            if (fallbackResponse.ok) {
+                                mainDocumentData = await fallbackResponse.json();
+                                console.log('Using regular documents API as fallback');
+                            } else {
+                                throw new Error(`Failed to fetch document: ${fallbackResponse.status} ${fallbackResponse.statusText}`);
+                            }
+                        } catch (docError) {
+                            console.error('Error fetching document from regular API:', docError);
+                            throw new Error(`Failed to fetch document: ${docError.message}`);
+                        }
+                    }
+                    
+                    // Make sure we found the document
+                    if (!mainDocumentData) {
+                        throw new Error('Document not found in either compiled-documents or regular documents');
+                    }
+
                     const data = mainDocumentData;
 
-                    if(mainHeaderTitle) mainHeaderTitle.textContent = data.title || 'Title Not Found';
-                    if(mainHeaderAuthor) mainHeaderAuthor.textContent = data.author || 'Author Not Found';
-                    if(mainHeaderYear) mainHeaderYear.textContent = data.publication_year || 'Year Not Found';
-                    if(forewordTextElement) forewordTextElement.textContent = data.abstract || 'Foreword not available.';
-                    if(infoTitle) infoTitle.textContent = data.title || '';
-                    if(infoAuthorContainer) createAuthorLinks(data.author, infoAuthorContainer);
-
-                     if (infoEditor) {
-                        infoEditor.innerHTML = '';
-                        if (data.editor && typeof data.editor === 'object') {
-                            let editorHTML = '';
-                            if (data.editor.vp_academic_affairs) {
-                                editorHTML += `<span>${data.editor.vp_academic_affairs} (Vice-President, Academic Affairs)</span><br>`;
+                    // Fetch child documents if this is a compiled document
+                    let childDocuments = [];
+                    
+                    // Look for children in different possible API formats
+                    if (data.children && Array.isArray(data.children)) {
+                        childDocuments = data.children;
+                    } else if (data.child_documents && Array.isArray(data.child_documents)) {
+                        childDocuments = data.child_documents;
+                    } else {
+                        // Fetch children separately if not included in main response
+                        let foundChildren = false;
+                        
+                        // Try compiled-documents children endpoint first if we found the main doc there
+                        if (foundInCompiledDocuments) {
+                            try {
+                                console.log(`Fetching child documents from /api/compiled-documents/${docId}/children`);
+                                const childrenResponse = await fetch(`/api/compiled-documents/${docId}/children`);
+                                if (childrenResponse.ok) {
+                                    const childrenData = await childrenResponse.json();
+                                    console.log('Child documents API response:', childrenData);
+                                    
+                                    if (Array.isArray(childrenData)) {
+                                        childDocuments = childrenData;
+                                        foundChildren = true;
+                                    } else if (childrenData.documents && Array.isArray(childrenData.documents)) {
+                                        childDocuments = childrenData.documents;
+                                        foundChildren = true;
+                                    } else if (childrenData.children && Array.isArray(childrenData.children)) {
+                                        childDocuments = childrenData.children;
+                                        foundChildren = true;
+                                    }
+                                }
+                            } catch (childError) {
+                                console.error('Error fetching child documents from compiled-documents API:', childError);
                             }
-                            if (data.editor.board_of_reviewers && Array.isArray(data.editor.board_of_reviewers) && data.editor.board_of_reviewers.length > 0) {
-                                editorHTML += '<strong>Board of Reviewers:</strong><ul class="editor-list">';
-                                data.editor.board_of_reviewers.forEach(reviewer => {
-                                    editorHTML += `<li>${reviewer}</li>`;
-                                });
-                                editorHTML += '</ul>';
-                            }
-                             infoEditor.innerHTML = editorHTML || 'N/A';
-                        } else if (typeof data.editor === 'string') {
-                             infoEditor.textContent = data.editor;
+                        }
+                        
+                        // If no children found yet, try regular documents endpoint
+                        if (!foundChildren) {
+                            try {
+                                console.log(`Fetching child documents from /api/documents/${docId}/children`);
+                                const fallbackChildrenResponse = await fetch(`/api/documents/${docId}/children`);
+                                if (fallbackChildrenResponse.ok) {
+                                    const fallbackData = await fallbackChildrenResponse.json();
+                                    console.log('Fallback child documents API response:', fallbackData);
+                                    
+                                    if (Array.isArray(fallbackData)) {
+                                        childDocuments = fallbackData;
+                                    } else if (fallbackData.documents && Array.isArray(fallbackData.documents)) {
+                                        childDocuments = fallbackData.documents;
                         } else {
-                             infoEditor.textContent = 'N/A';
+                                        console.error('Could not parse child documents from response');
+                                    }
+                                } else {
+                                    console.error('Could not fetch child documents');
+                                }
+                            } catch (childError) {
+                                console.error('Error fetching child documents from regular API:', childError);
+                            }
                         }
                     }
-                    if (infoYearElem) infoYearElem.textContent = data.publication_year || 'N/A';
-                    if (infoCategory) infoCategory.textContent = data.category || 'N/A';
+
+                    // Store the child documents in the main data object for later use
+                    mainDocumentData.contained_documents = childDocuments;
+                    console.log(`Found ${childDocuments.length} child documents:`, childDocuments);
+
+                    // Fetch detailed author information for each child document
+                    if (childDocuments && childDocuments.length > 0) {
+                        const enhancedChildDocuments = [];
+                        
+                        for (const childDoc of childDocuments) {
+                            if (childDoc.id) {
+                                try {
+                                    // Try to fetch author data specifically for this document
+                                    const authorResponse = await fetch(`/api/document-authors/${childDoc.id}`);
+                                    if (authorResponse.ok) {
+                                        const authorData = await authorResponse.json();
+                                        console.log(`Fetched author data for document ${childDoc.id}:`, authorData);
+                                        
+                                        // Add the authors data to our child document
+                                        if (authorData.authors && Array.isArray(authorData.authors)) {
+                                            childDoc.enhancedAuthors = authorData.authors;
+                                            
+                                            // Create a formatted author string for display
+                                            childDoc.formattedAuthor = authorData.authors
+                                                .map(author => author.full_name || author.name || author.author_name || '')
+                                                .filter(name => name)
+                                                .join(', ');
+                                            
+                                            console.log(`Enhanced document ${childDoc.id} with authors:`, childDoc.formattedAuthor);
+                                        }
+                                    }
+                                } catch (authorError) {
+                                    console.error(`Error fetching author data for document ${childDoc.id}:`, authorError);
+                                }
+                            }
+                            enhancedChildDocuments.push(childDoc);
+                        }
+                        
+                        // Replace the childDocuments array with our enhanced version
+                        childDocuments = enhancedChildDocuments;
+                        mainDocumentData.contained_documents = enhancedChildDocuments;
+                    }
+
+                    // Now update the UI with the document data
+                    if(mainHeaderTitle) mainHeaderTitle.textContent = data.title || 'Title Not Found';
+                    // Removed references to author and year header elements since they're no longer in the HTML
+                    if(forewordTextElement) {
+                        // For compiled documents, prioritize abstract_foreword
+                        if (data.abstract_foreword) {
+                            console.log('Displaying abstract_foreword in forewordTextElement');
+                            forewordTextElement.textContent = data.abstract_foreword;
+                        } else if (data.abstract) {
+                            console.log('Displaying abstract in forewordTextElement');
+                            forewordTextElement.textContent = data.abstract;
+                        } else if (data.foreword) {
+                            console.log('Displaying foreword in forewordTextElement');
+                            forewordTextElement.textContent = data.foreword;
+                        } else {
+                            forewordTextElement.textContent = 'Abstract not available.';
+                        }
+                    }
+                    if(infoTitle) infoTitle.textContent = data.title || '';
+                    
+                    // Enhanced document information fetching for specific fields
+                    console.log('Publication year from API:', data.publication_year);
+                    console.log('Volume from API:', data.volume);
+                    console.log('Pages from API:', data.pages);
+                    console.log('Date uploaded from API:', data.date_uploaded);
+                    console.log('Keywords from API:', data.keywords);
+                    
+                    // Publication Year - try multiple potential field names with safer extraction
+                    if (infoYearElem) {
+                        const publicationYear = extractFieldSafely(data, ['publication_year', 'year', 'pub_year', 'publicationYear']);
+                        infoYearElem.textContent = publicationYear || 'N/A';
+                        console.log('Setting publication year to:', publicationYear || 'N/A');
+                    }
+                    
+                    // Volume - enhanced to check multiple possible field names with safer extraction
                     if (infoVolume) {
-                        infoVolume.textContent = (data.category === "Confluence" || data.category === "Synergy") ? (data.volume || 'N/A') : 'N/A';
+                        const volumeValue = extractFieldSafely(data, ['volume', 'edition_volume', 'vol']);
+                        infoVolume.textContent = volumeValue || 'N/A';
+                        console.log('Setting volume to:', volumeValue || 'N/A');
                     }
-                    if (infoPages) infoPages.textContent = data.pages || 'N/A';
-                    if (infoAgenda) infoAgenda.textContent = data.research_agenda || 'N/A';
+                    
+                    // Number of Pages - enhanced to check multiple possible field names with safer extraction
+                    if (infoPages) {
+                        const pagesValue = extractFieldSafely(data, ['pages', 'page_count', 'num_pages', 'pageCount']);
+                        infoPages.textContent = pagesValue || 'N/A';
+                        console.log('Setting page count to:', pagesValue || 'N/A');
+                    }
+                    
+                    if (infoCategory) {
+                        const categoryValue = extractFieldSafely(data, ['category', 'doc_category', 'documentCategory']);
+                        infoCategory.textContent = categoryValue || 'N/A';
+                    }
+                    
+                    // Date Uploaded - enhanced with better formatting and fallbacks
                     if (infoDateUploaded) {
-                        infoDateUploaded.textContent = data.date_uploaded ? new Date(data.date_uploaded).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A';
+                        // Try different date fields and formats
+                        const dateObj = extractDateFromMultipleFields(data, [
+                            'date_uploaded', 'upload_date', 'dateUploaded', 'created_at', 'createdAt', 'date_created'
+                        ]);
+                        
+                        let dateValue = 'N/A';
+                        if (dateObj) {
+                            try {
+                                dateValue = dateObj.toLocaleDateString(undefined, { 
+                                    year: 'numeric', 
+                                    month: 'long', 
+                                    day: 'numeric' 
+                                });
+                            } catch (formatError) {
+                                console.error('Error formatting date:', formatError);
+                            }
+                        }
+                        
+                        infoDateUploaded.textContent = dateValue;
+                        console.log('Setting date uploaded to:', dateValue);
                     }
+                    
+                    // Keywords - enhanced with better error handling
                     if (infoKeywordsContainer) {
                         infoKeywordsContainer.innerHTML = '';
-                        if(data.keywords && Array.isArray(data.keywords) && data.keywords.length > 0){
-                            data.keywords.forEach((keyword, index) => {
-                                const link = document.createElement('a');
-                                link.href = `#/search/keyword/${encodeURIComponent(keyword)}`;
-                                link.className = 'clickable-meta clickable-keyword';
-                                link.textContent = keyword;
-                                link.onclick = (e) => { e.preventDefault(); searchByKeyword(keyword); };
-                                infoKeywordsContainer.appendChild(link);
-                                if (index < data.keywords.length - 1) {
-                                    infoKeywordsContainer.appendChild(document.createTextNode(', '));
-                                }
+                        
+                        // Use dedicated function to fetch and display keywords
+                        fetchDocumentKeywords(data.doc_id || docId)
+                            .then(keywords => {
+                                displayKeywords(keywords, infoKeywordsContainer);
+                            })
+                            .catch(error => {
+                                console.error('Error fetching keywords:', error);
+                                // Fallback to keywords already in document data
+                                const extractedKeywords = extractKeywordsFromDocData(data);
+                                displayKeywords(extractedKeywords, infoKeywordsContainer);
                             });
-                        } else {
-                             infoKeywordsContainer.innerHTML = '<span>N/A</span>';
-                        }
                     }
 
+                    // Display child documents in the Contents section and as article cards
                     if (tocContainer && tocList && containedDocumentsCardsContainer) {
                         tocList.innerHTML = '';
                         containedDocumentsCardsContainer.innerHTML = '';
-                        if (data.contained_documents && data.contained_documents.length > 0) {
+                        
+                        if (childDocuments && childDocuments.length > 0) {
+                            // Show the table of contents and divider since we have child documents
                             tocContainer.style.display = 'block';
                             if(tocArticlesDivider) tocArticlesDivider.style.display = 'block';
-                            data.contained_documents.forEach(doc => {
-                                const cardId = `article-${doc.doc_id}`;
-                                const titleId = `sub-doc-title-${doc.doc_id}`;
+                            
+                            // Process each child document
+                            childDocuments.forEach((doc, index) => {
+                                const cardId = `article-${doc.id || index}`;
+                                const titleId = `sub-doc-title-${doc.id || index}`;
+                                
+                                // Create TOC item
                                 const tocItem = document.createElement('li');
                                 const tocLinkContent = document.createElement('div');
                                 tocLinkContent.className = 'toc-link-content';
+                                
                                 const tocLink = document.createElement('a');
                                 tocLink.href = `#${cardId}`;
                                 tocLink.className = 'toc-title-link';
-                                tocLink.innerHTML = `<i class="fas fa-book-open" aria-hidden="true"></i> ${doc.title || 'Untitled'}`;
+                                tocLink.innerHTML = `<i class="fas fa-book-open" aria-hidden="true"></i> ${doc.title || `Document ${index + 1}`}`;
                                 tocLink.onclick = (e) => { e.preventDefault(); smoothScrollTo(cardId); };
                                 tocLinkContent.appendChild(tocLink);
-                                if (doc.author) {
+                                
+                                // Add author information to TOC if available
+                                if (doc.formattedAuthor || doc.author) {
                                     const tocAuthorSpan = document.createElement('span');
                                     tocAuthorSpan.className = 'toc-author';
                                     tocAuthorSpan.appendChild(document.createTextNode('by '));
-                                    createAuthorLinks(doc.author, tocAuthorSpan);
+                                    
+                                    // Use a custom createTocAuthorLinks function for TOC authors
+                                    if (doc.formattedAuthor) {
+                                        // Use the pre-formatted author string from our enhanced data
+                                        createTocAuthorLinks(doc.formattedAuthor, tocAuthorSpan);
+                                    } else {
+                                        createTocAuthorLinks(doc.author, tocAuthorSpan);
+                                    }
+                                    
                                     tocLinkContent.appendChild(tocAuthorSpan);
                                 }
+                                
                                 tocItem.appendChild(tocLinkContent);
                                 tocList.appendChild(tocItem);
+                                
+                                // Create document card
                                 const card = document.createElement('article');
                                 card.id = cardId;
                                 card.className = 'document-item-base article-card';
                                 card.setAttribute('aria-labelledby', titleId);
-                                let cardHTML = `<h3 id="${titleId}" class="sub-doc-title">${doc.title || 'Untitled'}</h3>`;
-                                const authorP = document.createElement('p');
-                                authorP.className = 'sub-doc-author';
-                                if (doc.author) {
-                                    authorP.appendChild(document.createTextNode('by '));
-                                    createAuthorLinks(doc.author, authorP);
-                                } else {
-                                    authorP.textContent = 'Author not available';
+                                
+                                // Add card title
+                                let cardHTML = `<h3 id="${titleId}" class="sub-doc-title">${doc.title || `Document ${index + 1}`}</h3>`;
+                                
+                                // Add author paragraph - using a placeholder that we'll fill in after the card is created
+                                cardHTML += `<p class="sub-doc-author" id="author-container-${cardId}">by <span class="author-placeholder" data-author="${doc.formattedAuthor || doc.author || ''}">Loading author...</span></p>`;
+                                
+                                // Add abstract
+                                if (doc.abstract) {
+                                    cardHTML += `<p class="sub-doc-abstract">${doc.abstract}</p>`;
                                 }
-                                cardHTML += authorP.outerHTML;
-                                if (doc.abstract) cardHTML += `<p class="sub-doc-abstract">${doc.abstract}</p>`;
-                                if (doc.keywords && doc.keywords.length > 0) {
+                                
+                                // Add keywords if available
+                                if (doc.keywords && Array.isArray(doc.keywords) && doc.keywords.length > 0) {
                                     cardHTML += `<div class="sub-doc-keywords-section"><strong>Keywords:</strong><div class="keywords-container-flex">`;
                                     doc.keywords.forEach(kw => {
                                         const pillA = document.createElement('a');
@@ -1115,15 +1508,48 @@
                                     });
                                     cardHTML += `</div></div>`;
                                 }
+                                
                                 card.innerHTML = cardHTML;
                                 containedDocumentsCardsContainer.appendChild(card);
+                                
+                                // Now that the card is in the DOM, properly set up the author links
+                                const authorContainer = document.getElementById(`author-container-${cardId}`);
+                                if (authorContainer) {
+                                    const authorPlaceholder = authorContainer.querySelector('.author-placeholder');
+                                    if (authorPlaceholder) {
+                                        let authorText = authorPlaceholder.getAttribute('data-author') || '';
+                                        
+                                        // Use enhanced authors if available
+                                        if (!authorText && doc.enhancedAuthors && Array.isArray(doc.enhancedAuthors) && doc.enhancedAuthors.length > 0) {
+                                            authorText = doc.enhancedAuthors
+                                                .map(author => author.full_name || author.name || '')
+                                                .filter(name => name)
+                                                .join(', ');
+                                        }
+                                        
+                                        // Remove the placeholder
+                                        authorPlaceholder.remove();
+                                        
+                                        if (authorText) {
+                                            // Create proper author links directly in the DOM
+                                            createCardAuthorLinks(authorText, authorContainer);
+                                        } else {
+                                            authorContainer.textContent = 'Author not available';
+                                        }
+                                    }
+                                }
                             });
                         } else {
+                            // Hide TOC and divider if no child documents
                             if(tocContainer) tocContainer.style.display = 'none';
                             if(tocArticlesDivider) tocArticlesDivider.style.display = 'none';
                         }
                     }
+                    
                     updateFloatingButtonDisplay(); // Update FAB status after data is loaded
+                    
+                    // Hide loading message
+                    hideGeneralMessage();
                 } catch (error) {
                     console.error('Error fetching document data:', error);
                     if(forewordTextElement) forewordTextElement.textContent = 'Failed to load document data.';
@@ -1193,10 +1619,10 @@
                         const button = document.createElement('button');
                         button.className = 'choice-button secondary';
                         button.textContent = doc.title || 'Untitled Article';
-                        button.dataset.docId = doc.doc_id;
+                        button.dataset.docId = doc.doc_id || doc.id;
                         button.dataset.docTitle = doc.title || 'Untitled Article';
                         button.onclick = () => {
-                            openAccessRequestModal(doc.doc_id, doc.title || 'Untitled Article');
+                            openAccessRequestModal(button.dataset.docId, button.dataset.docTitle);
                             closeModal(requestChoiceModal);
                         };
                         li.appendChild(button);
@@ -1221,8 +1647,10 @@
             if(closeChoiceModalButton) closeChoiceModalButton.addEventListener('click', () => closeModal(requestChoiceModal));
             if(requestCompilationButton && mainDocumentData) {
                 requestCompilationButton.onclick = () => { // Ensure mainDocumentData is available
-                    if (mainDocumentData && mainDocumentData.doc_id) {
-                        openAccessRequestModal(mainDocumentData.doc_id, mainDocumentData.title || 'Main Collection');
+                    if (mainDocumentData && (mainDocumentData.doc_id || mainDocumentData.id)) {
+                        // Get the document ID, ensuring it's a string
+                        const docId = String(mainDocumentData.doc_id || mainDocumentData.id);
+                        openAccessRequestModal(docId, mainDocumentData.title || 'Main Collection');
                         closeModal(requestChoiceModal);
                     } else {
                         showGeneralMessage("Collection details not available for request.", true);
@@ -1272,24 +1700,73 @@
                         if(reasonErrorElement) reasonErrorElement.style.display = 'block';
                         return;
                     }
+                    
+                    // Only check for "Other" details if "Other" is selected
                     if (selectedReasons.includes('Other') && reasonDescription && reasonDescription.value.trim() === '') {
                          showGeneralMessage("Please provide details for your 'Other' reason.", true);
-                         if(reasonDescription) reasonDescription.focus(); return;
+                         if(reasonDescription) reasonDescription.focus();
+                         return;
                     }
+                    
                     if (!consentCheckbox || !consentCheckbox.checked) {
-                        showGeneralMessage("Please agree to the Terms and Conditions.", true); return;
+                        showGeneralMessage("Please agree to the Terms and Conditions.", true);
+                        return;
                     }
 
+                    // Prepare form data in the format expected by the backend
                     const formData = {
-                        docId: requestedDocIdInput.value, // This is the ID of the item being requested
-                        docTitle: requestedDocTitleInput.value,
-                        fullName: document.getElementById('full_name').value,
+                        document_id: requestedDocIdInput.value, // This is the ID of the item being requested
+                        full_name: document.getElementById('full_name').value,
                         email: document.getElementById('email').value,
                         affiliation: document.getElementById('affiliation').value,
-                        reasons: selectedReasons,
-                        reasonDetails: reasonDescription ? reasonDescription.value : ''
-                     };
-                    console.log("Access Request For:", formData);
+                        reason: selectedReasons.join(', '),
+                        reason_details: ''
+                    };
+                    
+                    // Ensure reason_details is always populated (it's required by the backend)
+                    if (selectedReasons.includes('Other') && reasonDescription && reasonDescription.value.trim()) {
+                        // If "Other" is selected and details are provided, use those details
+                        formData.reason_details = reasonDescription.value.trim();
+                    } else if (reasonDescription && reasonDescription.value.trim()) {
+                        // If details were provided even without "Other" selected
+                        formData.reason_details = reasonDescription.value.trim();
+                    } else {
+                        // Default: Use the selected reasons as the details
+                        formData.reason_details = `Request for access based on: ${selectedReasons.join(', ')}`;
+                    }
+                    
+                    console.log("Submitting access request:", formData);
+                    
+                    // Show a loading indicator
+                    const submitButton = event.submitter;
+                    const originalButtonText = submitButton.innerHTML;
+                    submitButton.disabled = true;
+                    submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+                    
+                    // Submit the request to the backend
+                    fetch('/api/document-requests', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(formData)
+                    })
+                    .then(response => {
+                        // Reset the button state
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = originalButtonText;
+                        
+                        if (response.ok) {
+                            return response.json();
+                        } else {
+                            // Handle error response
+                            return response.json().then(errorData => {
+                                throw new Error(errorData.error || 'Failed to submit request');
+                            });
+                        }
+                    })
+                    .then(data => {
+                        console.log("Request submitted successfully:", data);
 
                     // Store pending status for the main document if the request was for the main document
                     // OR if the request was for any document originating from the floating button workflow.
@@ -1299,16 +1776,30 @@
                         updateFloatingButtonDisplay(); // Update the FAB to "Request Pending"
                     }
 
-
-                    if(receiptNumberElement) receiptNumberElement.textContent = 'REQ-' + Date.now();
-                    if(receiptDocTitleElement) receiptDocTitleElement.textContent = formData.docTitle;
+                        // Set receipt details
+                        if(receiptNumberElement) {
+                            // Use the ID from the response if available, otherwise generate a receipt number
+                            receiptNumberElement.textContent = data.id ? `REQ-${data.id}` : `REQ-${Date.now()}`;
+                        }
+                        if(receiptDocTitleElement) receiptDocTitleElement.textContent = requestedDocTitleInput.value;
+                        
+                        // Set up email service link
                     const emailInfo = getEmailServiceInfo(formData.email.toLowerCase());
                     if(emailServiceLink) {
                         emailServiceLink.href = emailInfo.url;
                         emailServiceLink.textContent = `Open ${emailInfo.name}`;
                     }
+                        
+                        // Show receipt section
                     if(formSection) formSection.classList.add('modal-section-hidden');
                     if(receiptSection) receiptSection.classList.remove('modal-section-hidden');
+                    })
+                    .catch(error => {
+                        console.error("Error submitting request:", error);
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = originalButtonText;
+                        showGeneralMessage(`Error: ${error.message || 'Failed to submit request. Please try again.'}`, true);
+                    });
                 });
             }
 
@@ -1332,11 +1823,303 @@
             });
 
             function searchByKeyword(keyword) { showGeneralMessage(`Search: Keyword "${keyword}"`); }
-            function searchByAuthor(author) { showGeneralMessage(`Search: Author "${author}"`); }
+            // Update the searchByAuthor function to use the new navigation pattern
+            function searchByAuthor(author) { 
+                navigateToAuthorProfile(author);
+            }
 
-            loadDocumentData(4);
+            // Get document ID from URL parameters
+            function getDocumentIdFromUrl() {
+                try {
+                    // Method 1: Get ID from query parameter
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const queryId = urlParams.get('id');
+                    
+                    if (queryId) {
+                        console.log(`Found document ID in query parameter: ${queryId}`);
+                        return queryId;
+                    }
+                    
+                    // Method 2: Try to extract ID from URL path segments
+                    const pathSegments = window.location.pathname.split('/');
+                    
+                    // Check the last segment for numeric ID
+                    const lastSegment = pathSegments[pathSegments.length - 1];
+                    const numericId = parseInt(lastSegment);
+                    
+                    if (!isNaN(numericId)) {
+                        console.log(`Found document ID in path: ${numericId}`);
+                        return numericId.toString();
+                    }
+                    
+                    // Method 3: Check if second-to-last segment is "document" or "doc" and last is numeric
+                    if (pathSegments.length >= 2) {
+                        const potentialIdSegment = pathSegments[pathSegments.length - 1];
+                        const potentialTypeSegment = pathSegments[pathSegments.length - 2].toLowerCase();
+                        
+                        if ((potentialTypeSegment === 'document' || potentialTypeSegment === 'doc') && 
+                            !isNaN(parseInt(potentialIdSegment))) {
+                            console.log(`Found document ID in path structure: ${potentialIdSegment}`);
+                            return potentialIdSegment;
+                        }
+                    }
+                    
+                    console.warn("No document ID found in URL");
+                    return null;
+                } catch (e) {
+                    console.error("Error extracting document ID from URL:", e);
+                    return null;
+                }
+            }
+
+            // Initialize the page with the document ID from the URL
+            const docIdFromUrl = getDocumentIdFromUrl();
+            if (docIdFromUrl) {
+                console.log(`Loading document ID: ${docIdFromUrl}`);
+                loadDocumentData(docIdFromUrl);
+            } else {
+                console.warn("No document ID provided in URL, using default ID 183 for testing");
+                loadDocumentData(183); // Default ID for testing
+            }
+
             const yearElement = document.getElementById('footerCurrentYear');
             if (yearElement) yearElement.textContent = new Date().getFullYear();
+
+            function updateUI(isError = false) {
+                if(mainHeaderTitle) mainHeaderTitle.textContent = mainDocumentData.title || 'Title Not Found';
+                if(infoTitle) infoTitle.textContent = mainDocumentData.title || '';
+                if(infoAuthorContainer) createAuthorLinks(mainDocumentData.author, infoAuthorContainer);
+            }
+
+            // --- Dedicated function to fetch document keywords ---
+            async function fetchDocumentKeywords(docId) {
+                try {
+                    console.log(`Fetching keywords specifically for document ID ${docId}`);
+                    
+                    // Try to fetch from compiled-documents first since that seems to be working
+                    try {
+                        const compiledDocResponse = await fetch(`/api/compiled-documents/${docId}`);
+                        if (compiledDocResponse.ok) {
+                            const compiledData = await compiledDocResponse.json();
+                            console.log('Fetched compiled document data:', compiledData);
+                            
+                            // Check if keywords exist in the compiled document
+                            if (compiledData.keywords && Array.isArray(compiledData.keywords)) {
+                                console.log('Found keywords in compiled-documents API:', compiledData.keywords);
+                                return compiledData.keywords;
+                            }
+                        }
+                    } catch (compiledError) {
+                        console.log('No keywords found in compiled-documents API:', compiledError);
+                    }
+                    
+                    // If we get here, try the dedicated keywords endpoint
+                    try {
+                        const keywordsResponse = await fetch(`/api/document-keywords/${docId}`);
+                        
+                        if (keywordsResponse.ok) {
+                            const keywordsData = await keywordsResponse.json();
+                            console.log('Keywords API response:', keywordsData);
+                            
+                            if (keywordsData.keywords && Array.isArray(keywordsData.keywords)) {
+                                return keywordsData.keywords;
+                            } else if (Array.isArray(keywordsData)) {
+                                return keywordsData;
+                            } else if (typeof keywordsData.keywords === 'string') {
+                                return keywordsData.keywords.split(',').map(k => k.trim()).filter(k => k);
+                            }
+                        } else {
+                            console.warn(`Keywords API returned ${keywordsResponse.status}: Using fallback approach`);
+                        }
+                    } catch (keywordsError) {
+                        console.warn('Error fetching from keywords API:', keywordsError);
+                    }
+                    
+                    // If both of the above fail, try the documents API
+                    try {
+                        const docResponse = await fetch(`/api/documents/${docId}`);
+                        
+                        if (docResponse.ok) {
+                            const docData = await docResponse.json();
+                            console.log('Documents API response:', docData);
+                            return extractKeywordsFromDocData(docData);
+                        } else {
+                            console.warn(`Documents API returned ${docResponse.status}`);
+                        }
+                    } catch (docError) {
+                        console.warn('Error fetching from documents API:', docError);
+                    }
+                    
+                    // If all APIs fail, check if we already have the keywords in mainDocumentData
+                    if (mainDocumentData && (mainDocumentData.doc_id === docId || mainDocumentData.id === docId)) {
+                        console.log('Using keywords from already loaded document data');
+                        return extractKeywordsFromDocData(mainDocumentData);
+                    }
+                    
+                    // For child documents, check if we can find it in the child documents array
+                    if (mainDocumentData.contained_documents && Array.isArray(mainDocumentData.contained_documents)) {
+                        const childDoc = mainDocumentData.contained_documents.find(
+                            doc => doc.id === docId || doc.doc_id === docId
+                        );
+                        
+                        if (childDoc) {
+                            console.log('Found keywords in child document data');
+                            return extractKeywordsFromDocData(childDoc);
+                        }
+                    }
+                    
+                    // If all else fails, return empty array
+                    console.warn('No keywords found through any method');
+                    return [];
+                } catch (error) {
+                    console.error('Error in fetchDocumentKeywords:', error);
+                    return [];
+                }
+            }
+            
+            // Helper function to extract keywords from document data
+            function extractKeywordsFromDocData(docData) {
+                let keywordsList = [];
+                
+                if (docData.keywords && Array.isArray(docData.keywords)) {
+                    keywordsList = docData.keywords;
+                } else if (docData.document_keywords && Array.isArray(docData.document_keywords)) {
+                    keywordsList = docData.document_keywords;
+                } else if (typeof docData.keywords === 'string' && docData.keywords.trim()) {
+                    keywordsList = docData.keywords.split(',').map(k => k.trim()).filter(k => k);
+                }
+                
+                console.log('Extracted keywords from doc data:', keywordsList);
+                return keywordsList;
+            }
+            
+            // Function to display keywords in a container
+            function displayKeywords(keywords, container) {
+                if (!container) return;
+                
+                container.innerHTML = ''; // Clear container
+                
+                if (keywords && keywords.length > 0) {
+                    console.log(`Displaying ${keywords.length} keywords:`, keywords);
+                    
+                    keywords.forEach((keyword, index) => {
+                        if (!keyword) return; // Skip empty keywords
+                        
+                        const link = document.createElement('a');
+                        link.href = `#/search/keyword/${encodeURIComponent(keyword)}`;
+                        link.className = 'clickable-meta clickable-keyword tag-pill';
+                        link.textContent = keyword;
+                        link.onclick = (e) => { 
+                            e.preventDefault(); 
+                            searchByKeyword(keyword);
+                        };
+                        container.appendChild(link);
+                        
+                        // Add comma between keywords (not after the last one)
+                        if (index < keywords.length - 1) {
+                            container.appendChild(document.createTextNode(' '));
+                        }
+                    });
+                } else {
+                    container.innerHTML = '<span>N/A</span>';
+                }
+            }
+
+            // Special function for TOC author links to prevent event conflict with TOC items
+            function createTocAuthorLinks(authorString, containerElement) {
+                if (!containerElement || !authorString) return;
+                
+                const authorsRaw = authorString.split(/,\s*|\s+and\s+|\s*&\s*/).map(a => a.trim()).filter(a => a);
+                authorsRaw.forEach((authorEntry, index) => {
+                    const link = document.createElement('a');
+                    link.href = `/authors/profile/${encodeURIComponent(authorEntry)}`;
+                    link.className = 'clickable-author';
+                    link.textContent = authorEntry;
+                    
+                    // Ensure event propagation is stopped and navigation works
+                    link.onclick = (e) => { 
+                        e.preventDefault(); 
+                        e.stopPropagation(); // Important to stop propagation for TOC items
+                        navigateToAuthorProfile(authorEntry);
+                    };
+                    
+                    containerElement.appendChild(link);
+                    if (index < authorsRaw.length - 1) {
+                        containerElement.appendChild(document.createTextNode(', '));
+                    }
+                });
+            }
+
+            // Specialized function for card author links
+            function createCardAuthorLinks(authorString, containerElement) {
+                if (!containerElement || !authorString) return;
+                
+                const authorsRaw = authorString.split(/,\s*|\s+and\s+|\s*&\s*/).map(a => a.trim()).filter(a => a);
+                authorsRaw.forEach((authorEntry, index) => {
+                    const link = document.createElement('a');
+                    link.href = `/authors/profile/${encodeURIComponent(authorEntry)}`;
+                    link.className = 'clickable-author';
+                    link.textContent = authorEntry;
+                    
+                    // Ensure proper navigation with stopPropagation
+                    link.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        navigateToAuthorProfile(authorEntry);
+                    });
+                    
+                    containerElement.appendChild(link);
+                    if (index < authorsRaw.length - 1) {
+                        containerElement.appendChild(document.createTextNode(', '));
+                    }
+                });
+            }
+
+            // Helper function to safely extract fields that might be missing
+            function extractFieldSafely(obj, fieldNames) {
+                if (!obj || typeof obj !== 'object') return null;
+                
+                for (const field of fieldNames) {
+                    if (obj[field] !== undefined && obj[field] !== null) {
+                        // For special cases, handle numeric vs string values
+                        if (field === 'pages' || field === 'page_count' || field === 'num_pages' || field === 'pageCount') {
+                            // For page counts, ensure they're formatted properly
+                            if (typeof obj[field] === 'number') {
+                                return obj[field].toString();
+                            } else if (typeof obj[field] === 'string' && obj[field].trim()) {
+                                return obj[field].trim();
+                            }
+                        } else {
+                            // For general fields, just return the value if it exists
+                            return obj[field];
+                        }
+                    }
+                }
+                
+                return null;
+            }
+            
+            // Helper function to extract dates from multiple possible fields
+            function extractDateFromMultipleFields(obj, dateFieldNames) {
+                if (!obj || typeof obj !== 'object') return null;
+                
+                for (const field of dateFieldNames) {
+                    const dateValue = obj[field];
+                    if (dateValue) {
+                        try {
+                            const dateObj = new Date(dateValue);
+                            if (!isNaN(dateObj.getTime())) {
+                                return dateObj;
+                            }
+                        } catch (e) {
+                            console.warn(`Failed to parse date from field ${field}:`, e);
+                        }
+                    }
+                }
+                
+                // If we couldn't extract a valid date from any field
+                return null;
+            }
         });
     </script>
 

@@ -814,6 +814,30 @@ window.NavbarModule = (function() {
                     console.log('Added event listener to desktop logout button');
                 }
                 
+                // Fix navigation links to ensure they work across page navigations
+                const navLinks = profileBadge.querySelectorAll('.dropdown-menu a[href]');
+                navLinks.forEach(link => {
+                    link.addEventListener('click', function(e) {
+                        // Use normal navigation for links rather than direct manipulation
+                        // This ensures proper page loading and event reattachment
+                        const href = this.getAttribute('href');
+                        
+                        // Only prevent default for # links or javascript links
+                        if (href === '#' || href.startsWith('javascript:')) {
+                            e.preventDefault();
+                        }
+                        
+                        // For library and history links, ensure they point to the right pages
+                        if (this.textContent.trim() === 'Library') {
+                            this.href = '/pages/savedDocument.html';
+                        } else if (this.textContent.trim() === 'History') {
+                            this.href = '/pages/userHistory.html';
+                        }
+                        
+                        console.log(`Navbar navigation to: ${this.href}`);
+                    });
+                });
+                
                 // Add event listener to user name
                 const userNamePart = profileBadge.querySelector('#user-name-part');
                 if (userNamePart && typeof window.handleUserNameClick === 'function') {
@@ -833,6 +857,29 @@ window.NavbarModule = (function() {
                         logoutButtonMobile.addEventListener('click', logout);
                         console.log('Added event listener to mobile logout button');
                     }
+                    
+                    // Fix navigation links in mobile menu
+                    const mobileNavLinks = mobileProfileSection.querySelectorAll('a[href]');
+                    mobileNavLinks.forEach(link => {
+                        link.addEventListener('click', function(e) {
+                            // Use normal navigation for links
+                            const href = this.getAttribute('href');
+                            
+                            // Only prevent default for # links or javascript links
+                            if (href === '#' || href.startsWith('javascript:')) {
+                                e.preventDefault();
+                            }
+                            
+                            // For library and history links, ensure they point to the right pages
+                            if (this.textContent.trim().includes('Library')) {
+                                this.href = '/pages/savedDocument.html';
+                            } else if (this.textContent.trim().includes('History')) {
+                                this.href = '/pages/userHistory.html';
+                            }
+                            
+                            console.log(`Mobile navbar navigation to: ${this.href}`);
+                        });
+                    });
                 }
             } else {
                 console.error('createProfileBadge function not found in navbar');
@@ -1281,10 +1328,17 @@ window.NavbarModule = (function() {
     // Public API
     return {
         init: initNavbar,
-        refresh: function() {
-            console.log('Manually refreshing navbar...');
-            setupNavbar();
-        },
+        updateProfileInfo: updateProfileInfo,
         logout: logout
     };
-})(); 
+})();
+
+// The function initNavbar is defined inside the module closure above,
+// so we need to use the version returned by the module
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.NavbarModule && typeof window.NavbarModule.init === 'function') {
+        window.NavbarModule.init();
+    } else {
+        console.error('NavbarModule or init function not available');
+    }
+}); 

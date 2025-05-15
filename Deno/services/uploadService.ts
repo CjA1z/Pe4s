@@ -97,7 +97,7 @@ export async function saveFile(
     }
     
     // Generate unique filename
-    let fileExtension = (originalName || "unknown.bin").split(".").pop() || "bin";
+    let fileExtension = (originalName || "unknown.pdf").split(".").pop() || "pdf";
     
     // Detect file type and ensure proper extension for known types
     const fileType = (typeof file === "object" && "type" in file && file.type) ? file.type : "";
@@ -107,6 +107,9 @@ export async function saveFile(
       fileExtension = originalName.toLowerCase().endsWith(".docx") ? "docx" : originalName.toLowerCase().endsWith(".doc") ? "doc" : "rtf";
     } else if (fileType.includes("image/") || originalName.toLowerCase().match(/\.(jpg|jpeg|png|gif|bmp|svg)$/i)) {
       fileExtension = originalName.toLowerCase().split('.').pop() || "jpg";
+    } else {
+      // Default to PDF for document management system
+      fileExtension = "pdf";
     }
     
     const uniqueFilename = `${timestamp}_${Math.floor(Math.random() * 10000)}.${fileExtension}`;

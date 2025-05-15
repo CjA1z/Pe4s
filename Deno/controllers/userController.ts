@@ -1,5 +1,6 @@
 import { Context } from "../deps.ts";
 import { client } from "../db/denopost_conn.ts";
+import { UserLibraryModel } from "../models/userLibraryModel.ts";
 
 interface User {
   id: string;
@@ -138,7 +139,18 @@ export const handleGetUserProfile = async (req: Request): Promise<Response> => {
       });
     }
     
-    return new Response(JSON.stringify(result.rows[0]), {
+    const userData = result.rows[0];
+    
+    // Get the user's library count
+    try {
+      const libraryCount = await UserLibraryModel.getLibraryCount(userId);
+      userData.library_count = libraryCount;
+    } catch (error) {
+      console.warn(`Unable to get library count for user ${userId}:`, error);
+      // Continue without library count if there's an error
+    }
+    
+    return new Response(JSON.stringify(userData), {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });

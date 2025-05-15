@@ -9,22 +9,42 @@
 async function updateMostVisitedWorks(days = 7) {
     const limit = 5; // Always use exactly 5 documents
     try {
-        console.log('Fetching most visited works data...');
-        const response = await fetch(`/api/page-visits/most-visited-documents?limit=${limit}&days=${days}`);
+        console.log('Fetching most visited works data directly from documents and visits tables...');
+        
+        // Try the new endpoint that directly joins documents and document_visits tables
+        const response = await fetch(`/api/documents/most-visited?limit=${limit}&days=${days}`);
         
         if (!response.ok) {
-            console.log(`HTTP error! status: ${response.status}`);
-            // Try to fetch regular documents as fallback
-            await fetchRegularDocuments();
+            console.log(`Direct join API returned error! status: ${response.status}`);
+            console.log('Trying legacy endpoint as fallback...');
+            
+            // Fall back to the legacy endpoint
+            const legacyResponse = await fetch(`/api/page-visits/most-visited-documents?limit=${limit}&days=${days}`);
+            
+            if (!legacyResponse.ok) {
+                console.log(`Legacy endpoint also failed with status: ${legacyResponse.status}`);
+                await fetchDocumentsWithVisits(days, limit);
+                return;
+            }
+            
+            const legacyData = await legacyResponse.json();
+            console.log('Legacy endpoint data received:', legacyData);
+            
+            if (!legacyData.documents || legacyData.documents.length === 0) {
+                await fetchDocumentsWithVisits(days, limit);
+                return;
+            }
+            
+            updateWorksTable(legacyData.documents.slice(0, limit));
             return;
         }
         
         const data = await response.json();
-        console.log('Most visited works data received:', data);
+        console.log('Direct join API data received:', data);
         
         if (!data.documents || data.documents.length === 0) {
-            // If no visit data, fetch regular documents as fallback
-            await fetchRegularDocuments();
+            console.log('No documents returned from direct join API');
+            await fetchDocumentsWithVisits(days, limit);
             return;
         }
         
@@ -32,7 +52,112 @@ async function updateMostVisitedWorks(days = 7) {
         updateWorksTable(data.documents.slice(0, limit));
     } catch (error) {
         console.error('Error updating most visited works:', error);
-        // Try to fetch regular documents as fallback
+        await fetchDocumentsWithVisits(days, limit);
+    }
+}
+
+/**
+ * New function to fetch documents first, then manually get visit counts
+ * This is a more reliable approach when the API endpoints aren't working properly
+ */
+async function fetchDocumentsWithVisits(days = 7, limit = 5) {
+    try {
+        console.log('Fetching all documents first, then getting visit counts...');
+        
+        // First get all documents
+        const docsResponse = await fetch('/api/documents?limit=50');
+        
+        if (!docsResponse.ok) {
+            console.error(`Failed to fetch documents: ${docsResponse.status}`);
+            await fetchRegularDocuments();
+            return;
+        }
+        
+        const docsData = await docsResponse.json();
+        
+        if (!docsData.documents || docsData.documents.length === 0) {
+            console.log('No documents found in documents API');
+            await fetchRegularDocuments();
+            return;
+        }
+        
+        console.log(`Got ${docsData.documents.length} documents, now fetching visit counts...`);
+        
+        // Try to get visit counts separately
+        let visitCounts = {};
+        
+        try {
+            // Try to fetch visit counts from document_visits table
+            const visitsResponse = await fetch(`/api/document-visits/counts?days=${days}`);
+            
+            if (visitsResponse.ok) {
+                const visitsData = await visitsResponse.json();
+                console.log('Visit counts received:', visitsData);
+                
+                if (visitsData.visits) {
+                    visitCounts = visitsData.visits;
+                }
+            } else {
+                console.log(`Could not fetch visit counts: ${visitsResponse.status}`);
+            }
+        } catch (visitsError) {
+            console.error('Error fetching visit counts:', visitsError);
+        }
+        
+        // Combine the documents with visit counts
+        console.log('Raw document data from API:', docsData.documents);
+
+        const documentsWithVisits = docsData.documents.map(doc => {
+            // Get visit count for this document
+            const visitCount = visitCounts[doc.id] || 0;
+            
+            // Extensive logging to debug title issues
+            console.log(`Processing document ${doc.id}:`);
+            console.log('- Raw title field:', doc.title);
+            console.log('- All document fields:', Object.keys(doc).join(', '));
+            
+            // Try multiple possible title field names
+            let documentTitle = 'Untitled Document';
+            
+            if (doc.title && typeof doc.title === 'string' && doc.title.trim() !== '') {
+                documentTitle = doc.title;
+                console.log(`- Using 'title' field: ${documentTitle}`);
+            } else if (doc.document_title && typeof doc.document_title === 'string' && doc.document_title.trim() !== '') {
+                documentTitle = doc.document_title;
+                console.log(`- Using 'document_title' field: ${documentTitle}`);
+            } else if (doc.name && typeof doc.name === 'string' && doc.name.trim() !== '') {
+                documentTitle = doc.name;
+                console.log(`- Using 'name' field: ${documentTitle}`);
+            } else if (doc.text && typeof doc.text === 'string' && doc.text.trim() !== '') {
+                // Use the first 50 characters of text as title
+                documentTitle = doc.text.substring(0, 50) + '...';
+                console.log(`- Using 'text' field: ${documentTitle}`);
+            } else {
+                console.log('- No valid title field found. Using default: "Untitled Document"');
+            }
+            
+            return {
+                document_id: doc.id,
+                document_type: doc.document_type || 'single',
+                title: documentTitle, // Use our determined title
+                original_title: doc.title, // Keep original for debugging
+                original_document: doc, // Keep full document for debugging
+                visit_count: visitCount,
+                last_visit_date: doc.updated_at || doc.publication_date || doc.created_at,
+                keywords: doc.keywords || [],
+                author: doc.author_name || doc.author || 'Unknown'
+            };
+        });
+        
+        // Sort by visit count (highest first)
+        documentsWithVisits.sort((a, b) => b.visit_count - a.visit_count);
+        
+        console.log('Combined documents with visits:', documentsWithVisits);
+        
+        // Take the top documents based on limit
+        updateWorksTable(documentsWithVisits.slice(0, limit));
+    } catch (error) {
+        console.error('Error in fetchDocumentsWithVisits:', error);
         await fetchRegularDocuments();
     }
 }
@@ -129,6 +254,8 @@ function getDocumentTypeIcon(type) {
 
 // Function to display data in the existing table
 function updateWorksTable(documents) {
+    console.log('Documents to display in works table:', documents);
+    
     // Get the table body
     const tableBody = document.getElementById('most-visited-works-tbody');
     if (!tableBody) {
@@ -139,10 +266,110 @@ function updateWorksTable(documents) {
     // Clear existing content
     tableBody.innerHTML = '';
     
+    // Check if we need to query actual document titles from database
+    if (documents.some(doc => doc.title === 'Untitled Document' || !doc.title)) {
+        console.warn('Some documents are missing titles - attempting direct database query...');
+        
+        // Mark documents that need title resolution
+        documents.forEach(doc => {
+            if (doc.title === 'Untitled Document' || !doc.title) {
+                doc.needsTitleResolution = true;
+            }
+        });
+        
+        // Get list of document IDs that need title resolution
+        const documentIdsToResolve = documents
+            .filter(d => d.needsTitleResolution)
+            .map(d => d.document_id || d.id)
+            .filter(id => id); // Remove any undefined IDs
+            
+        if (documentIdsToResolve.length > 0) {
+            console.log(`Attempting to resolve titles for ${documentIdsToResolve.length} documents:`, documentIdsToResolve);
+            
+            // Make a direct API call to resolve titles
+            fetch('/api/documents/by-ids', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ documentIds: documentIdsToResolve })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    console.error(`Failed to resolve titles: ${response.status}`);
+                    throw new Error(`Failed to resolve titles: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Title resolution response:', data);
+                
+                // Check if we have resolved documents
+                if (data.documents && data.documents.length > 0) {
+                    // Update titles with resolved ones
+                    data.documents.forEach(resolvedDoc => {
+                        // Find matching document in our list
+                        const docToUpdate = documents.find(d => 
+                            (d.document_id && d.document_id.toString() === resolvedDoc.id.toString()) || 
+                            (d.id && d.id.toString() === resolvedDoc.id.toString())
+                        );
+                        
+                        if (docToUpdate) {
+                            // Try multiple fields for title
+                            if (resolvedDoc.title) {
+                                docToUpdate.title = resolvedDoc.title;
+                                console.log(`✅ Resolved title for doc ${resolvedDoc.id}: "${resolvedDoc.title}"`);
+                            } else if (resolvedDoc.name) {
+                                docToUpdate.title = resolvedDoc.name;
+                                console.log(`✅ Resolved title from name for doc ${resolvedDoc.id}: "${resolvedDoc.name}"`);
+                            } else {
+                                docToUpdate.title = `Document #${resolvedDoc.id}`;
+                                console.log(`⚠️ Could not find title for doc ${resolvedDoc.id}, using ID instead`);
+                            }
+                            
+                            // Mark as resolved
+                            docToUpdate.needsTitleResolution = false;
+                        }
+                    });
+                    
+                    // Refresh the table with updated titles
+                    console.log('Refreshing table with resolved titles');
+                    renderDocumentsToTable(documents, tableBody);
+                } else {
+                    console.warn('No documents found in title resolution response');
+                }
+            })
+            .catch(error => {
+                console.error('Error resolving titles:', error);
+                // Continue with rendering even if resolution failed
+                renderDocumentsToTable(documents, tableBody);
+            });
+            
+            // Initial render with unresolved titles
+            // This will be updated once titles are resolved
+            renderDocumentsToTable(documents, tableBody);
+        } else {
+            // If no titles need resolution, just render normally
+            renderDocumentsToTable(documents, tableBody);
+        }
+    } else {
+        // If no documents need title resolution, just render normally
+        renderDocumentsToTable(documents, tableBody);
+    }
+}
+
+// Separate function to render documents to the table
+function renderDocumentsToTable(documents, tableBody) {
     // Add each document to the table
     documents.forEach((doc) => {
+        // Add debug attribute to help identify untitled documents
+        const debugInfo = doc.needsTitleResolution ? ' data-needs-title="true"' : '';
+        
+        // Create a row with the debug attribute
         const row = document.createElement('tr');
         row.className = 'most-visited-row';
+        if (doc.needsTitleResolution) {
+            row.setAttribute('data-needs-title', 'true');
+            row.style.backgroundColor = '#fff8e1'; // Light yellow background for debugging
+        }
         
         // Create cover cell
         const coverCell = document.createElement('td');
@@ -173,12 +400,55 @@ function updateWorksTable(documents) {
         // Document title and basic info
         const titleElement = document.createElement('h5');
         titleElement.className = 'most-visited-title';
-        const title = doc.title || `Document ${doc.document_id}`;
+        
+        // Even more enhanced fallback for title
+        let title = doc.title || 'Untitled Document';
+        
+        // If title is still "Untitled Document", create a more descriptive fallback
+        if (title === 'Untitled Document' || !title) {
+            // Try other fields in order of preference
+            if (doc.document_title) {
+                title = doc.document_title;
+            } else if (doc.name) {
+                title = doc.name;
+            } else if (doc.description && doc.description.length > 0) {
+                // Use first 50 chars of description
+                title = doc.description.substring(0, 50) + (doc.description.length > 50 ? '...' : '');
+            } else if (doc.document_type) {
+                // Create title from document type and ID
+                const docType = formatDocumentType(doc.document_type);
+                title = `${docType} #${doc.document_id || doc.id || 'Unknown'}`;
+            } else if (doc.document_id || doc.id) {
+                title = `Document #${doc.document_id || doc.id}`;
+            } else if (doc.path) {
+                // Extract filename from path
+                const pathParts = doc.path.split('/');
+                title = pathParts[pathParts.length - 1];
+            }
+        }
+        
+        // Handle special case for legacy database entry format
+        if (doc.original_document && doc.original_document.title) {
+            title = doc.original_document.title;
+        }
         
         // Only show the title without document type or date
         titleElement.textContent = title;
         // Add title attribute to show full title on hover
         titleElement.title = title;
+        
+        // Add data attribute for debugging
+        titleElement.setAttribute('data-doc-id', doc.document_id || doc.id || 'unknown');
+        
+        // Log document data for debugging
+        console.log(`Rendering document:`, {
+            id: doc.document_id || doc.id,
+            title: title,
+            original_title: doc.title,
+            doc_type: doc.document_type,
+            all_fields: Object.keys(doc),
+            final_title_used: title
+        });
         
         // Format the document type for display (used for tags only)
         const docType = formatDocumentType(doc.document_type);
@@ -191,6 +461,8 @@ function updateWorksTable(documents) {
         const docTypeSpan = document.createElement('span');
         docTypeSpan.className = 'doc-type most-visited-doc-type';
         docTypeSpan.textContent = docType;
+        // Make the document type tag non-clickable
+        docTypeSpan.style.pointerEvents = 'none';
         tagsDiv.appendChild(docTypeSpan);
         
         // Add keywords as tags if available
@@ -202,6 +474,8 @@ function updateWorksTable(documents) {
                     const keywordTag = document.createElement('span');
                     keywordTag.className = 'tag most-visited-tag';
                     keywordTag.textContent = keyword;
+                    // Make sure it's not clickable
+                    keywordTag.style.pointerEvents = 'none';
                     tagsDiv.appendChild(keywordTag);
                 }
             });
@@ -214,6 +488,8 @@ function updateWorksTable(documents) {
                 const keywordTag = document.createElement('span');
                 keywordTag.className = 'tag most-visited-tag';
                 keywordTag.textContent = keyword;
+                // Make sure it's not clickable
+                keywordTag.style.pointerEvents = 'none';
                 tagsDiv.appendChild(keywordTag);
             });
         }

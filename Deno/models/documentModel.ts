@@ -1,4 +1,5 @@
 import { client } from "../db/denopost_conn.ts";
+import { join } from "https://deno.land/std@0.190.0/path/mod.ts";
 
 /**
  * Document types as defined in the database enum
@@ -34,6 +35,14 @@ export interface Document {
   deleted_at?: Date;
   compiled_document_id?: number; // Reference to compiled_documents table (legacy field)
   compiled_parent_id?: number; // Direct reference to compiled_documents table
+  // Additional fields for guest document API
+  author?: string;
+  publication_year?: string;
+  keywords?: string[];
+  category?: string;
+  research_agenda?: string;
+  editor?: any;
+  is_compiled?: boolean;
 }
 
 /**
@@ -159,6 +168,47 @@ export class DocumentModel {
       return result.rows;
     } catch (error) {
       console.error("Error searching documents:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Get all documents that are part of a compiled document
+   * @param compiledDocId ID of the compiled document
+   * @returns Array of contained documents
+   */
+  static async getContainedDocuments(compiledDocId: number): Promise<Document[]> {
+    try {
+      // This query assumes there's a compiled_document_items table or similar relationship
+      // Modify according to your actual database schema
+      const result = await client.queryObject<Document>(
+        `SELECT d.* FROM documents d
+         WHERE d.compiled_parent_id = $1
+         AND d.deleted_at IS NULL
+         ORDER BY d.id ASC`,
+        [compiledDocId]
+      );
+      
+      // If no results from parent_id relation, try another approach
+      if (result.rows.length === 0) {
+        // Try alternative relationship table if it exists in your schema
+        const altResult = await client.queryObject<Document>(
+          `SELECT d.* FROM documents d
+           JOIN compiled_document_items cdi ON d.id = cdi.document_id
+           WHERE cdi.compiled_document_id = $1
+           AND d.deleted_at IS NULL
+           ORDER BY cdi.order_position ASC`,
+          [compiledDocId]
+        );
+        
+        if (altResult.rows.length > 0) {
+          return altResult.rows;
+        }
+      }
+      
+      return result.rows;
+    } catch (error) {
+      console.error(`Error fetching contained documents for ID ${compiledDocId}:`, error);
       return [];
     }
   }
@@ -490,31 +540,171 @@ export class DocumentModel {
       let filePath = result.rows[0].file_path;
       console.log(`[DocumentModel] Raw file path from DB: ${filePath}`);
       
-      // Ensure path is absolute
-      if (!filePath.startsWith('/') && !filePath.match(/^[A-Z]:\//i)) {
-        // Convert relative path to absolute path
-        const workingDir = Deno.cwd();
-        filePath = `${workingDir}/${filePath}`;
-        console.log(`[DocumentModel] Converted to absolute path: ${filePath}`);
+      if (!filePath) {
+        console.error(`[DocumentModel] Document has no file path in the database: ${documentId}`);
+        return null;
       }
       
-      // Normalize the path to handle any ../ or ./ references
-      filePath = filePath.replace(/\\/g, '/');
-      console.log(`[DocumentModel] Normalized path: ${filePath}`);
+      // IMPROVED PATH RESOLUTION: First check if the path is already absolute and exists
+      if (filePath.match(/^[A-Z]:\//i)) {
+        console.log(`[DocumentModel] Path is already absolute: ${filePath}`);
+        try {
+          const fileInfo = await Deno.stat(filePath);
+          console.log(`[DocumentModel] Absolute file exists: ${filePath} (${fileInfo.size} bytes)`);
+          return filePath;
+        } catch (err) {
+          console.warn(`[DocumentModel] Absolute file not found: ${filePath}`);
+          // Continue with other path resolution methods
+        }
+      }
       
-      // Check if file exists
+      // Get the workspace root directory (parent of Deno directory)
+      const workspaceRoot = Deno.cwd().replace(/[\\/]Deno$/, '');
+      
+      // Try multiple path resolutions in order of likelihood:
+      const pathsToTry = [
+        // 1. If path starts with /storage, remove leading slash and join with workspace root
+        filePath.startsWith('/storage/') ? join(workspaceRoot, filePath.substring(1)) : null,
+        
+        // 2. If path is just a filename, try in storage/thesis directory
+        !filePath.includes('/') && !filePath.includes('\\') ? 
+          join(workspaceRoot, 'storage', 'thesis', filePath) : null,
+          
+        // 3. Try direct path in thesis directory if it contains a filename but no full path
+        filePath.includes('/') || filePath.includes('\\') ? 
+          join(workspaceRoot, 'storage', 'thesis', filePath.split(/[/\\]/).pop() || '') : null,
+          
+        // 4. Try storage directory with filename
+        join(workspaceRoot, 'storage', filePath),
+        
+        // 5. Try with .file extension in thesis (many files use this extension)
+        join(workspaceRoot, 'storage', 'thesis', `${filePath.split(/[/\\]/).pop() || ''}.file`),
+        
+        // 6. Use path as is
+        filePath
+      ];
+      
+      // Filter out null entries
+      const validPaths = pathsToTry.filter(p => p !== null) as string[];
+      
+      console.log(`[DocumentModel] Trying these paths in order:`);
+      validPaths.forEach((path, i) => {
+        console.log(`  ${i+1}. ${path}`);
+      });
+      
+      // Try each path until one exists
+      for (const path of validPaths) {
+        try {
+          const fileInfo = await Deno.stat(path);
+          console.log(`[DocumentModel] ✅ Found file at: ${path} (${fileInfo.size} bytes)`);
+          return path;
+        } catch (err) {
+          console.log(`[DocumentModel] File not found at: ${path}`);
+        }
+      }
+      
+      // ENHANCED: Search in category subfolders (recursive search)
+      // Look in common storage directories and their subdirectories
+      const rootStorageDirs = [
+        'storage/thesis',
+        'storage/dissertation',
+        'storage/confluence',
+        'storage/synergy'
+      ];
+      
+      console.log(`[DocumentModel] Searching in category subfolders...`);
+      
+      // Extract filename from the path
+      const fileName = filePath.split(/[/\\]/).pop() || '';
+      
+      // Check each storage directory and its subdirectories
+      for (const rootDir of rootStorageDirs) {
+        const fullRootDir = join(workspaceRoot, rootDir);
+        console.log(`[DocumentModel] Searching in ${fullRootDir}`);
+        
+        try {
+          // First check directly in the root directory
+          const directPath = join(fullRootDir, fileName);
+          try {
+            const directStat = await Deno.stat(directPath);
+            console.log(`[DocumentModel] ✅ Found file directly in ${rootDir}: ${directPath} (${directStat.size} bytes)`);
+            return directPath;
+          } catch {
+            // File not found directly, continue to subdirectories
+          }
+          
+          // Try with .file extension
+          if (!fileName.endsWith('.file')) {
+            const fileExtPath = join(fullRootDir, `${fileName}.file`);
+            try {
+              const fileExtStat = await Deno.stat(fileExtPath);
+              console.log(`[DocumentModel] ✅ Found file with .file extension: ${fileExtPath} (${fileExtStat.size} bytes)`);
+              return fileExtPath;
+            } catch {
+              // File not found with .file extension, continue to subdirectories
+            }
+          }
+          
+          // Then look in subdirectories
+          for await (const entry of Deno.readDir(fullRootDir)) {
+            if (entry.isDirectory) {
+              const subDir = join(fullRootDir, entry.name);
+              console.log(`[DocumentModel] Checking subdirectory: ${subDir}`);
+              
+              // Check for file in this subdirectory
+              const subDirFilePath = join(subDir, fileName);
+              try {
+                const subDirStat = await Deno.stat(subDirFilePath);
+                console.log(`[DocumentModel] ✅ Found file in subdirectory: ${subDirFilePath} (${subDirStat.size} bytes)`);
+                return subDirFilePath;
+              } catch {
+                // Not found in this subdirectory, try with .file extension
+              }
+              
+              // Try with .file extension in subdirectory
+              if (!fileName.endsWith('.file')) {
+                const subDirFileExtPath = join(subDir, `${fileName}.file`);
+                try {
+                  const subDirFileExtStat = await Deno.stat(subDirFileExtPath);
+                  console.log(`[DocumentModel] ✅ Found file with .file extension in subdirectory: ${subDirFileExtPath} (${subDirFileExtStat.size} bytes)`);
+                  return subDirFileExtPath;
+                } catch {
+                  // Not found with .file extension in this subdirectory
+                }
+              }
+            }
+          }
+        } catch (searchErr) {
+          console.error(`[DocumentModel] Error searching directory ${fullRootDir}:`, searchErr);
+          // Continue to next root directory
+        }
+      }
+      
+      // If no file found by direct paths, try to find similar files
       try {
-        const fileInfo = await Deno.stat(filePath);
-        console.log(`[DocumentModel] File exists: ${filePath} (${fileInfo.size} bytes)`);
-      } catch (error) {
-        console.warn(`[DocumentModel] File does not exist at path: ${filePath}`);
-        console.warn(`[DocumentModel] Error details: ${error instanceof Error ? error.message : String(error)}`);
-        // Still return the path even if file doesn't exist, so email service can handle it
+        const fileNamePart = (filePath.split(/[/\\]/).pop() || '').split('_')[0];
+        
+        if (fileNamePart && fileNamePart.length > 3) {
+          console.log(`[DocumentModel] Looking for files starting with: ${fileNamePart}`);
+          
+          for await (const entry of Deno.readDir(join(workspaceRoot, 'storage', 'thesis'))) {
+            if (entry.isFile && entry.name.startsWith(fileNamePart)) {
+              const matchPath = join(workspaceRoot, 'storage', 'thesis', entry.name);
+              console.log(`[DocumentModel] ✅ Found similar filename: ${matchPath}`);
+              return matchPath;
+            }
+          }
+        }
+      } catch (fuzzyError) {
+        console.error(`[DocumentModel] Error during fuzzy filename search:`, fuzzyError);
       }
       
-      return filePath;
+      // If all attempts fail, return the most likely path for logging
+      console.warn(`[DocumentModel] ❌ All path resolutions failed. Using best guess: ${validPaths[0]}`);
+      return validPaths[0];
     } catch (error) {
       console.error(`[DocumentModel] Error fetching document path for ID ${id}:`, error instanceof Error ? error.message : String(error));
+      console.error(`[DocumentModel] Error stack:`, error instanceof Error ? error.stack : 'No stack trace');
       return null;
     }
   }

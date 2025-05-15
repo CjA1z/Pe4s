@@ -511,6 +511,178 @@
         .confirmation-message.error { background-color: var(--danger-red-dark); }
         .confirmation-message.visible { opacity: 1; visibility: visible; transition: opacity 0.3s ease; }
 
+        /* Confirmation message */
+        #confirmationMessage {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            border-radius: 4px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 1000;
+            font-weight: 500;
+            max-width: 90%;
+            text-align: center;
+        }
+        
+        #confirmationMessage.visible {
+            opacity: 1;
+        }
+        
+        #confirmationMessage.success {
+            background-color: #059669;
+            color: white;
+        }
+        
+        #confirmationMessage.error {
+            background-color: #DC2626;
+            color: white;
+        }
+        
+        #confirmationMessage.warning {
+            background-color: #F59E0B;
+            color: white;
+        }
+
+        /* Detailed confirmation popup */
+        #detailedConfirmation {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+            padding: 1.5rem;
+            max-width: 90%;
+            width: 450px;
+            z-index: 1100;
+            display: none;
+            animation: fadeIn 0.2s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translate(-50%, -48%); }
+            to { opacity: 1; transform: translate(-50%, -50%); }
+        }
+        
+        #detailedConfirmation .file-status-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+        
+        #detailedConfirmation .message-title {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+        
+        #detailedConfirmation .message-details {
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            line-height: 1.5;
+        }
+        
+        #detailedConfirmation .buttons-container {
+            display: flex;
+            justify-content: flex-end;
+        }
+        
+        #detailedConfirmation button.close-button {
+            color: var(--text-secondary);
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2rem;
+            padding: 0.2rem;
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            transition: color 0.2s ease;
+        }
+        
+        #detailedConfirmation button.close-button:hover {
+            color: var(--text-primary);
+        }
+        
+        #detailedConfirmation button.ok-button {
+            background-color: var(--background-light);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        #detailedConfirmation button.ok-button:hover {
+            background-color: var(--border-color);
+        }
+        
+        #detailedConfirmation.success .header-icon {
+            color: var(--primary-green);
+        }
+        
+        #detailedConfirmation.warning .header-icon {
+            color: var(--gold-accent);
+        }
+        
+        #detailedConfirmation.error .header-icon {            
+            color: var(--danger-red);        
+        }                
+        
+        /* Add styles for content container */        
+        #detailedConfirmation .content-container {            
+            position: relative;            
+            padding: 0.5rem 1rem 1rem 1rem;        
+        }                
+        
+        #detailedConfirmation.success .content-container {            
+            border-left: 4px solid var(--primary-green);        
+        }                
+        
+        #detailedConfirmation.warning .content-container {            
+            border-left: 4px solid var(--gold-accent);        
+        }                
+        
+        #detailedConfirmation.error .content-container {            
+            border-left: 4px solid var(--danger-red);        
+        }                
+        
+        #detailedConfirmation .flex {            
+            display: flex;        
+        }                
+        
+        #detailedConfirmation .items-center {            
+            align-items: center;        
+        }                
+        
+        #detailedConfirmation .mb-4 {            
+            margin-bottom: 1rem;        
+        }                
+        
+        #detailedConfirmation .mr-3 {            
+            margin-right: 0.75rem;        
+        }
+
+        /* Added CSS for detailed confirmation */
+        #detailedConfirmation .header-icon {
+            font-size: 1.5rem;
+        }
+        
+        #detailedConfirmation .file-status-icon {
+            display: inline-block;
+            margin-right: 0.5rem;
+        }
     </style>
 </head>
 <body class="p-0">
@@ -1761,10 +1933,45 @@
                         
                         // Get the request with all updated information
                         const request = requests[requestIndex];
-                        await sendApprovalEmail(request);
+                        
+                        // Show an immediate notification that the request was approved - using BOTH methods
+                        showDetailedConfirmation({
+                            message: `Request ${requestId} approved`,
+                            details: `The request has been approved. Attempting to send email notification...`,
+                            type: 'success',
+                            fileStatus: 'pending'
+                        });
+                        
+                        // Also use the simple alert as a guaranteed notification
+                        alert(`Request ${requestId} approved. Attempting to send email notification...`);
+                        
+                        // Try to send the email
+                        const emailResult = await sendApprovalEmail(request);
+                        console.log("Email sending result:", emailResult);
+                        
+                        // Always show a result notification regardless of emailResult status
+                        setTimeout(() => {
+                            // Use both notification methods for reliability
+                            if (emailResult === true) {
+                                alert(`SUCCESS: Email with document was sent to the requester.`);
+                                showDetailedConfirmation({
+                                    message: `Email successfully sent`,
+                                    details: `The approval email was successfully sent with the document attached.`,
+                                    type: 'success',
+                                    fileStatus: 'attached'
+                                });
+                            } else {
+                                alert(`WARNING: The request was approved, but there may have been an issue sending the document. Check console for details.`);
+                                showDetailedConfirmation({
+                                    message: `Document delivery issue`,
+                                    details: `The request was approved, but there may have been an issue sending the document. Check browser console (F12) for details.`,
+                                    type: 'warning',
+                                    fileStatus: 'uncertain'
+                                });
+                            }
+                        }, 1000); // Slight delay to avoid multiple popups at once
                     }
 
-                    showConfirmationMessage(`Request ${requestId} approved. Email notification sent.`, 'success');
                     closeDetailsModal();
                     applyFiltersAndSort();
                 }
@@ -1785,54 +1992,197 @@
             }
         }
 
-        /**
-         * Sends an approval email with the PDF document attached
-         * @param {Object} request - The approved request object
-         */
-        async function sendApprovalEmail(request) {
-            try {
-                console.log(`[DOCUMENT REQUEST] Starting email process for approval of request ID: ${request.id}`);
+        /** * Sends an approval email with the PDF document attached * @param {Object} request - The approved request object * @returns {boolean} - Whether the email was successfully sent with document attached */async function sendApprovalEmail(request) {    try {        // First, log ALL request data to help diagnose fields        console.log(`[DOCUMENT REQUEST] Complete request object for debugging:`, request);        console.log(`[DOCUMENT REQUEST] =================================================`);        console.log(`[DOCUMENT REQUEST] Starting email process for approval of request ID: ${request.id}`);                // Get request details using our helper function        const fullName = getRequestData(request, 'full_name', 'User');        const email = getRequestData(request, 'email', '');        const bookTitle = getRequestData(request, 'book_title', 'Document');        const documentId = getRequestData(request, 'document_id', '');                console.log(`[DOCUMENT REQUEST] Sending approval email for document "${bookTitle}" (ID: ${documentId}) to ${fullName} <${email}>`);                if (!email) {            console.error('Cannot send approval email: recipient email not found');            alert(`ERROR: Cannot send approval email - recipient email address not found`);            return false;        }                // Verify document ID before sending        if (!documentId) {            console.error('[DOCUMENT REQUEST] Missing document ID for email attachment');            alert(`ERROR: Cannot attach document - Missing document ID`);            return false;        }                // Log additional field variations to help debug potential field name mismatches        console.log(`[DOCUMENT REQUEST] Document ID check - Different field names:`);        console.log(`  - document_id: ${request.document_id || 'not found'}`);        console.log(`  - documentId: ${request.documentId || 'not found'}`);        console.log(`  - doc_id: ${request.doc_id || 'not found'}`);        console.log(`  - id (if this is document id): ${request.id || 'not found'}`);
                 
-                // Get request details using our helper function
-                const fullName = getRequestData(request, 'full_name', 'User');
-                const email = getRequestData(request, 'email', '');
-                const bookTitle = getRequestData(request, 'book_title', 'Document');
-                const documentId = getRequestData(request, 'document_id', '');
-                
-                console.log(`[DOCUMENT REQUEST] Sending approval email for document "${bookTitle}" (ID: ${documentId}) to ${fullName} <${email}>`);
-                
-                if (!email) {
-                    console.error('Cannot send approval email: recipient email not found');
-                    return false;
+                // First, check if the document file exists and can be located
+                console.log(`[DOCUMENT REQUEST] Pre-checking document file existence for ID: ${documentId}`);
+                try {
+                    console.log(`[DOCUMENT REQUEST] Checking file existence for document ID: ${documentId}`);
+                    const fileCheckResponse = await fetch('/api/email/check-document-files', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            documentId,
+                            debug: true  // Request extra debugging info
+                        })
+                    });
+                    
+                    if (!fileCheckResponse.ok) {
+                        console.error(`[DOCUMENT REQUEST] File check API returned error: ${fileCheckResponse.status}`);
+                        showDetailedConfirmation({
+                            message: `File Check Failed`,
+                            details: `The document file check API returned an error. Status: ${fileCheckResponse.status}`,
+                            type: 'warning',
+                            fileStatus: 'uncertain'
+                        });
+                    }
+                    
+                    const fileCheckData = await fileCheckResponse.json();
+                    console.log(`[DOCUMENT REQUEST] File check API response:`, fileCheckData);
+                    
+                    if (fileCheckData.success && fileCheckData.foundCount > 0) {
+                        console.log(`[DOCUMENT REQUEST] ✅ Document file found: ${fileCheckData.foundFiles[0].path} (${fileCheckData.foundFiles[0].size} bytes)`);
+                        
+                        // Display all found paths for debugging
+                        if (fileCheckData.foundFiles.length > 1) {
+                            console.log(`[DOCUMENT REQUEST] Multiple matching files found:`);
+                            fileCheckData.foundFiles.forEach((file, index) => {
+                                console.log(`  ${index+1}. ${file.path} (${file.size} bytes)`);
+                            });
+                        }
+                        
+                        // Log searched paths that didn't contain the file
+                        if (fileCheckData.searchedPaths) {
+                            console.log(`[DOCUMENT REQUEST] All searched paths:`, fileCheckData.searchedPaths);
+                        }
+                    } else {
+                        console.warn(`[DOCUMENT REQUEST] ⚠️ Document file not found in any location!`);
+                        
+                        // Log searched paths to help diagnose the issue
+                        if (fileCheckData.searchedPaths) {
+                            console.log(`[DOCUMENT REQUEST] Searched in these locations:`, fileCheckData.searchedPaths);
+                        }
+                        
+                        // Get additional search paths to try
+                        let additionalDetails = '';
+                        if (fileCheckData.searchedPaths && fileCheckData.searchedPaths.length > 0) {
+                            additionalDetails = `\n\nSearched in ${fileCheckData.searchedPaths.length} locations including: ${fileCheckData.searchedPaths.slice(0, 3).join(', ')}${fileCheckData.searchedPaths.length > 3 ? '...' : ''}`;
+                        }
+                        
+                        // Show warning to admin
+                        const continueAnyway = confirm(`WARNING: The document file for "${bookTitle}" (ID: ${documentId}) was not found in the storage directories. It will likely not be attached to the email.${additionalDetails}\n\nDo you want to continue sending the approval email anyway?`);
+                        
+                        if (!continueAnyway) {
+                            showDetailedConfirmation({
+                                message: `Email Sending Cancelled`,
+                                details: `Document file "${documentId}" not found in any storage location.`,
+                                type: 'error',
+                                fileStatus: 'missing'
+                            });
+                            return false;
+                        }
+                        
+                        // Continue but warn user
+                        showDetailedConfirmation({
+                            message: `Warning: Proceeding Without File`,
+                            details: `Approval email will be sent without document attachment because the file could not be found.`,
+                            type: 'warning',
+                            fileStatus: 'missing'
+                        });
+                    }
+                } catch (fileCheckError) {
+                    console.error(`[DOCUMENT REQUEST] Error checking document file:`, fileCheckError);
+                    showDetailedConfirmation({
+                        message: `File Check Error`,
+                        details: `Error while checking if document file exists: ${fileCheckError.message || 'Unknown error'}`,
+                        type: 'warning',
+                        fileStatus: 'uncertain'
+                    });
+                    // Continue anyway, but we've logged the error and shown a warning
                 }
                 
-                // Make API call to send the email with document attachment
-                console.log(`[DOCUMENT REQUEST] Calling email API to send document ID ${documentId} to ${email}`);
-                const response = await fetch('/api/email/send-approval', {
-                 method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        email,
-                        fullName,
-                        documentTitle: bookTitle,
-                        documentId
-                    })
-                });
+                                // Then, check if the document file exists via the verify-file API                try {                    console.log(`[DOCUMENT REQUEST] Verifying document file exists for ID: ${documentId}`);                    const verifyResponse = await fetch(`/api/documents/${documentId}/verify-file`);                                        if (!verifyResponse.ok) {                        let verifyErrorText = '';                        try {                            const verifyData = await verifyResponse.json();                            verifyErrorText = JSON.stringify(verifyData);                        } catch (e) {                            verifyErrorText = await verifyResponse.text();                        }                                                console.warn(`[DOCUMENT REQUEST] Document file verification warning: ${verifyErrorText}`);                        alert(`WARNING: Document file verification failed: ${verifyResponse.status} ${verifyErrorText.substring(0, 100)}`);                        // We'll continue anyway but log the warning                    } else {                        const verifyData = await verifyResponse.json();                        console.log(`[DOCUMENT REQUEST] ✅ Document file verified: ${verifyData.filePath}`);                                                // Try to display additional file information if available                        if (verifyData.filePath) {                            console.log(`[DOCUMENT REQUEST] Document file path: ${verifyData.filePath}`);                            console.log(`[DOCUMENT REQUEST] File exists: ${verifyData.fileExists === true ? 'Yes' : 'No'}`);                            if (verifyData.fileSize) {                                console.log(`[DOCUMENT REQUEST] File size: ${verifyData.fileSize} bytes`);                            }                                                        // Check if the file path seems valid                            const filePathSections = verifyData.filePath.split('/');                            if (filePathSections.length > 0) {                                const fileName = filePathSections[filePathSections.length - 1];                                console.log(`[DOCUMENT REQUEST] File name from path: ${fileName}`);                                                                // Check if file name contains document ID                                if (fileName.includes(documentId)) {                                    console.log(`[DOCUMENT REQUEST] ✅ File name contains document ID`);                                } else {                                    console.warn(`[DOCUMENT REQUEST] ⚠️ File name does not contain document ID!`);                                    alert(`WARNING: The file path (${fileName}) doesn't seem to match the document ID (${documentId})`);                                }                            }                        }                    }                } catch (verifyError) {                    console.warn(`[DOCUMENT REQUEST] Error verifying document file:`, verifyError);                    alert(`ERROR checking file: ${verifyError.message || 'Unknown error'}`);                    // Continue anyway, the email API will try alternative paths                }
+                
+                                // Make API call to send the email with document attachment                console.log(`[DOCUMENT REQUEST] Calling email API to send document ID ${documentId} to ${email}`);                                // Create request body with debugging flag                const requestBody = {                    email,                    fullName,                    documentTitle: bookTitle,                    documentId,                    debug: true,                    // Request extra debugging info                    forceAttachment: true,          // Try harder to attach the file                    checkAllDirectories: true       // Look in all possible directories for the file                };                                console.log(`[DOCUMENT REQUEST] Email API request body:`, requestBody);                                // Try the email API call with additional error handling                let response;                try {                    response = await fetch('/api/email/send-approval', {                        method: 'POST',                        headers: {                            'Content-Type': 'application/json'                        },                        body: JSON.stringify(requestBody)                    });                                        console.log(`[DOCUMENT REQUEST] Email API response status:`, response.status);                                        if (!response.ok) {                        alert(`ERROR: Email API returned status ${response.status}`);                    }                } catch (fetchError) {                    console.error(`[DOCUMENT REQUEST] Error calling email API:`, fetchError);                    alert(`ERROR calling email API: ${fetchError.message || 'Network error'}`);                    return false;                }
+                
+                // Parse the response for better error handling
+                let responseData;
+                try {
+                    responseData = await response.json();
+                } catch (jsonError) {
+                    const errorText = await response.text();
+                    console.error(`[DOCUMENT REQUEST] Error parsing email API response: ${errorText}`);
+                    showDetailedConfirmation({
+                        message: `Email API Response Error`,
+                        details: `Failed to parse response: ${errorText.substring(0, 100)}${errorText.length > 100 ? '...' : ''}`,
+                        type: 'error',
+                        fileStatus: 'failed'
+                    });
+                    return false;
+                }
                 
                 if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error(`Error sending approval email: ${errorText}`);
+                    console.error(`[DOCUMENT REQUEST] Email API error: ${JSON.stringify(responseData)}`);
+                    showDetailedConfirmation({
+                        message: `Email API Error`,
+                        details: `Error: ${responseData.message || 'Unknown error'}. Status: ${response.status}`,
+                        type: 'error',
+                        fileStatus: 'failed'
+                    });
                     return false;
                 }
                 
-                const result = await response.json();
-                console.log(`[DOCUMENT REQUEST] Email service response:`, result);
-                console.log(`[DOCUMENT REQUEST] ✅ Document "${bookTitle}" (ID: ${documentId}) successfully sent to ${email}`);
-                return true;
+                console.log(`[DOCUMENT REQUEST] Email service response:`, responseData);
+                console.log(`[DEBUG] Email response check - success property:`, responseData.success ? 'true' : 'false');
+                console.log(`[DEBUG] Email response check - documentPath property:`, responseData.documentPath ? `exists: ${responseData.documentPath}` : 'missing');
+                console.log(`[DEBUG] Email response check - fileExists property:`, responseData.fileExists !== undefined ? `exists: ${responseData.fileExists}` : 'missing');
+
+                if (responseData.success) {
+                    console.log(`[DOCUMENT REQUEST] ✅ Document "${bookTitle}" (ID: ${documentId}) successfully sent to ${email}`);
+                    // Log attachment details if available
+                    if (responseData.documentPath) {
+                        console.log(`[DOCUMENT REQUEST] Document path used: ${responseData.documentPath}`);
+                        
+                        if (responseData.fileExists === true) {
+                            console.log(`[DOCUMENT REQUEST] File verified: ${responseData.documentPath} (${responseData.fileSize || 'unknown'} bytes)`);
+                            console.log(`[FILE SENT SUCCESSFULLY] ✅✅✅ THE FILE WAS SUCCESSFULLY SENT TO ${email} (${fullName})`);
+                            
+                            // Show detailed popup about successful file attachment
+                            showDetailedConfirmation({
+                                message: `Document successfully sent to ${email}`,
+                                details: `File "${bookTitle}" was attached to the email.`,
+                                type: 'success',
+                                fileStatus: 'attached'
+                            });
+                        } else {
+                            console.log(`[DOCUMENT REQUEST] ⚠️ File not found: ${responseData.documentPath}`);
+                            if (responseData.verificationError) {
+                                console.log(`[DOCUMENT REQUEST] Error: ${responseData.verificationError}`);
+                            }
+                            console.log(`[FILE NOT SENT] ⚠️⚠️⚠️ APPROVAL EMAIL SENT WITHOUT FILE ATTACHMENT TO ${email} (${fullName})`);
+                            
+                            // Show detailed popup about missing attachment
+                            showDetailedConfirmation({
+                                message: `Approval email sent WITHOUT ATTACHMENT`,
+                                details: `File "${bookTitle}" could not be found at: ${responseData.documentPath.split('/').pop()}`,
+                                type: 'warning',
+                                fileStatus: 'missing'
+                            });
+                        }
+                    } else {
+                        console.log(`[FILE ATTACHMENT WARNING] ⚠️ Email sent but no documentPath was returned - file attachment status uncertain`);
+                        
+                        // Show detailed popup about uncertain attachment status
+                        showDetailedConfirmation({
+                            message: `Approval email sent, attachment status UNKNOWN`,
+                            details: `Email was sent to ${email}, but the file attachment status is uncertain.`,
+                            type: 'warning',
+                            fileStatus: 'uncertain'
+                        });
+                    }
+                    return true;
+                } else {
+                    console.error(`[DOCUMENT REQUEST] ❌ Email API reported failure: ${responseData.message || 'Unknown reason'}`);
+                    
+                    // Show detailed error popup
+                    showDetailedConfirmation({
+                        message: `Email delivery FAILED`,
+                        details: `Error: ${responseData.message || 'Unknown error'}`,
+                        type: 'error',
+                        fileStatus: 'failed'
+                    });
+                    return false;
+                }
             } catch (error) {
-                console.error('Error sending approval email:', error);
+                console.error('[DOCUMENT REQUEST] Error sending approval email:', error);
+                showDetailedConfirmation({
+                    message: `Error sending approval email: ${error.message || 'Unknown error'}`,
+                    details: `An error occurred while sending approval email. Please try again.`,
+                    type: 'error',
+                    fileStatus: 'failed'
+                });
                 return false;
             }
         }
@@ -1850,7 +2200,7 @@
         function showConfirmationMessage(message, type = 'success') { // Default to 'success'
              confirmationMessage.textContent = message;
              // Remove previous type classes
-             confirmationMessage.classList.remove('success', 'error');
+             confirmationMessage.classList.remove('success', 'error', 'warning');
              // Add the new type class
              confirmationMessage.classList.add(type);
              // Make visible
@@ -2176,6 +2526,117 @@
             
             // Default fallback
             return fallback;
+        }
+
+        /**
+         * Shows a detailed confirmation popup with message, details, and optional icon based on file status.
+         * @param {Object} options - The confirmation options
+         * @param {string} options.message - Main message to display
+         * @param {string} options.details - Additional details to display
+         * @param {string} options.type - Message type: 'success', 'warning', or 'error'
+         * @param {string} options.fileStatus - Status of the file: 'attached', 'missing', 'uncertain', or 'failed'
+         */
+        function showDetailedConfirmation(options) {
+            console.log(`[POPUP] Showing detailed confirmation:`, options);
+            // Create or get the detailed confirmation element
+            let detailedConfirm = document.getElementById('detailedConfirmation');
+            if (!detailedConfirm) {
+                detailedConfirm = document.createElement('div');
+                detailedConfirm.id = 'detailedConfirmation';
+                document.body.appendChild(detailedConfirm);
+            }
+
+            // Reset classes then add type class
+            detailedConfirm.className = options.type; // Add the type class (success, warning, error)
+
+            // Set appropriate icon based on type and fileStatus
+            let headerIconClass = '';
+            let statusIconHTML = '';
+
+            // Set header icon based on message type
+            switch (options.type) {
+                case 'success':
+                    headerIconClass = 'fas fa-check-circle';
+                    break;
+                case 'warning':
+                    headerIconClass = 'fas fa-exclamation-triangle';
+                    break;
+                case 'error':
+                    headerIconClass = 'fas fa-times-circle';
+                    break;
+            }
+
+            // Add file status icon based on file status
+            switch (options.fileStatus) {
+                case 'attached':
+                    statusIconHTML = '<i class="fas fa-paperclip text-emerald-600"></i>';
+                    break;
+                case 'missing':
+                    statusIconHTML = '<i class="fas fa-unlink text-amber-600"></i>';
+                    break;
+                case 'uncertain':
+                    statusIconHTML = '<i class="fas fa-question-circle text-amber-600"></i>';
+                    break;
+                case 'failed':
+                    statusIconHTML = '<i class="fas fa-exclamation-circle text-red-600"></i>';
+                    break;
+                case 'pending':
+                    statusIconHTML = '<i class="fas fa-spinner fa-spin text-blue-600"></i>';
+                    break;
+                default:
+                    statusIconHTML = '';
+                    break;
+            }
+
+            // Set the content with proper class names
+            detailedConfirm.innerHTML = `
+                <div class="content-container">
+                    <button id="closeDetailedConfirm" class="close-button">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    
+                    <div class="flex items-center mb-4">
+                        <i class="${headerIconClass} header-icon text-2xl mr-3"></i>
+                        <h3 class="message-title">${options.message}</h3>
+                    </div>
+                    
+                    <p class="message-details">
+                        <span class="file-status-icon">${statusIconHTML}</span>
+                        ${options.details}
+                    </p>
+                    
+                    <div class="buttons-container">
+                        <button id="detailedConfirmOk" class="ok-button">
+                            OK
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            // Show the confirmation
+            detailedConfirm.style.display = 'block';
+
+            // Add event listeners for close and OK buttons
+            document.getElementById('closeDetailedConfirm').addEventListener('click', () => {
+                detailedConfirm.style.display = 'none';
+            });
+
+            document.getElementById('detailedConfirmOk').addEventListener('click', () => {
+                detailedConfirm.style.display = 'none';
+            });
+
+            // Also close on click outside
+            const closeOnOutsideClick = (e) => {
+                if (e.target !== detailedConfirm && !detailedConfirm.contains(e.target)) {
+                    detailedConfirm.style.display = 'none';
+                    document.removeEventListener('click', closeOnOutsideClick);
+                }
+            };
+
+            // Add a small delay to prevent immediate closing
+            setTimeout(() => {
+                document.addEventListener('click', closeOnOutsideClick);
+            }, 100);
         }
 
     </script>

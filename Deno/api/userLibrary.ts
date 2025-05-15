@@ -76,20 +76,10 @@ export async function getSavedDocuments(req: Request): Promise<Response> {
     const enhancedDocuments = await Promise.all(
       savedDocs.map(async (savedDoc: any) => {
         try {
-          // Get full document details from DocumentModel including authors
-          const docId = savedDoc.doc_id;
-          const fullDocDetails = await DocumentModel.getWithAuthors(docId);
-          
-          // Combine saved document data with full document details
+          // Document details are now already included from the joined query
           return {
             ...savedDoc,
-            saved_at: savedDoc.saved_at,
-            document: fullDocDetails || null,
-            // Add a list of author names for easier frontend display
-            author_names: fullDocDetails?.authors ? 
-              fullDocDetails.authors.map((author: any) => author.full_name) : 
-              [],
-            // Include a formatted date for easier frontend display
+            // Format date for easier frontend display
             saved_at_formatted: new Date(savedDoc.saved_at).toLocaleDateString('en-US', {
               year: 'numeric',
               month: 'long',
@@ -106,6 +96,21 @@ export async function getSavedDocuments(req: Request): Promise<Response> {
     
     // Get library count
     const count = await UserLibraryModel.getLibraryCount(userId);
+    
+    // Update the session data with the library count
+    try {
+      // Update the user info in session storage with library count
+      const userInfoKey = `user:${userId}`;
+      const userInfoStr = await sessionStorage.getItem(userInfoKey);
+      
+      if (userInfoStr) {
+        const userInfo = JSON.parse(userInfoStr);
+        userInfo.libraryCount = count;
+        await sessionStorage.setItem(userInfoKey, JSON.stringify(userInfo));
+      }
+    } catch (sessionError) {
+      console.warn("Error updating user session with library count:", sessionError);
+    }
     
     return new Response(
       JSON.stringify({ 

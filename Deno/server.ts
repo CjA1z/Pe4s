@@ -1613,22 +1613,29 @@ router.get("/logout", async (ctx) => {
 router.get("/api/documents/most-visited", async (ctx) => {
   try {
     console.log("[SERVER] Fetching most visited documents");
-    // TODO: Fix DocumentViewController implementation
-    // const request = new Request(ctx.request.url.toString(), {
-    //   method: ctx.request.method,
-    //   headers: ctx.request.headers
-    // });
     
-    // const response = await DocumentViewController.getMostVisited(request);
+    // Extract query parameters
+    const url = new URL(ctx.request.url);
+    const limit = parseInt(url.searchParams.get("limit") || "10");
+    const days = parseInt(url.searchParams.get("days") || "30");
     
-    // ctx.response.status = response.status;
-    // ctx.response.headers = response.headers;
-    // ctx.response.body = await response.json();
+    // Use the PageVisitsModel to get most visited documents
+    const { PageVisitsModel } = await import("./models/pageVisitsModel.ts");
+    const documents = await PageVisitsModel.getMostVisitedDocuments(limit, days);
     
-    // Temporary mock data
+    console.log(`[SERVER] Found ${documents.length} most visited documents`);
+    
+    // Format response to match expected format in frontend
     ctx.response.status = 200;
     ctx.response.body = { 
-      mostVisited: [] 
+      documents: documents.map(doc => ({
+        document_id: doc.document_id,
+        id: doc.document_id, // Add id as an alias for document_id
+        title: doc.title || 'Untitled Document',
+        document_type: doc.document_type || 'single',
+        visit_count: doc.visit_count,
+        last_visit_date: doc.last_visit_date
+      }))
     };
   } catch (error) {
     console.error("[SERVER] Error fetching most visited documents:", error);
@@ -1845,6 +1852,220 @@ router.all("/api/user/library(/.*)?", async (ctx) => {
       error: "Internal server error processing user library request",
       details: error instanceof Error ? error.message : String(error)
     };
+  }
+});
+
+// Import user document history handlers
+import { 
+  handleDocumentViewRecording, 
+  handleDocumentDownloadRecording, 
+  handleUserHistoryRequest 
+} from "./api/userDocumentHistory.ts";
+
+// Add route for analytics document view recording
+router.post("/api/analytics/document-view", async (ctx) => {
+  try {
+    console.log(`[SERVER] Recording document view`);
+    
+    // Convert Oak request to standard Request
+    const headers = new Headers(ctx.request.headers);
+    
+    // Create body if needed
+    let body = null;
+    if (ctx.request.hasBody) {
+      const reqBody = ctx.request.body({ type: "json" });
+      body = await reqBody.value;
+    }
+    
+    // Create a Request object
+    const request = new Request(ctx.request.url.toString(), {
+      method: ctx.request.method,
+      headers: headers,
+      body: body ? JSON.stringify(body) : undefined
+    });
+    
+    // Process through the API handler
+    const response = await handleDocumentViewRecording(request);
+    
+    // Set status and headers
+    ctx.response.status = response.status;
+    for (const [key, value] of response.headers.entries()) {
+      ctx.response.headers.set(key, value);
+    }
+    
+    // Set body
+    if (response.status !== 204) {
+      const responseBody = await response.text();
+      try {
+        // Try to parse as JSON first
+        const jsonBody = JSON.parse(responseBody);
+        ctx.response.body = jsonBody;
+      } catch {
+        // If not JSON, use as is
+        ctx.response.body = responseBody;
+      }
+    }
+  } catch (error) {
+    console.error(`[SERVER] Error recording document view:`, error);
+    ctx.response.status = 500;
+    ctx.response.body = {
+      error: "Internal server error recording document view",
+      details: error instanceof Error ? error.message : String(error)
+    };
+  }
+});
+
+// Add route for analytics document download recording
+router.post("/api/analytics/document-download", async (ctx) => {
+  try {
+    console.log(`[SERVER] Recording document download`);
+    
+    // Convert Oak request to standard Request
+    const headers = new Headers(ctx.request.headers);
+    
+    // Create body if needed
+    let body = null;
+    if (ctx.request.hasBody) {
+      const reqBody = ctx.request.body({ type: "json" });
+      body = await reqBody.value;
+    }
+    
+    // Create a Request object
+    const request = new Request(ctx.request.url.toString(), {
+      method: ctx.request.method,
+      headers: headers,
+      body: body ? JSON.stringify(body) : undefined
+    });
+    
+    // Process through the API handler
+    const response = await handleDocumentDownloadRecording(request);
+    
+    // Set status and headers
+    ctx.response.status = response.status;
+    for (const [key, value] of response.headers.entries()) {
+      ctx.response.headers.set(key, value);
+    }
+    
+    // Set body
+    if (response.status !== 204) {
+      const responseBody = await response.text();
+      try {
+        // Try to parse as JSON first
+        const jsonBody = JSON.parse(responseBody);
+        ctx.response.body = jsonBody;
+      } catch {
+        // If not JSON, use as is
+        ctx.response.body = responseBody;
+      }
+    }
+  } catch (error) {
+    console.error(`[SERVER] Error recording document download:`, error);
+    ctx.response.status = 500;
+    ctx.response.body = {
+      error: "Internal server error recording document download",
+      details: error instanceof Error ? error.message : String(error)
+    };
+  }
+});
+
+// Add route for user history
+router.get("/api/user/history", async (ctx) => {
+  try {
+    console.log(`[SERVER] Fetching user document history`);
+    
+    // Convert Oak request to standard Request
+    const headers = new Headers(ctx.request.headers);
+    
+    // Create a Request object
+    const request = new Request(ctx.request.url.toString(), {
+      method: ctx.request.method,
+      headers: headers
+    });
+    
+    // Process through the API handler
+    const response = await handleUserHistoryRequest(request);
+    
+    // Set status and headers
+    ctx.response.status = response.status;
+    for (const [key, value] of response.headers.entries()) {
+      ctx.response.headers.set(key, value);
+    }
+    
+    // Set body
+    if (response.status !== 204) {
+      const responseBody = await response.text();
+      try {
+        // Try to parse as JSON first
+        const jsonBody = JSON.parse(responseBody);
+        ctx.response.body = jsonBody;
+      } catch {
+        // If not JSON, use as is
+        ctx.response.body = responseBody;
+      }
+    }
+  } catch (error) {
+    console.error(`[SERVER] Error fetching user document history:`, error);
+    ctx.response.status = 500;
+    ctx.response.body = {
+      error: "Internal server error fetching user document history",
+      details: error instanceof Error ? error.message : String(error)
+    };
+  }
+});
+
+// Add route for getting multiple documents by IDs
+router.post("/api/documents/by-ids", async (ctx) => {
+  try {
+    if (!ctx.request.hasBody) {
+      ctx.response.status = 400;
+      ctx.response.body = { error: "Request body is required" };
+      return;
+    }
+    
+    // Parse the request body to get the document IDs
+    const body = await ctx.request.body({ type: "json" }).value;
+    
+    if (!body.documentIds || !Array.isArray(body.documentIds) || body.documentIds.length === 0) {
+      ctx.response.status = 400;
+      ctx.response.body = { error: "Document IDs array is required" };
+      return;
+    }
+    
+    console.log(`[SERVER] Fetching documents by IDs: ${body.documentIds.join(', ')}`);
+    
+    // Query the database for the documents
+    const query = `
+      SELECT id, title, document_type, abstract, publication_date, 
+             file_path, is_public, created_at, updated_at
+      FROM documents
+      WHERE id = ANY($1::int[])
+      AND deleted_at IS NULL
+    `;
+    
+    const result = await client.queryObject(query, [body.documentIds]);
+    
+    console.log(`[SERVER] Found ${result.rows.length} documents by IDs`);
+    
+    // Map the results to the expected format
+    const documents = result.rows.map((row: any) => ({
+      id: row.id,
+      title: row.title || 'Untitled Document',
+      document_type: row.document_type || 'single',
+      abstract: row.abstract,
+      publication_date: row.publication_date,
+      file_path: row.file_path,
+      is_public: row.is_public,
+      created_at: row.created_at,
+      updated_at: row.updated_at
+    }));
+    
+    // Return the documents
+    ctx.response.status = 200;
+    ctx.response.body = { documents };
+  } catch (error) {
+    console.error("[SERVER] Error fetching documents by IDs:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Internal server error" };
   }
 });
 

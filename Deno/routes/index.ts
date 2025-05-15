@@ -35,7 +35,9 @@ const rootHandler = (ctx: any) => {
 
 // Map document routes to /api/documents path
 const apiDocumentRoutes = documentRoutes.map(route => {
-  const newPath = route.path.replace(/^\/documents/, '/api/documents');
+  const newPath = route.path.replace(/^\/documents/, '/api/documents')
+                           .replace(/^\/guest\/documents/, '/api/guest/documents')
+                           .replace(/^\/public\/documents/, '/api/public/documents');
   console.log(`Mapping route: ${route.path} → ${newPath}`);
   return {
     ...route,

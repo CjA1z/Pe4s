@@ -43,7 +43,16 @@ export async function getCompiledDocument(compiledDocId: number): Promise<any> {
       console.log(`Compiled document ${compiledDocId} does not have a foreword`);
     }
     
-    return compiledDoc;
+    // Create a response object with all fields from compiledDoc plus any additional fields
+    const response = {
+      ...compiledDoc,
+      // If there's no abstract field but there is abstract_foreword, use that as the abstract
+      abstract: compiledDoc.abstract_foreword || compiledDoc.foreword || ''
+    };
+    
+    console.log(`Compiled document ${compiledDocId} abstract_foreword:`, compiledDoc.abstract_foreword);
+    
+    return response;
   } catch (error) {
     console.error(`Error in getCompiledDocument(${compiledDocId}):`, error);
     throw error;

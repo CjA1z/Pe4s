@@ -502,25 +502,27 @@ async function handleSingleDocumentSubmit(e) {
         };
         
         // Save file record to database
-        try {
-            const fileRecordResponse = await fetch('/api/files', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(fileRecord)
-            });
-            
-            if (!fileRecordResponse.ok) {
-                const errorData = await fileRecordResponse.json();
-                console.warn('Warning: Failed to create file record:', errorData.error || 'Unknown error');
-            } else {
-                console.log('File record created successfully');
-            }
-        } catch (fileRecordError) {
-            console.warn('Warning: Error creating file record:', fileRecordError);
-            // Continue even if file record creation fails
-        }
+        // REMOVED: No longer creating separate file records
+        // We now rely entirely on the documents.file_path field
+        // try {
+        //     const fileRecordResponse = await fetch('/api/files', {
+        //         method: 'POST',
+        //         headers: {
+        //             'Content-Type': 'application/json'
+        //         },
+        //         body: JSON.stringify(fileRecord)
+        //     });
+        //     
+        //     if (!fileRecordResponse.ok) {
+        //         const errorData = await fileRecordResponse.json();
+        //         console.warn('Warning: Failed to create file record:', errorData.error || 'Unknown error');
+        //     } else {
+        //         console.log('File record created successfully');
+        //     }
+        // } catch (fileRecordError) {
+        //     console.warn('Warning: Error creating file record:', fileRecordError);
+        //     // Continue even if file record creation fails
+        // }
         
         // Save author information
         if (formData.get('author')) {

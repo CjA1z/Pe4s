@@ -3,7 +3,8 @@ import {
     getDocumentById, 
     createDocument, 
     updateDocument, 
-    deleteDocument 
+    deleteDocument,
+    getDocumentAuthors 
 } from "../controllers/documentController.ts";
 import { DocumentModel } from "../models/documentModel.ts";
 
@@ -33,6 +34,16 @@ export async function handleDocumentById(req: Request): Promise<Response> {
         default:
             return new Response("Method Not Allowed", { status: 405 });
     }
+}
+
+/**
+ * Handle document authors request
+ */
+export async function handleDocumentAuthors(req: Request): Promise<Response> {
+    if (req.method === "GET") {
+        return await getDocumentAuthors(req);
+    }
+    return new Response("Method Not Allowed", { status: 405 });
 }
 
 /**

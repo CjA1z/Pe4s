@@ -532,7 +532,7 @@
                         <div class="spinner" style="border: 4px solid rgba(0, 0, 0, 0.1); width: 36px; height: 36px; border-radius: 50%; border-left-color: #09f; animation: spin 1s linear infinite; margin: 0 auto 1rem;"></div>
                         <p>Loading document...</p>
                     </div>
-                </div>
+                    </div>
                 
                 <!-- Document content will be displayed here -->
                 <div id="documentContent"></div>
@@ -572,12 +572,30 @@
         </div>
     </div>
 
-    <!-- Load the navbar module -->
-    <script src="/Components/js/navbar-loader.js"></script>
-    
-    <!-- Define the saveForLater function in the global scope -->
+    <!-- Global functions -->
     <script>
-        // Make saveForLater globally accessible
+        // Global message handling function
+        function showMessage(message, type = 'info') {
+            const messageBoxOverlay = document.getElementById('message-box-overlay');
+            const messageBoxText = document.getElementById('message-box-text');
+            
+            if (messageBoxOverlay && messageBoxText) {
+                messageBoxText.textContent = message;
+                messageBoxOverlay.classList.add('visible');
+                
+                // Add class based on message type
+                messageBoxText.className = `message-box-text message-${type}`;
+                
+                // Auto-hide after 3 seconds
+                setTimeout(() => {
+                    messageBoxOverlay.classList.remove('visible');
+                }, 3000);
+            } else {
+                alert(message);
+            }
+        }
+        
+        // Global saveForLater function
         function saveForLater(event, documentId) {
             event.preventDefault();
             
@@ -677,28 +695,10 @@
                 }
             });
         }
-
-        // Also define the showMessage function globally
-        function showMessage(message, type = 'info') {
-            const messageBoxOverlay = document.getElementById('message-box-overlay');
-            const messageBoxText = document.getElementById('message-box-text');
-            
-            if (messageBoxOverlay && messageBoxText) {
-                messageBoxText.textContent = message;
-                messageBoxOverlay.classList.add('visible');
-                
-                // Add class based on message type
-                messageBoxText.className = `message-box-text message-${type}`;
-                
-                // Auto-hide after 3 seconds
-                setTimeout(() => {
-                    messageBoxOverlay.classList.remove('visible');
-                }, 3000);
-            } else {
-                alert(message);
-            }
-        }
     </script>
+
+    <!-- Load the navbar module -->
+    <script src="/Components/js/navbar-loader.js"></script>
     
     <!-- Initialize the navbar module -->
     <script>
@@ -859,10 +859,10 @@
                         // Attempt to fetch from regular documents API
                         console.log(`Fetching document ${docId} from regular documents API...`);
                         try {
-                            const response = await fetch(`/api/documents/${docId}`);
-                            
-                            if (response.ok) {
-                                documentData = await response.json();
+                        const response = await fetch(`/api/documents/${docId}`);
+                        
+                        if (response.ok) {
+                            documentData = await response.json();
                                 console.log(`Document data received:`, documentData);
                                 
                                 // ALWAYS try to fetch additional author data regardless of what's in the document
@@ -891,31 +891,31 @@
                                 } catch (authorErr) {
                                     console.warn(`Error fetching author details:`, authorErr);
                                 }
-                                
-                                // Double-check if this is actually a compiled document
-                                const isCompiled = documentData.is_compiled === true || 
-                                                documentData.document_type?.toLowerCase() === 'compiled' || 
-                                                documentData.child_count > 0;
-                                                
-                                if (isCompiled) {
-                                    console.warn('This document is a compiled document');
-                                    // Redirect to compiled document page
-                                    window.location.href = `/pages/user-compiled.html?id=${docId}`;
-                                    return;
-                                }
-                                
-                                // Display the document data on the page
-                                displayDocument(documentData);
-                                
-                                // Track document visit
-                                trackDocumentVisit(docId);
+                            
+                            // Double-check if this is actually a compiled document
+                            const isCompiled = documentData.is_compiled === true || 
+                                             documentData.document_type?.toLowerCase() === 'compiled' || 
+                                             documentData.child_count > 0;
+                                             
+                            if (isCompiled) {
+                                console.warn('This document is a compiled document');
+                                // Redirect to compiled document page
+                                window.location.href = `/pages/user-compiled.html?id=${docId}`;
+                                return;
+                            }
+                            
+                            // Display the document data on the page
+                            displayDocument(documentData);
+                            
+                            // Track document visit
+                            trackDocumentVisit(docId);
                             } else if (response.status === 404) {
                                 // Handle 404 specifically
                                 console.error(`Document ${docId} not found (404)`);
                                 throw new Error(`Document not found. The document with ID ${docId} may have been removed or is not accessible.`);
-                            } else {
+                        } else {
                                 console.error(`Failed to fetch document ${docId}: ${response.status} ${response.statusText}`);
-                                throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`);
+                            throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`);
                             }
                         } catch (networkErr) {
                             console.error('Network error when fetching document:', networkErr);
@@ -1078,9 +1078,9 @@
                 
                 // Check if document is in library (for Read Later button state)
                 checkIfInLibrary(data.id).then(isInLibrary => {
-                    // Build the HTML structure
-                    const documentHtml = `
-                        <article class="document-item-base">
+                // Build the HTML structure
+                const documentHtml = `
+                    <article class="document-item-base">
                             <section class="abstract">
                                 <h2>Abstract</h2>
                                 <p>${data.abstract || data.description || 'No abstract available.'}</p>
@@ -1095,14 +1095,14 @@
                                         (typeof data.keywords === 'string' ? 
                                             data.keywords.split(',').map(kw => `<a href="#" class="tag-pill">${kw.trim()}</a>`).join('') :
                                             '<span>No keywords available</span>')}
-                                </div>
+                            </div>
                             </section>
                             ` : ''}
                             
                             <article class="document-item-base mb-12">
                                 <header>
                                     <h2>Document Information</h2>
-                                </header>
+                        </header>
                                 <section class="doc-info-grid">
                                     <div>
                                         <strong>Title:</strong>
@@ -1218,122 +1218,122 @@
                     // This is the same code as above but without the library check
                     const documentHtml = `
                         <article class="document-item-base">
-                            <section class="abstract">
-                                <h2>Abstract</h2>
-                                <p>${data.abstract || data.description || 'No abstract available.'}</p>
-                            </section>
-                            
-                            ${data.keywords ? `
-                            <section class="keywords-section">
-                                <h3>Keywords</h3>
-                                <div class="keywords-container-flex">
-                                    ${Array.isArray(data.keywords) ? 
-                                        data.keywords.map(kw => `<a href="#" class="tag-pill">${kw}</a>`).join('') :
-                                        (typeof data.keywords === 'string' ? 
-                                            data.keywords.split(',').map(kw => `<a href="#" class="tag-pill">${kw.trim()}</a>`).join('') :
-                                            '<span>No keywords available</span>')}
+                        <section class="abstract">
+                            <h2>Abstract</h2>
+                            <p>${data.abstract || data.description || 'No abstract available.'}</p>
+                        </section>
+                        
+                        ${data.keywords ? `
+                        <section class="keywords-section">
+                            <h3>Keywords</h3>
+                            <div class="keywords-container-flex">
+                                ${Array.isArray(data.keywords) ? 
+                                    data.keywords.map(kw => `<a href="#" class="tag-pill">${kw}</a>`).join('') :
+                                    (typeof data.keywords === 'string' ? 
+                                        data.keywords.split(',').map(kw => `<a href="#" class="tag-pill">${kw.trim()}</a>`).join('') :
+                                        '<span>No keywords available</span>')}
+                            </div>
+                        </section>
+                        ` : ''}
+                        
+                        <article class="document-item-base mb-12">
+                            <header>
+                                <h2>Document Information</h2>
+                            </header>
+                            <section class="doc-info-grid">
+                                <div>
+                                    <strong>Title:</strong>
+                                    <span id="info-title">${data.title || 'Untitled'}</span>
                                 </div>
-                            </section>
-                            ` : ''}
-                            
-                            <article class="document-item-base mb-12">
-                                <header>
-                                    <h2>Document Information</h2>
-                                </header>
-                                <section class="doc-info-grid">
-                                    <div>
-                                        <strong>Title:</strong>
-                                        <span id="info-title">${data.title || 'Untitled'}</span>
-                                    </div>
-                                    <div>
-                                        <strong>Author(s):</strong>
+                                <div>
+                                    <strong>Author(s):</strong>
                                         <a href="/pages/authorprofile.html?id=${getAuthorIdFromDocument(data) || ''}" class="clickable-meta clickable-author" id="info-author">
                                             ${getAuthorDisplayName(data)}
                                         </a>
-                                    </div>
-                                    ${data.editor ? `
-                                    <div>
-                                        <strong>Editor(s):</strong>
-                                        <span class="opacity-90" id="info-editor">${data.editor}</span>
-                                    </div>
-                                    ` : ''}
-                                    ${data.publication_year ? `
-                                    <div>
-                                        <strong>Publication Year:</strong>
-                                        <span id="info-year">${data.publication_year}</span>
-                                    </div>
-                                    ` : ''}
-                                    ${data.volume ? `
-                                    <div>
-                                        <strong>Volume:</strong>
-                                        <span id="info-volume">${data.volume}</span>
-                                    </div>
-                                    ` : ''}
-                                    ${data.pages ? `
-                                    <div>
-                                        <strong>Number of Pages:</strong>
-                                        <span id="info-pages">${data.pages}</span>
-                                    </div>
-                                    ` : ''}
-                                    ${data.category || data.document_type ? `
-                                    <div>
-                                        <strong>Category:</strong>
-                                        <span class="opacity-90" id="info-category">${data.category || data.document_type}</span>
-                                    </div>
-                                    ` : ''}
-                                    ${data.research_agenda ? `
-                                    <div>
-                                        <strong>Research Agenda:</strong>
-                                        <span class="opacity-90" id="info-agenda">${data.research_agenda}</span>
-                                    </div>
-                                    ` : ''}
-                                    ${data.upload_date ? `
-                                    <div>
-                                        <strong>Date Uploaded:</strong>
-                                        <span id="info-date-uploaded">${new Date(data.upload_date).toLocaleDateString('en-US', {year: 'numeric', month: 'long', day: 'numeric'})}</span>
-                                    </div>
-                                    ` : ''}
-                                    ${data.keywords ? `
-                                    <div>
-                                        <strong>Keywords:</strong>
-                                        <span id="info-keywords">
-                                            ${Array.isArray(data.keywords) ? 
-                                                data.keywords.map(kw => `<a href="#" class="clickable-meta clickable-keyword">${kw}</a>`).join(', ') :
-                                                (typeof data.keywords === 'string' ? 
-                                                    data.keywords.split(',').map(kw => `<a href="#" class="clickable-meta clickable-keyword">${kw.trim()}</a>`).join(', ') :
-                                                    'No keywords available')}
-                                        </span>
-                                    </div>
-                                    ` : ''}
-                                </section>
-                            </article>
-                            
-                            ${data.content ? `
-                            <section class="document-content">
-                                <h2>Content</h2>
-                                <div class="content-viewer">${data.content}</div>
+                                </div>
+                                ${data.editor ? `
+                                <div>
+                                    <strong>Editor(s):</strong>
+                                    <span class="opacity-90" id="info-editor">${data.editor}</span>
+                                </div>
+                                ` : ''}
+                                ${data.publication_year ? `
+                                <div>
+                                    <strong>Publication Year:</strong>
+                                    <span id="info-year">${data.publication_year}</span>
+                                </div>
+                                ` : ''}
+                                ${data.volume ? `
+                                <div>
+                                    <strong>Volume:</strong>
+                                    <span id="info-volume">${data.volume}</span>
+                                </div>
+                                ` : ''}
+                                ${data.pages ? `
+                                <div>
+                                    <strong>Number of Pages:</strong>
+                                    <span id="info-pages">${data.pages}</span>
+                                </div>
+                                ` : ''}
+                                ${data.category || data.document_type ? `
+                                <div>
+                                    <strong>Category:</strong>
+                                    <span class="opacity-90" id="info-category">${data.category || data.document_type}</span>
+                                </div>
+                                ` : ''}
+                                ${data.research_agenda ? `
+                                <div>
+                                    <strong>Research Agenda:</strong>
+                                    <span class="opacity-90" id="info-agenda">${data.research_agenda}</span>
+                                </div>
+                                ` : ''}
+                                ${data.upload_date ? `
+                                <div>
+                                    <strong>Date Uploaded:</strong>
+                                    <span id="info-date-uploaded">${new Date(data.upload_date).toLocaleDateString('en-US', {year: 'numeric', month: 'long', day: 'numeric'})}</span>
+                                </div>
+                                ` : ''}
+                                ${data.keywords ? `
+                                <div>
+                                    <strong>Keywords:</strong>
+                                    <span id="info-keywords">
+                                        ${Array.isArray(data.keywords) ? 
+                                            data.keywords.map(kw => `<a href="#" class="clickable-meta clickable-keyword">${kw}</a>`).join(', ') :
+                                            (typeof data.keywords === 'string' ? 
+                                                data.keywords.split(',').map(kw => `<a href="#" class="clickable-meta clickable-keyword">${kw.trim()}</a>`).join(', ') :
+                                                'No keywords available')}
+                                    </span>
+                                </div>
+                                ` : ''}
                             </section>
-                            ` : ''}
                         </article>
                         
-                        <div id="floating-buttons" class="floating-action-container">
-                            ${data.file_path ? `
-                            <a id="read-doc-btn" href="${data.file_path}" class="btn btn-primary" target="_blank">
-                                <i class="fas fa-eye" aria-hidden="true"></i>
-                                Read Document
-                            </a>
-                            ` : ''}
-                            <a id="read-later-btn" href="#" class="btn btn-secondary" onclick="saveForLater(event, '${data.id}')">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                    <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-13a.75.75 0 0 0-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 0 0 0-1.5h-3.25V5Z" clip-rule="evenodd" />
-                                </svg>
-                                Read Later
-                            </a>
-                        </div>
-                    `;
+                        ${data.content ? `
+                        <section class="document-content">
+                            <h2>Content</h2>
+                            <div class="content-viewer">${data.content}</div>
+                        </section>
+                        ` : ''}
+                    </article>
                     
-                    // Update the content
-                    contentElement.innerHTML = documentHtml;
+                    <div id="floating-buttons" class="floating-action-container">
+                        ${data.file_path ? `
+                        <a id="read-doc-btn" href="${data.file_path}" class="btn btn-primary" target="_blank">
+                            <i class="fas fa-eye" aria-hidden="true"></i>
+                            Read Document
+                        </a>
+                        ` : ''}
+                        <a id="read-later-btn" href="#" class="btn btn-secondary" onclick="saveForLater(event, '${data.id}')">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-13a.75.75 0 0 0-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 0 0 0-1.5h-3.25V5Z" clip-rule="evenodd" />
+                            </svg>
+                            Read Later
+                        </a>
+                    </div>
+                `;
+                
+                // Update the content
+                contentElement.innerHTML = documentHtml;
                 });
                 
                 // Update page title
@@ -1341,8 +1341,8 @@
             }
 
             function trackDocumentVisit(docId) {
-                // Initialize document visit tracking for single documents
-                if (window.DocumentTracker) {
+            // Initialize document visit tracking for single documents
+            if (window.DocumentTracker) {
                     // Check if using the new counter-based approach
                     if (typeof window.DocumentTracker.initSingleDocumentTracking === 'function') {
                         window.DocumentTracker.initSingleDocumentTracking(docId);
@@ -1361,15 +1361,15 @@
                     } else {
                         console.error('No compatible document tracking method found');
                     }
-                } else {
-                    console.error('DocumentTracker not found! Make sure document-visit-tracker.js is loaded correctly.');
+                        } else {
+                console.error('DocumentTracker not found! Make sure document-visit-tracker.js is loaded correctly.');
                 }
             }
 
             function showError(message) {
                 showMessage(message, 'error');
             }
-
+            
             // Setup message box close button
             const messageBoxClose = document.getElementById('message-box-close');
             if (messageBoxClose) {

@@ -314,6 +314,39 @@ export class PageVisitsModel {
    */
   static async getMostVisitedDocuments(limit = 10, days?: number): Promise<DocumentVisitStats[]> {
     try {
+      // First try to get data from document_visits table with title information
+      try {
+        const result = await client.queryObject(
+          `SELECT dv.doc_id as document_id, SUM(dv.visit_count) as visit_count,
+                  d.title, d.document_type,
+                  MAX(dv.date) as last_visit_date
+           FROM document_visits dv
+           LEFT JOIN documents d ON dv.doc_id = d.id::text
+           WHERE dv.date >= CURRENT_DATE - INTERVAL '${days || 30} days'
+           GROUP BY dv.doc_id, d.title, d.document_type
+           ORDER BY visit_count DESC, last_visit_date DESC
+           LIMIT $1`,
+          [limit]
+        );
+
+        // If we got results, return them
+        if (result.rows.length > 0) {
+          console.log("Using document_visits table joined with documents for most visited documents");
+          return result.rows.map((row: any) => ({
+            document_id: row.document_id,
+            document_type: row.document_type || 'single',
+            title: row.title || 'Untitled Document',
+            visit_count: parseInt(row.visit_count.toString()),
+            last_visit_date: row.last_visit_date ? new Date(row.last_visit_date) : undefined
+          }));
+        }
+      } catch (innerError) {
+        console.error("Error getting most visited documents from document_visits:", innerError);
+        // Continue to legacy implementation
+      }
+
+      // Legacy implementation using page_visits table
+      console.log("Falling back to legacy page_visits table for most visited documents");
       // Build the SQL query with optional time limit
       let sql = `
         SELECT 
@@ -344,12 +377,42 @@ export class PageVisitsModel {
       // Execute the query
       const result = await client.queryObject(sql, params);
       
-      return result.rows.map((row: any) => ({
+      // Create an array of documents with an optional title property
+      const documentsWithoutTitles: (DocumentVisitStats & { title?: string })[] = result.rows.map((row: any) => ({
         document_id: row.document_id,
         document_type: row.document_type,
         visit_count: parseInt(row.visit_count.toString()),
         last_visit_date: row.last_visit_date ? new Date(row.last_visit_date) : undefined
       }));
+      
+      // Try to get titles for these documents
+      try {
+        // Extract document IDs
+        const documentIds = documentsWithoutTitles.map(d => d.document_id);
+        
+        if (documentIds.length > 0) {
+          // Query titles from documents table
+          const titlesResult = await client.queryObject(
+            `SELECT id, title FROM documents WHERE id = ANY($1::int[])`,
+            [documentIds]
+          );
+          
+          // Create a map of document IDs to titles
+          const titleMap = new Map<string, string>();
+          (titlesResult.rows as any[]).forEach(row => {
+            titleMap.set(row.id.toString(), row.title);
+          });
+          
+          // Add titles to original results
+          documentsWithoutTitles.forEach(doc => {
+            doc.title = titleMap.get(doc.document_id) || 'Untitled Document';
+          });
+        }
+      } catch (titleError) {
+        console.error("Error getting document titles:", titleError);
+      }
+      
+      return documentsWithoutTitles;
     } catch (error) {
       console.error("Error getting most visited documents:", error);
       return [];
@@ -609,38 +672,6 @@ export class PageVisitsModel {
       }));
     } catch (error) {
       console.error("Error getting most visited pages:", error);
-      return [];
-    }
-  }
-  
-  /**
-   * Get most visited documents from the counter table
-   * 
-   * @param limit Maximum number of documents to return
-   * @param days Number of days to look back (default: 30)
-   * @returns Array of document IDs with visit counts
-   */
-  static async getMostVisitedDocuments(limit: number = 10, days: number = 30): Promise<Array<{
-    doc_id: string,
-    total_visits: number
-  }>> {
-    try {
-      const result = await client.queryObject(
-        `SELECT doc_id, SUM(visit_count) as total_visits
-         FROM document_visits
-         WHERE date >= CURRENT_DATE - INTERVAL '${days} days'
-         GROUP BY doc_id
-         ORDER BY total_visits DESC
-         LIMIT $1`,
-        [limit]
-      );
-      
-      return (result.rows as any[]).map(row => ({
-        doc_id: row.doc_id,
-        total_visits: parseInt(row.total_visits.toString())
-      }));
-    } catch (error) {
-      console.error("Error getting most visited documents:", error);
       return [];
     }
   }

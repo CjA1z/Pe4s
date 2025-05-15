@@ -7,6 +7,7 @@ import {
     handleSoftDeleteCompiledDocument,
     handleUpdateCompiledDocument
 } from "../api/compiledDocument.ts";
+import { client } from "../db/denopost_conn.ts"; // Import the client directly
 
 // Compiled Document route handlers
 const createCompiledDocument = async (ctx: RouterContext<any, any, any>) => {
@@ -175,7 +176,7 @@ const hardDeleteCompiledDocument = async (ctx: RouterContext<any, any, any>) => 
     
     try {
         // First, check if the compiled document exists in the database
-        const checkResult = await ctx.state.client.queryObject(
+        const checkResult = await client.queryObject(
             "SELECT id FROM compiled_documents WHERE id = $1",
             [id]
         );
@@ -190,12 +191,12 @@ const hardDeleteCompiledDocument = async (ctx: RouterContext<any, any, any>) => 
         }
         
         // Execute a hard delete of the compiled document
-        const deleteResult = await ctx.state.client.queryObject(
+        const deleteResult = await client.queryObject(
             "DELETE FROM compiled_documents WHERE id = $1 RETURNING id",
             [id]
         );
         
-        if (deleteResult.rowCount > 0) {
+        if (deleteResult.rowCount && deleteResult.rowCount > 0) {
             ctx.response.status = 200;
             ctx.response.body = { 
                 message: "Compiled document permanently deleted successfully",
@@ -219,12 +220,125 @@ const hardDeleteCompiledDocument = async (ctx: RouterContext<any, any, any>) => 
     }
 };
 
+// Add handler for getting children of a compiled document
+const getCompiledDocumentChildren = async (ctx: RouterContext<any, any, any>) => {
+    const id = ctx.params.id;
+    
+    if (!id || isNaN(parseInt(id, 10))) {
+        ctx.response.status = 400;
+        ctx.response.body = { 
+            error: "Invalid compiled document ID", 
+            success: false 
+        };
+        return;
+    }
+    
+    const compiledDocId = parseInt(id, 10);
+    
+    try {
+        // Query to get documents associated with this compiled document
+        const result = await client.queryObject(`
+            SELECT d.* 
+            FROM documents d
+            JOIN compiled_document_items cdi ON d.id = cdi.document_id
+            WHERE cdi.compiled_document_id = $1
+            ORDER BY cdi.id ASC
+        `, [compiledDocId]);
+        
+        if (result.rows.length === 0) {
+            // Try alternative method
+            const altResult = await client.queryObject(`
+                SELECT d.* 
+                FROM documents d
+                WHERE d.compiled_parent_id = $1
+                ORDER BY d.id ASC
+            `, [compiledDocId]);
+            
+            if (altResult.rows.length === 0) {
+                // Return empty array instead of error for UI compatibility
+                ctx.response.body = [];
+                return;
+            }
+            
+            // Return the found documents
+            ctx.response.body = altResult.rows;
+            return;
+        }
+        
+        // Return the found documents
+        ctx.response.body = result.rows;
+    } catch (error) {
+        console.error(`Error fetching children of compiled document ${compiledDocId}:`, error);
+        ctx.response.status = 500;
+        ctx.response.body = { 
+            error: error instanceof Error ? error.message : "Unknown error occurred", 
+            success: false 
+        };
+    }
+};
+
+// Add handler to get items from compiled_document_items table
+const getCompiledDocumentItems = async (ctx: RouterContext<any, any, any>) => {
+    const id = ctx.params.id;
+    
+    if (!id || isNaN(parseInt(id, 10))) {
+        ctx.response.status = 400;
+        ctx.response.body = { 
+            error: "Invalid compiled document ID", 
+            success: false 
+        };
+        return;
+    }
+    
+    const compiledDocId = parseInt(id, 10);
+    
+    try {
+        // Query to get items directly from the compiled_document_items table
+        const result = await client.queryObject(`
+            SELECT cdi.*, d.title, d.abstract, d.publication_date 
+            FROM compiled_document_items cdi
+            JOIN documents d ON cdi.document_id = d.id
+            WHERE cdi.compiled_document_id = $1
+            ORDER BY cdi.id ASC
+        `, [compiledDocId]);
+        
+        if (result.rows.length === 0) {
+            // Return empty array instead of error for UI compatibility
+            ctx.response.body = { items: [], success: true };
+            return;
+        }
+        
+        // Return the found items
+        ctx.response.body = { 
+            items: result.rows,
+            success: true
+        };
+    } catch (error) {
+        console.error(`Error fetching items for compiled document ${compiledDocId}:`, error);
+        ctx.response.status = 500;
+        ctx.response.body = { 
+            error: error instanceof Error ? error.message : "Unknown error occurred", 
+            success: false 
+        };
+    }
+};
+
 // Export an array of routes
 export const compiledDocumentRoutes: Route[] = [
     { method: "POST", path: "/compiled-documents", handler: createCompiledDocument },
     { method: "GET", path: "/compiled-documents/:id", handler: getCompiledDocument },
+    { method: "GET", path: "/compiled-documents/:id/children", handler: getCompiledDocumentChildren },
+    { method: "GET", path: "/compiled-documents/:id/items", handler: getCompiledDocumentItems },
     { method: "POST", path: "/compiled-documents/add-documents", handler: addDocumentsToCompilation },
     { method: "DELETE", path: "/compiled-documents/:id/soft-delete", handler: softDeleteCompiledDocument },
     { method: "PUT", path: "/compiled-documents/:id", handler: updateCompiledDocument },
     { method: "DELETE", path: "/compiled-documents/:id/hard-delete", handler: hardDeleteCompiledDocument },
+    
+    // Add guest and public access routes
+    { method: "GET", path: "/guest/compiled-documents/:id", handler: getCompiledDocument },
+    { method: "GET", path: "/public/compiled-documents/:id", handler: getCompiledDocument },
+    { method: "GET", path: "/guest/compiled-documents/:id/children", handler: getCompiledDocumentChildren },
+    { method: "GET", path: "/public/compiled-documents/:id/children", handler: getCompiledDocumentChildren },
+    { method: "GET", path: "/guest/compiled-documents/:id/items", handler: getCompiledDocumentItems },
+    { method: "GET", path: "/public/compiled-documents/:id/items", handler: getCompiledDocumentItems },
 ]; 

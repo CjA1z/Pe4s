@@ -1,6 +1,7 @@
 import { RouterContext } from "../deps.ts";
 import { DocumentRequestModel, DocumentRequest } from "../models/documentRequestModel.ts";
 import { DocumentModel } from "../models/documentModel.ts";
+import { sendRequestConfirmationEmail } from "../services/emailService.ts";
 
 export class DocumentRequestController {
     private documentRequestModel: DocumentRequestModel;
@@ -35,6 +36,50 @@ export class DocumentRequestController {
 
             // Create the request
             const request = await this.documentRequestModel.create(requestData);
+            
+            // Send confirmation email
+            try {
+                console.log("Sending document request confirmation email...");
+                
+                // Extract document info
+                const documentInfo = {
+                    title: document.title || 'Requested Document',
+                    author: document.author || undefined,
+                    category: document.category || undefined,
+                    researchAgenda: document.research_agenda || undefined,
+                    abstract: document.abstract || undefined
+                };
+                
+                // Extract request info
+                const requestInfo = {
+                    affiliation: requestData.affiliation,
+                    reason: requestData.reason,
+                    reasonDetails: requestData.reason_details
+                };
+                
+                // Generate request ID - this format matches what we show in the UI
+                const requestId = `REQ-${request.id || Date.now()}`;
+                
+                // Send the confirmation email
+                await sendRequestConfirmationEmail(
+                    requestData.email,
+                    requestData.full_name,
+                    documentInfo,
+                    requestInfo,
+                    requestId
+                ).then(success => {
+                    if (success) {
+                        console.log(`Confirmation email sent to ${requestData.email}`);
+                    } else {
+                        console.error(`Failed to send confirmation email to ${requestData.email}`);
+                    }
+                }).catch(error => {
+                    console.error("Error sending confirmation email:", error);
+                });
+            } catch (emailError) {
+                // Log error but don't fail the request
+                console.error("Error in email confirmation process:", emailError);
+            }
             
             ctx.response.status = 201;
             ctx.response.body = request;

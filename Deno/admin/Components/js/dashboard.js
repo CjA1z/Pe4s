@@ -256,26 +256,95 @@ async function updateTopAuthors() {
         const data = await response.json();
         console.log('Top authors data received:', data);
         
-        // Check if we have valid data
-        if (!data.topAuthors || data.topAuthors.length === 0) {
-            console.log('No top authors data, fetching all authors...');
+        // Enhanced data handling to check multiple response formats
+        let usableData = { topAuthors: [] };
+        
+        // Check if we have data in different formats
+        if (data.topAuthors && data.topAuthors.length > 0) {
+            // Direct format with topAuthors array
+            usableData = data;
+            console.log('Using topAuthors from direct response format');
+        } else if (data.authors && data.authors.length > 0) {
+            // Alternative format with authors array
+            usableData = {
+                topAuthors: data.authors.map(author => ({
+                    full_name: author.full_name || author.name || 'Unknown Author',
+                    visit_count: author.visit_count || author.visits || 0,
+                    profile_picture: author.profilePicUrl || author.profile_picture || author.avatar || "/admin/Components/img/samp_pfp.jpg"
+                }))
+            };
+            console.log('Converted authors array to topAuthors format');
+        } else if (data.authorId === 'stats') {
+            // Try to extract from the stats format
+            console.log('Trying to extract authors from stats format');
+            
+            // Attempt to extract author data from the stats object
+            const extractedAuthors = [];
+            
+            // If we have daily stats with author information
+            if (data.daily && Array.isArray(data.daily)) {
+                const authorMap = new Map();
+                
+                // Process daily stats to aggregate author visits
+                data.daily.forEach(entry => {
+                    if (entry.author_id && entry.author_name) {
+                        // Create or update author in our map
+                        if (!authorMap.has(entry.author_id)) {
+                            authorMap.set(entry.author_id, {
+                                full_name: entry.author_name,
+                                visit_count: entry.visits || entry.count || 1,
+                                profile_picture: entry.profile_picture || "/admin/Components/img/samp_pfp.jpg"
+                            });
+                        } else {
+                            // Add to existing author's visit count
+                            const author = authorMap.get(entry.author_id);
+                            author.visit_count += (entry.visits || entry.count || 1);
+                            authorMap.set(entry.author_id, author);
+                        }
+                    }
+                });
+                
+                // Convert map to array
+                authorMap.forEach(author => extractedAuthors.push(author));
+            }
+            
+            // If we managed to extract authors
+            if (extractedAuthors.length > 0) {
+                usableData = { topAuthors: extractedAuthors };
+                console.log(`Extracted ${extractedAuthors.length} authors from stats data`);
+            } else {
+                console.log('Failed to extract authors from stats format, fetching all authors...');
+                const allAuthorsResponse = await fetch('/api/authors/all');
+                
+                if (allAuthorsResponse.ok) {
+                    const allAuthorsData = await allAuthorsResponse.json();
+                    usableData = {
+                        topAuthors: allAuthorsData.authors.slice(0, 5).map(author => ({
+                            full_name: author.full_name || author.name || 'Unknown Author',
+                            visit_count: 0,
+                            profile_picture: author.profilePicUrl || author.profile_picture || "/admin/Components/img/samp_pfp.jpg"
+                        }))
+                    };
+                }
+            }
+        } else {
+            // Fallback to getting all authors
+            console.log('No top authors data in expected format, fetching all authors...');
             const allAuthorsResponse = await fetch('/api/authors/all');
             
             if (allAuthorsResponse.ok) {
                 const allAuthorsData = await allAuthorsResponse.json();
-                const transformedData = {
+                usableData = {
                     topAuthors: allAuthorsData.authors.slice(0, 5).map(author => ({
-                        full_name: author.full_name,
+                        full_name: author.full_name || author.name || 'Unknown Author',
                         visit_count: 0,
-                        profile_picture: author.profilePicUrl || "/admin/Components/img/samp_pfp.jpg"
+                        profile_picture: author.profilePicUrl || author.profile_picture || "/admin/Components/img/samp_pfp.jpg"
                     }))
                 };
-                updateTopAuthorsUI(transformedData);
-                return;
             }
         }
         
-        updateTopAuthorsUI(data);
+        updateTopAuthorsUI(usableData);
     } catch (error) {
         console.log('Error updating top authors:', error);
         // Try to fetch all authors as a fallback
@@ -332,8 +401,21 @@ function updateTopAuthorsUI(data) {
         const authorElement = document.createElement('div');
         authorElement.className = 'author';
         
-        // Create author image div with background image
-        const imageUrl = author.profile_picture || './Components/img/samp_pfp.jpg';
+        // Improve profile picture URL handling to fix 404 errors
+        let imageUrl = '/admin/Components/img/default_user.png'; // Default image that should always exist
+        
+        if (author.profile_picture) {
+            // Check if profile_picture is already a full URL or a relative path
+            if (author.profile_picture.startsWith('http') || author.profile_picture.startsWith('/')) {
+                imageUrl = author.profile_picture;
+            } else {
+                // If it's just a filename, prepend the path
+                imageUrl = `/storage/authors/profile-pictures/${author.profile_picture}`;
+            }
+            
+            // Log the image URL for debugging
+            console.log(`Author image URL: ${imageUrl} (from ${author.profile_picture})`);
+        }
         
         // Format the visit count with the proper label
         const visitCount = author.visit_count || 0;

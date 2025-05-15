@@ -92,16 +92,38 @@ export class UserLibraryModel {
    */
   static async getUserLibrary(userId: string): Promise<any[]> {
     try {
+      // Query to get document details and authors
       const result = await client.queryObject(
-        `SELECT sd.*, d.title, d.abstract, d.publication_year, d.document_type,
-         COALESCE(d.file_path, '') as file_path
-         FROM saved_documents sd
-         JOIN documents d ON sd.doc_id = d.id
-         WHERE sd.user_id = $1
-         ORDER BY sd.saved_at DESC`,
+        `SELECT 
+          sd.*, 
+          d.title, 
+          d.abstract, 
+          d.document_type,
+          COALESCE(d.file_path, '') as file_path,
+          ARRAY_AGG(DISTINCT a.full_name) FILTER (WHERE a.full_name IS NOT NULL) as author_names,
+          ARRAY_AGG(DISTINCT ra.name) FILTER (WHERE ra.name IS NOT NULL) as keywords
+        FROM 
+          saved_documents sd
+        JOIN 
+          documents d ON sd.doc_id = d.id
+        LEFT JOIN 
+          document_authors da ON d.id = da.document_id
+        LEFT JOIN 
+          authors a ON da.author_id = a.id
+        LEFT JOIN 
+          document_research_agenda dra ON d.id = dra.document_id
+        LEFT JOIN 
+          research_agenda ra ON dra.research_agenda_id = ra.id
+        WHERE 
+          sd.user_id = $1
+        GROUP BY 
+          sd.user_id, sd.doc_id, sd.saved_at, d.id, d.title, d.abstract, d.document_type, d.file_path
+        ORDER BY 
+          sd.saved_at DESC`,
         [userId]
       );
 
+      // Return rows with arrays for authors and keywords
       return result.rows;
     } catch (error) {
       console.error("Error retrieving user library:", error);

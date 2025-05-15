@@ -637,6 +637,9 @@
     </style>
 </head>
 <body>
+    <!-- Navbar will be loaded here -->
+    <div id="navbarContainer"></div>
+    
     <div class="page-wrapper">
 
         <header class="page-header" role="banner">
@@ -648,24 +651,20 @@
         </header>
 
         <main class="container" role="main">
-            <article id="foreword-card" class="document-item-base">
+            <article id="abstract-card" class="document-item-base">
                 <header>
-                    <h2>Foreword</h2>
+                    <h2>Abstract</h2>
                 </header>
                 <section>
-                    <p class="foreword-text">
-                        Foreword content will be loaded here.
+                    <p class="abstract-text">
+                        Abstract content will be loaded here.
                     </p>
                 </section>
             </article>
 
             <hr class="section-divider">
 
-            <div id="toc-container" class="document-item-base" style="display: none;">
-                 <h2>Contents</h2>
-                 <ul id="toc-list">
-                     </ul>
-            </div>
+            
 
              <hr id="toc-articles-divider" class="section-divider" style="display: none;">
 
@@ -685,30 +684,29 @@
                         <strong>Author(s):</strong>
                         <span id="info-author-container"></span>
                     </div>
+                    <!-- 
                     <div>
                         <strong>Editor(s):</strong>
                         <span class="opacity-90" id="info-editor"></span>
                     </div>
+                    -->
                     <div>
-                        <strong>Publication Year:</strong>
-                        <span id="info-year"></span>
+                        <strong>Publication Date:</strong>
+                        <span id="info-date"></span>
                     </div>
-                    <div>
-                        <strong>Volume:</strong>
-                        <span id="info-volume"></span>
-                    </div>
+                    
                     <div>
                         <strong>Number of Pages:</strong>
                         <span id="info-pages"></span>
                     </div>
                     <div>
-                        <strong>Category:</strong>
+                        <strong>Research Category:</strong>
                         <span class="opacity-90" id="info-category"></span>
                     </div>
-                    <div>
+                    <!--<div>
                         <strong>Research Agenda:</strong>
                         <span class="opacity-90" id="info-agenda"></span>
-                    </div>
+                    </div>-->
                     <div>
                         <strong>Date Uploaded:</strong>
                         <span id="info-date-uploaded"></span>
@@ -729,7 +727,7 @@
                     <div class="footer-logo-section">
                         <div class="footer-logo-container">
                             <img
-                                src="https://placehold.co/200x80/006A4E/FFFFFF?text=PeAS+Logo"
+                                src="../Components/images/peas_logo.png"
                                 alt="PeAS Logo"
                                 onerror="this.onerror=null; this.src='https://placehold.co/200x80/cccccc/ffffff?text=Logo+Error';">
                         </div>
@@ -888,7 +886,7 @@
             const mainHeaderTitle = document.getElementById('main-doc-title-header');
             const mainHeaderAuthor = document.getElementById('main-doc-author-header');
             const mainHeaderYear = document.getElementById('main-doc-year-header');
-            const forewordTextElement = document.querySelector('#foreword-card .foreword-text');
+            const abstractTextElement = document.querySelector('#abstract-card .abstract-text');
             const infoTitle = document.getElementById('info-title');
             const infoAuthorContainer = document.getElementById('info-author-container');
             const infoEditor = document.getElementById('info-editor');
@@ -999,81 +997,312 @@
             // --- Load Document Data ---
             async function loadDocumentData(docId) {
                 try {
-                    let currentMockData;
-                    if (docId === 4) { // Main collection example
-                        currentMockData = {
-                            doc_id: "MAIN_COLLECTION_004", // Ensure main doc has an ID
-                            title: "The SPUD CONFLUENCE: 2020-2021, Vol. 11, No. 1",
-                            author: "St. Paul University Dumaguete",
-                            publication_year: "2020-2021",
-                            abstract: "This issue of Confluence presents research designs, an approach for answering research questions...", // Shortened for brevity
-                            keywords: ["Faculty Research", "Academic Journal", "Higher Education"],
-                            editor: { vp_academic_affairs: "SR HELEN MALUBAY, SPC", board_of_reviewers: ["Reviewer A", "Reviewer B"] },
-                            volume: "Vol. 11, No. 1", pages: "Multiple Articles", category: "Confluence",
-                            research_agenda: "Varied Academic Research", date_uploaded: "2021-06-01T00:00:00.000Z",
+                    // Show loading indicator or state
+                    if(abstractTextElement) abstractTextElement.textContent = 'Loading document data...';
+                    
+                    let documentData = null;
+                    
+                    // Guest document endpoint
+                    try {
+                        console.log(`Fetching document ${docId} from guest documents API...`);
+                        const guestResponse = await fetch(`/api/guest/documents/${docId}`);
+                        
+                        if (guestResponse.ok) {
+                            const data = await guestResponse.json();
+                            if (data.success && data.document) {
+                                console.log("Loaded data from guest API endpoint");
+                                documentData = data.document;
+                            } else {
+                                console.warn(`Guest API: ${data.message || 'No data returned'}`);
+                            }
+                        } else {
+                            console.warn(`Guest API: ${guestResponse.status} ${guestResponse.statusText}`);
+                        }
+                    } catch (e) {
+                        console.warn(`Guest API error: ${e.message}`);
+                    }
+                    
+                    // Public document endpoint (fallback)
+                    if (!documentData) {
+                        try {
+                            console.log(`Fetching document ${docId} from public documents API...`);
+                            const publicResponse = await fetch(`/api/public/documents/${docId}`);
+                            
+                            if (publicResponse.ok) {
+                                const data = await publicResponse.json();
+                                if (data.success && data.document) {
+                                    console.log("Loaded data from public API endpoint");
+                                    documentData = data.document;
+                                } else {
+                                    console.warn(`Public API: ${data.message || 'No data returned'}`);
+                                }
+                            } else {
+                                console.warn(`Public API: ${publicResponse.status} ${publicResponse.statusText}`);
+                            }
+                        } catch (e) {
+                            console.warn(`Public API error: ${e.message}`);
+                        }
+                    }
+                    
+                    // Standard API with guest parameter (final fallback)
+                    if (!documentData) {
+                        try {
+                            console.log(`Fetching document ${docId} from standard API with guest parameter...`);
+                            const standardResponse = await fetch(`/api/documents/${docId}?guest=true`);
+                            
+                            if (standardResponse.ok) {
+                                const data = await standardResponse.json();
+                                console.log("Standard API response:", data);
+                                
+                                // Check if the response has success and document properties
+                                // Or if it's just a raw document object
+                                if (data.success && data.document) {
+                                    console.log("Loaded data from standard API endpoint (success wrapper)");
+                                    documentData = data.document;
+                                } else if (data.id && data.title) {
+                                    // Likely a direct document object
+                                    console.log("Loaded data from standard API endpoint (direct object)");
+                                    documentData = data;
+                                } else {
+                                    console.warn(`Standard API: ${data.message || 'No data returned'}`);
+                                }
+                            } else {
+                                console.warn(`Standard API: ${standardResponse.status} ${standardResponse.statusText}`);
+                            }
+                        } catch (e) {
+                            console.warn(`Standard API error: ${e.message}`);
+                        }
+                    }
+                    
+                    // Check if we got document data through any endpoint
+                    if (!documentData) {
+                        // If all attempts failed, throw error with details
+                        throw new Error(`Failed to load document data from any available endpoint`);
+                    }
+                    
+                    // Process and enhance the data
+                    console.log(`Processing document data:`, documentData);
+                    console.log(`Author field before processing:`, documentData.author);
+                    
+                    // If we don't have author information but have document ID, 
+                    // try to fetch author information directly
+                    if ((!documentData.author || documentData.author === "Unknown Author") && documentData.id) {
+                        try {
+                            // Try guest endpoint first
+                            console.log(`Attempting to fetch author information for document ID ${documentData.id}`);
+                            let authorResponse = await fetch(`/api/guest/documents/${documentData.id}/authors`);
+                            
+                            if (!authorResponse.ok) {
+                                // Try public endpoint next
+                                console.log(`Guest author endpoint failed, trying public endpoint...`);
+                                authorResponse = await fetch(`/api/public/documents/${documentData.id}/authors`);
+                            }
+                            
+                            if (!authorResponse.ok) {
+                                // Try standard API endpoint as fallback
+                                console.log(`Public author endpoint failed, trying standard endpoint...`);
+                                authorResponse = await fetch(`/api/documents/${documentData.id}/authors`);
+                            }
+                            
+                            if (authorResponse.ok) {
+                                const authorData = await authorResponse.json();
+                                console.log(`Author data received:`, authorData);
+                                
+                                if (authorData.authors && Array.isArray(authorData.authors) && authorData.authors.length > 0) {
+                                    documentData.enhancedAuthors = authorData.authors;
+                                    console.log(`Found ${authorData.authors.length} authors, adding to document data`);
+                                }
+                            } else {
+                                console.warn(`Could not fetch author details: ${authorResponse.status}`);
+                            }
+                        } catch (authorErr) {
+                            console.warn(`Error fetching author details:`, authorErr);
+                        }
+                    }
+                    
+                    // Handle author display
+                    documentData.author = getAuthorDisplayName(documentData);
+                    console.log(`Author field after processing:`, documentData.author);
+                    
+                    // If document has contained_documents, process each one
+                    if (documentData.contained_documents && Array.isArray(documentData.contained_documents)) {
+                        documentData.contained_documents = documentData.contained_documents.map(doc => {
+                            console.log(`Processing contained document:`, doc);
+                            return {
+                                ...doc,
+                                author: getAuthorDisplayName(doc)
+                            };
+                        });
+                    }
+                    
+                    // Store the data and update UI
+                    mainDocumentData = documentData;
+                    updateUI();
+                    
+                } catch (error) {
+                    console.error('Error fetching document data:', error);
+                    
+                    // Development environment fallback - simulate document data
+                    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.includes('local')) {
+                        console.warn("Using simulated document data for development environment");
+                        
+                        mainDocumentData = {
+                            doc_id: docId,
+                            title: `Simulated Document #${docId}`,
+                            author: "Development Author",
+                            publication_year: "2023",
+                            abstract: "This is simulated abstract content for development purposes. The API endpoint might not be configured correctly, or the document might not exist in the database.",
+                            keywords: ["simulation", "development", "testing"],
+                            category: "Development",
+                            volume: "Dev Vol. 1",
+                            pages: "1-100",
+                            research_agenda: "Software Development",
+                            date_uploaded: new Date().toISOString(),
+                            editor: { vp_academic_affairs: "Simulated Editor", board_of_reviewers: ["Dev Reviewer A", "Dev Reviewer B"] },
                             contained_documents: [
-                                { doc_id: 401, title: "Research Designs Used by Students", author: "Roel Jumawan, et al.", abstract: "Study on research designs...", keywords: ["research designs", "students"] },
-                                { doc_id: 402, title: "Thematic Patterns in Editorials", author: "Sami Managbanag, et al.", abstract: "Analysis of thematic patterns...", keywords: ["discourse analysis", "editorials"] },
-                                { doc_id: 403, title: "Resiliency and Mental Health of Students", author: "Adah Balbon, et al.", abstract: "Assessment of student well-being...", keywords: ["resiliency", "mental health"] }
+                                {
+                                    doc_id: `${docId}-sub1`,
+                                    title: "Simulated Sub-Document 1",
+                                    author: "Dev Author A",
+                                    abstract: "This is a simulated sub-document for testing purposes.",
+                                    keywords: ["testing", "sub-document"]
+                                },
+                                {
+                                    doc_id: `${docId}-sub2`,
+                                    title: "Simulated Sub-Document 2",
+                                    author: "Dev Author B",
+                                    abstract: "Another simulated sub-document for development.",
+                                    keywords: ["development", "simulation"]
+                                }
                             ]
                         };
-                    } else { // Fallback for unknown ID
-                        currentMockData = { doc_id: "UNKNOWN_DOC", title: "Document Not Found", abstract: "Details not available." };
+                        
+                        updateUI();
+                        showGeneralMessage("Using simulated data. This is a development environment.", false);
+                        return;
                     }
-                    mainDocumentData = currentMockData;
+                    
+                    if(abstractTextElement) abstractTextElement.textContent = 'Failed to load document data.';
+                    showGeneralMessage(`Error: Could not load document details. ${error.message}`, true);
+                    
+                    // Set minimal data for a graceful failure
+                    mainDocumentData = { 
+                        doc_id: docId,
+                        title: "Document Not Found", 
+                        abstract: "We couldn't load this document. Please try again later or contact support."
+                    };
+                    updateUI(true); // Update UI with error state
+                }
+            }
+            
+            // Helper function to get author display name from document data
+            function getAuthorDisplayName(data) {
+                if (!data) return 'Unknown Author';
+                
+                // Check enhancedAuthors first (this is how compiled documents get their author data)
+                if (data.enhancedAuthors && Array.isArray(data.enhancedAuthors) && data.enhancedAuthors.length > 0) {
+                    return data.enhancedAuthors.map(author => {
+                        return author.full_name || author.name || 
+                               (author.first_name && author.last_name ? `${author.first_name} ${author.last_name}` : 
+                               author.id ? `ID: ${author.id}` : 'Unknown');
+                    }).join(', ');
+                }
+                
+                // Check for document_authors relation
+                if (data.document_authors && Array.isArray(data.document_authors) && data.document_authors.length > 0) {
+                    return data.document_authors.map(docAuthor => {
+                        const author = docAuthor.author || docAuthor;
+                        return author.full_name || author.name || 
+                               (author.first_name && author.last_name ? `${author.first_name} ${author.last_name}` : 
+                               `ID: ${author.id || docAuthor.author_id}`);
+                    }).join(', ');
+                }
+                
+                // Then check for author object
+                if (data.author && typeof data.author === 'object') {
+                    const author = data.author;
+                    return author.full_name || author.name || 
+                           (author.first_name && author.last_name ? `${author.first_name} ${author.last_name}` : 
+                           author.id ? `ID: ${author.id}` : 'Unknown Author');
+                }
+                
+                // Then check various author name fields
+                if (data.author_name) return data.author_name;
+                if (data.author && typeof data.author === 'string') return data.author;
+                if (data.authors) {
+                    if (Array.isArray(data.authors)) {
+                        return data.authors.map(author => {
+                            if (typeof author === 'object') {
+                                return author.full_name || author.name || 
+                                       (author.first_name && author.last_name ? `${author.first_name} ${author.last_name}` : 
+                                       author.id ? `ID: ${author.id}` : 'Unknown');
+                            }
+                            return author;
+                        }).join(', ');
+                    }
+                    return data.authors;
+                }
+                
+                // If nothing found, return Unknown
+                return 'Unknown Author';
+            }
 
-                    await new Promise(resolve => setTimeout(resolve, 300));
-                    const data = mainDocumentData;
-
-                    if(mainHeaderTitle) mainHeaderTitle.textContent = data.title || 'Title Not Found';
-                    if(mainHeaderAuthor) mainHeaderAuthor.textContent = data.author || 'Author Not Found';
-                    if(mainHeaderYear) mainHeaderYear.textContent = data.publication_year || 'Year Not Found';
-                    if(forewordTextElement) forewordTextElement.textContent = data.abstract || 'Foreword not available.';
-                    if(infoTitle) infoTitle.textContent = data.title || '';
-                    if(infoAuthorContainer) createAuthorLinks(data.author, infoAuthorContainer);
+            // Separated UI update logic for reuse
+            function updateUI(isError = false) {
+                if(mainHeaderTitle) mainHeaderTitle.textContent = mainDocumentData.title || 'Title Not Found';
+                if(mainHeaderAuthor) mainHeaderAuthor.textContent = mainDocumentData.author || 'Author Not Found';
+                if(mainHeaderYear) mainHeaderYear.textContent = mainDocumentData.publication_year || 'Year Not Found';
+                
+                // Use abstract from document data for foreword text
+                if(abstractTextElement) abstractTextElement.textContent = mainDocumentData.abstract || 'Abstract not available.';
+                
+                if(infoTitle) infoTitle.textContent = mainDocumentData.title || '';
+                if(infoAuthorContainer) createAuthorLinks(mainDocumentData.author, infoAuthorContainer);
 
                      if (infoEditor) {
                         infoEditor.innerHTML = '';
-                        if (data.editor && typeof data.editor === 'object') {
+                    if (mainDocumentData.editor && typeof mainDocumentData.editor === 'object') {
                             let editorHTML = '';
-                            if (data.editor.vp_academic_affairs) {
-                                editorHTML += `<span>${data.editor.vp_academic_affairs} (Vice-President, Academic Affairs)</span><br>`;
+                        if (mainDocumentData.editor.vp_academic_affairs) {
+                            editorHTML += `<span>${mainDocumentData.editor.vp_academic_affairs} (Vice-President, Academic Affairs)</span><br>`;
                             }
-                            if (data.editor.board_of_reviewers && Array.isArray(data.editor.board_of_reviewers) && data.editor.board_of_reviewers.length > 0) {
+                        if (mainDocumentData.editor.board_of_reviewers && Array.isArray(mainDocumentData.editor.board_of_reviewers) && mainDocumentData.editor.board_of_reviewers.length > 0) {
                                 editorHTML += '<strong>Board of Reviewers:</strong><ul class="editor-list">';
-                                data.editor.board_of_reviewers.forEach(reviewer => {
+                            mainDocumentData.editor.board_of_reviewers.forEach(reviewer => {
                                     editorHTML += `<li>${reviewer}</li>`;
                                 });
                                 editorHTML += '</ul>';
                             }
                              infoEditor.innerHTML = editorHTML || 'N/A';
-                        } else if (typeof data.editor === 'string') {
-                             infoEditor.textContent = data.editor;
+                    } else if (typeof mainDocumentData.editor === 'string') {
+                        infoEditor.textContent = mainDocumentData.editor;
                         } else {
                              infoEditor.textContent = 'N/A';
                         }
                     }
-                    if (infoYearElem) infoYearElem.textContent = data.publication_year || 'N/A';
-                    if (infoCategory) infoCategory.textContent = data.category || 'N/A';
+                
+                if (infoYearElem) infoYearElem.textContent = mainDocumentData.publication_year || 'N/A';
+                if (infoCategory) infoCategory.textContent = mainDocumentData.category || 'N/A';
                     if (infoVolume) {
-                        infoVolume.textContent = (data.category === "Confluence" || data.category === "Synergy") ? (data.volume || 'N/A') : 'N/A';
+                    infoVolume.textContent = (mainDocumentData.category === "Confluence" || mainDocumentData.category === "Synergy") ? (mainDocumentData.volume || 'N/A') : 'N/A';
                     }
-                    if (infoPages) infoPages.textContent = data.pages || 'N/A';
-                    if (infoAgenda) infoAgenda.textContent = data.research_agenda || 'N/A';
+                if (infoPages) infoPages.textContent = mainDocumentData.pages || 'N/A';
+                if (infoAgenda) infoAgenda.textContent = mainDocumentData.research_agenda || 'N/A';
                     if (infoDateUploaded) {
-                        infoDateUploaded.textContent = data.date_uploaded ? new Date(data.date_uploaded).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A';
+                    infoDateUploaded.textContent = mainDocumentData.date_uploaded ? new Date(mainDocumentData.date_uploaded).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A';
                     }
+                
                     if (infoKeywordsContainer) {
                         infoKeywordsContainer.innerHTML = '';
-                        if(data.keywords && Array.isArray(data.keywords) && data.keywords.length > 0){
-                            data.keywords.forEach((keyword, index) => {
+                    if(mainDocumentData.keywords && Array.isArray(mainDocumentData.keywords) && mainDocumentData.keywords.length > 0){
+                        mainDocumentData.keywords.forEach((keyword, index) => {
                                 const link = document.createElement('a');
                                 link.href = `#/search/keyword/${encodeURIComponent(keyword)}`;
                                 link.className = 'clickable-meta clickable-keyword';
                                 link.textContent = keyword;
                                 link.onclick = (e) => { e.preventDefault(); searchByKeyword(keyword); };
                                 infoKeywordsContainer.appendChild(link);
-                                if (index < data.keywords.length - 1) {
+                            if (index < mainDocumentData.keywords.length - 1) {
                                     infoKeywordsContainer.appendChild(document.createTextNode(', '));
                                 }
                             });
@@ -1085,10 +1314,10 @@
                     if (tocContainer && tocList && containedDocumentsCardsContainer) {
                         tocList.innerHTML = '';
                         containedDocumentsCardsContainer.innerHTML = '';
-                        if (data.contained_documents && data.contained_documents.length > 0) {
+                    if (mainDocumentData.contained_documents && mainDocumentData.contained_documents.length > 0) {
                             tocContainer.style.display = 'block';
                             if(tocArticlesDivider) tocArticlesDivider.style.display = 'block';
-                            data.contained_documents.forEach(doc => {
+                        mainDocumentData.contained_documents.forEach(doc => {
                                 const cardId = `article-${doc.doc_id}`;
                                 const titleId = `sub-doc-title-${doc.doc_id}`;
                                 const tocItem = document.createElement('li');
@@ -1140,16 +1369,12 @@
                                 containedDocumentsCardsContainer.appendChild(card);
                             });
                         } else {
-                            if(tocContainer) tocContainer.style.display = 'none';
-                            if(tocArticlesDivider) tocArticlesDivider.style.display = 'none';
+                        if(!isError && tocContainer) tocContainer.style.display = 'none';
+                        if(!isError && tocArticlesDivider) tocArticlesDivider.style.display = 'none';
                         }
                     }
+                
                     updateFloatingButtonDisplay(); // Update FAB status after data is loaded
-                } catch (error) {
-                    console.error('Error fetching document data:', error);
-                    if(forewordTextElement) forewordTextElement.textContent = 'Failed to load document data.';
-                    showGeneralMessage('Error: Could not load document details.', true);
-                }
             }
 
             function showGeneralMessage(message, isError = false) {
@@ -1357,11 +1582,97 @@
             function searchByKeyword(keyword) { showGeneralMessage(`Search: Keyword "${keyword}"`); }
             function searchByAuthor(author) { showGeneralMessage(`Search: Author "${author}"`); }
 
-            loadDocumentData(4);
+            // Get document ID from URL parameters
+            function getDocumentIdFromUrl() {
+                try {
+                    // Method 1: Get ID from query parameter
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const queryId = urlParams.get('id');
+                    
+                    if (queryId) {
+                        console.log(`Found document ID in query parameter: ${queryId}`);
+                        return queryId;
+                    }
+                    
+                    // Method 2: Try to extract ID from URL path segments
+                    const pathSegments = window.location.pathname.split('/');
+                    
+                    // Check the last segment for numeric ID
+                    const lastSegment = pathSegments[pathSegments.length - 1];
+                    const numericId = parseInt(lastSegment);
+                    
+                    if (!isNaN(numericId)) {
+                        console.log(`Found document ID in path: ${numericId}`);
+                        return numericId.toString();
+                    }
+                    
+                    // Method 3: Check if second-to-last segment is "document" or "doc" and last is numeric
+                    if (pathSegments.length >= 2) {
+                        const potentialIdSegment = pathSegments[pathSegments.length - 1];
+                        const potentialTypeSegment = pathSegments[pathSegments.length - 2].toLowerCase();
+                        
+                        if ((potentialTypeSegment === 'document' || potentialTypeSegment === 'doc') && 
+                            !isNaN(parseInt(potentialIdSegment))) {
+                            console.log(`Found document ID in path structure: ${potentialIdSegment}`);
+                            return potentialIdSegment;
+                        }
+                    }
+                    
+                    // Method 4: Look for a hash-based ID (#id=123)
+                    const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
+                    const hashId = hashParams.get('id');
+                    
+                    if (hashId) {
+                        console.log(`Found document ID in hash: ${hashId}`);
+                        return hashId;
+                    }
+                    
+                    console.warn("No document ID found in URL");
+                    return null;
+                } catch (e) {
+                    console.error("Error extracting document ID from URL:", e);
+                    return null;
+                }
+            }
+            
+            // Initialize the page
+            const documentId = getDocumentIdFromUrl();
+            if (documentId) {
+                console.log(`Loading document ID: ${documentId}`);
+                loadDocumentData(documentId);
+            } else {
+                console.error("No document ID provided in URL");
+                showGeneralMessage('Error: No document ID provided. Please check the URL.', true);
+                // Set minimal data for a graceful failure
+                mainDocumentData = { 
+                    doc_id: 'unknown',
+                    title: "Document Not Found", 
+                    abstract: "No document ID was provided in the URL."
+                };
+                
+                if(mainHeaderTitle) mainHeaderTitle.textContent = mainDocumentData.title;
+                if(mainHeaderAuthor) mainHeaderAuthor.textContent = 'N/A';
+                if(mainHeaderYear) mainHeaderYear.textContent = 'N/A';
+                if(abstractTextElement) abstractTextElement.textContent = mainDocumentData.abstract;
+                if(infoTitle) infoTitle.textContent = mainDocumentData.title;
+                if(tocContainer) tocContainer.style.display = 'none';
+                if(tocArticlesDivider) tocArticlesDivider.style.display = 'none';
+            }
+            
             const yearElement = document.getElementById('footerCurrentYear');
             if (yearElement) yearElement.textContent = new Date().getFullYear();
         });
     </script>
 
+    <!-- Navbar loading script -->
+    <script src="/Components/js/navbar-loader.js"></script>
+    <script>
+        // Initialize the navbar
+        if (window.NavbarModule) {
+            window.NavbarModule.init();
+        } else {
+            console.error('NavbarModule not found! Make sure navbar-loader.js is loaded correctly.');
+        }
+    </script>
 </body>
 </html>

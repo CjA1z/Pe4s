@@ -42,8 +42,14 @@
             background-color: var(--theme-navbar-bg); 
             color: var(--primary-text-color); 
             min-height: 100vh;
-            padding-top: 1.5rem; 
-            padding-bottom: 1.5rem; 
+            padding-bottom: 1.5rem;
+            margin: 0;
+        }
+
+        /* Add space between navbar and content */
+        main.container {
+            padding-top: 2rem;
+            position: relative;
         }
 
         select.form-input-professional { 
@@ -174,6 +180,10 @@
         }
          #document-container.view-table tr.document-item-base.deleting td > * {
             visibility: hidden; 
+            height: 0;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease, visibility 0.3s;
         }
 
 
@@ -276,6 +286,7 @@
             transition: opacity 0.2s ease-out, transform 0.2s ease-out;
             opacity: 0;
             transform: translateY(5px) scale(0.95);
+            position: fixed; /* Change to fixed to prevent layout issues */
         }
         .view-options-popup.active {
             display: flex; 
@@ -638,20 +649,38 @@
         }
         #toast-notification.error { background-color: #b91c1c; }
 
+        /* Delete Confirmation Popup Animation */
+        #delete-confirmation-popup {
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+        }
+        #delete-confirmation-popup.show {
+            opacity: 1;
+            visibility: visible;
+            transition: opacity 0.3s ease, visibility 0s linear 0s;
+        }
+        #delete-confirmation-popup .bg-white {
+            transform: scale(0.95);
+            transition: transform 0.3s ease;
+        }
+        #delete-confirmation-popup.show .bg-white {
+            transform: scale(1);
+        }
     </style>
 </head>
-<body class="selection:bg-green-700 selection:text-white"> 
-    <!-- Navbar will be loaded here -->
+<body class="selection:bg-green-700 selection:text-white">
+    <!-- Navbar Container -->
     <div id="navbarContainer"></div>
     
-    <main class="container mx-auto p-4 md:p-6 lg:p-8">
+    <main class="container mx-auto p-4 md:p-6 lg:p-8 mt-6">
         <div id="delete-selected-btn-container">
             <button id="delete-selected-btn" class="btn btn-danger"><i class="fas fa-trash-alt mr-2"></i>Delete Selected</button>
         </div>
 
         <h1 class="text-3xl md:text-4xl font-bold flex items-center mb-6" style="color: var(--theme-green-dark);">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" class="w-10 h-10 mr-3" style="color: var(--theme-gold);">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
             </svg>
             Your Library
         </h1>
@@ -749,6 +778,26 @@
         <span id="toast-message"></span>
     </div>
 
+    <!-- Custom Delete Confirmation Popup -->
+    <div id="delete-confirmation-popup" class="fixed inset-0 bg-gray-900 bg-opacity-50 z-[2000] hidden flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden transform transition-all">
+            <div class="bg-red-50 px-6 py-4 border-b border-red-100">
+                <div class="flex items-center">
+                    <div class="bg-red-100 p-2 rounded-full">
+                        <i class="fas fa-trash-alt text-red-600"></i>
+                    </div>
+                    <h3 class="text-lg font-medium text-red-800 ml-3" id="delete-popup-title">Delete Document</h3>
+                </div>
+            </div>
+            <div class="px-6 py-4">
+                <p class="text-gray-700 mb-4" id="delete-popup-message">Are you sure you want to remove this document from your library?</p>
+                <div class="flex justify-end space-x-3">
+                    <button id="delete-popup-cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors">Cancel</button>
+                    <button id="delete-popup-confirm-btn" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
         // DOM Element References
@@ -778,7 +827,7 @@
         let selectedDocuments = []; 
         let filtersExpanded = false; 
         let viewsPopupActive = false; 
-        let toastTimeout; 
+        let toastTimeout; // Fixed variable declaration
 
         // Constants for Deletion and Toast
         const TOAST_DURATION = 3000; // ms
@@ -786,24 +835,301 @@
         const CSS_CLASS_SHOW = 'show';
         const CSS_CLASS_ERROR = 'error';
 
-        // Real data from API
+        // API endpoints
+        const API_ENDPOINTS = {
+            GET_DOCUMENTS: '/api/user/library',
+            DELETE_DOCUMENT: '/api/user/library?documentId=',
+        };
+
+        // Mock data (Ensure this matches your actual data structure)
+        const mockDocuments = [
+            { id: 1, type: 'pdf', category: 'Synergy', keywords: ['Annual Report', 'Finance', 'Corporate', 'Yearly Review', 'Stakeholders', 'Q1 Performance', 'Q2 Outlook', 'Q3 Strategy', 'Q4 Goals', 'Budgeting Cycle', 'Financial Forecast', 'Investor Relations Update', 'Audit Committee Report', 'Compliance Overview', 'Strategic Initiatives', 'Market Analysis', 'Risk Assessment', 'Shareholder Value', 'Sustainability Report', 'Executive Summary'], title: 'Annual Report for the Fiscal Year Ending 2024', author: 'Corporate Communications Department', date: 'May 1, 2025', url: '#details?docId=1' }, 
+            { id: 2, type: 'docx', category: 'General Document', keywords: ['Innovation', 'OBE', 'Education', 'Proposal', 'Curriculum'], title: 'Project Proposal Alpha: A New Dawn for Innovation in OBE', author: 'Dr. Eleanor Vance & Team', date: 'April 22, 2025', url: '#details?docId=2' }, 
+            { id: 3, type: 'jpg', category: 'General Document', keywords: ['Team Building', 'Retreat', 'HR', 'Company Event'], title: 'Team Photo: Q1 Company Retreat in the Bahamas', author: 'HR Department Photography', date: 'March 15, 2025', url: '#details?docId=3' }, 
+            { id: 4, type: 'txt', category: 'Confluence', keywords: ['Meeting Notes', 'Client Strategy', 'Onboarding', 'Minutes'], title: 'Meeting Notes: Client Onboarding Strategy Discussion (May 6)', author: 'Johnathan M. Smitherson Jr.', date: 'May 6, 2025', url: '#details?docId=4' },
+            { id: 5, type: 'xlsx', category: 'Synergy', keywords: ['Budget', 'Finance', 'Projections', 'Analysis', 'Spreadsheet'], title: 'Q2 Budget Forecast and Financial Projections Analysis Report', author: 'Finance & Accounting Division', date: 'April 30, 2025', url: '#details?docId=5' }, 
+            { id: 6, type: 'png', category: 'General Document', keywords: ['Branding', 'Logo', 'Marketing', 'Design', 'Assets'], title: 'Company Logo (Transparent, High Resolution, PNG Format)', author: 'Marketing Design Team', date: 'February 10, 2025', url: '#details?docId=6' },
+            { id: 7, type: 'pptx', category: 'Synergy', keywords: ['Investment', 'Funding', 'Pitch Deck', 'Startup', 'Presentation'], title: 'Investor Pitch Deck: Series B Funding Round Presentation Slides', author: 'CEO & Founder\'s Office', date: 'May 5, 2025', url: '#details?docId=7' }, 
+            { id: 8, type: 'pdf', category: 'Thesis', keywords: ['User Manual', 'Product Guide', 'Technology', 'Documentation', 'Instructions'], title: 'Comprehensive User Manual for Product X Model Gamma v2.1', author: 'Technical Writing Department', date: 'March 20, 2025', url: '#details?docId=8' },
+            { id: 9, type: 'txt', category: 'General Document', keywords: ['Research', 'AI', 'Energy', 'Sustainability', 'Innovation', 'Paulinian'], title: 'Research Paper: The Future of AI in Sustainable Energy Solutions', author: 'Dr. A. K. Singh et al.', date: 'May 10, 2025', url: '#details?docId=9' },
+            { id: 10, type: 'jpg', category: 'General Document', keywords: ['Travel', 'Photography', 'Personal', 'Vacation'], title: 'Personal Vacation Photographs: Hawaiian Islands Adventure Collection', author: 'Jane Doe (Personal)', date: 'January 15, 2025', url: '#details?docId=10' },
+            { id: 11, type: 'pdf', category: 'Confluence', keywords: ['Legal', 'Contract', 'Agreement', 'Template', 'Paulinian'], title: 'Master Service Agreement Template (Standard Client Contract)', author: 'Legal Department Review Board', date: 'April 1, 2025', url: '#details?docId=11' },
+            { id: 12, type: 'docx', category: 'Synergy', keywords: ['Marketing', 'Campaign', 'Strategy', 'Product Launch', 'Paulinian', 'Global Partnership'], title: 'Detailed Marketing Plan: Q3 Product Launch Campaign Strategy', author: 'Global Marketing Strategy Team', date: 'May 2, 2025', url: '#details?docId=12' },
+            { id: 13, type: 'xlsx', category: 'General Document', keywords: ['Sales Data', 'Analytics', 'Finance', 'Annual Report'], title: 'Consolidated Sales Data: Fiscal Year 2024 (Regional Breakdown)', author: 'Sales Operations & Analytics', date: 'January 5, 2025', url: '#details?docId=13' },
+            { id: 14, type: 'png', category: 'Dissertation', keywords: ['Web Design', 'UX/UI', 'Mockup', 'Education', 'Inclusivity', 'Technology'], title: 'Website Homepage Redesign Mockup v3 (User Feedback Incorporated)', author: 'UX/UI Design Department', date: 'May 8, 2025', url: '#details?docId=14' },
+            { id: 15, type: 'pptx', category: 'Confluence', keywords: ['Training', 'HR', 'Onboarding', 'Faculty Development', 'Paulinian'], title: 'New Hire Onboarding & Training Presentation Materials Package', author: 'Human Resources Development', date: 'March 10, 2025', url: '#details?docId=15' },
+            { id: 16, type: 'pdf', category: 'Dissertation', keywords: ['Newsletter', 'Archive', 'Internal Comms', 'Spirituality', 'Community'], title: 'Archived Internal Company Newsletter - May 2024 Edition (PDF)', author: 'Internal Communications Team', date: 'May 30, 2024', url: '#details?docId=16' },
+            { id: 17, type: 'txt', category: 'General Document', keywords: ['Security', 'Server Logs', 'IT Audit', 'Technology'], title: 'Critical Server Access Logs: Security Audit May 9th Report', author: 'IT Security Operations Center', date: 'May 9, 2025', url: '#details?docId=17' },
+            { id: 18, type: 'jpg', category: 'Synergy', keywords: ['Conference', 'Event Design', 'Marketing', 'Expo', 'Global Partnership'], title: 'Finalized Conference Booth Design: Tech Expo 2025 Showcase', author: 'Events and Exhibitions Team', date: 'February 20, 2025', url: '#details?docId=18' },
+            { id: 19, type: 'pdf', category: 'Thesis', keywords: ['HR Policy', 'Employee Handbook', 'Paulinian', 'Documentation', 'Advocacy'], title: 'Official Employee Handbook - Updated January 2025 Version (PDF)', author: 'Human Resources Policy Division', date: 'January 1, 2025', url: '#details?docId=19' },
+            { id: 20, type: 'docx', category: 'Confluence', keywords: ['Client Feedback', 'Analysis', 'Q1 Review', 'Advocacy', 'Community'], title: 'Client Feedback Summary & Analysis: Q1 Product Review Cycle', author: 'Customer Success Management', date: 'April 15, 2025', url: '#details?docId=20' },
+            { id: 21, type: 'xlsx', category: 'General Document', keywords: ['Inventory', 'Logistics', 'Supply Chain', 'Infrastructure', 'Finance'], title: 'Real-time Inventory Stock Levels & Reorder Point Tracking Sheet', author: 'Supply Chain & Logistics Dept.', date: 'May 9, 2025', url: '#details?docId=21' },
+            { id: 22, type: 'pdf', category: 'Thesis', keywords: ['Paulinian', 'Spirituality', 'Global Partnership', 'Research', 'Education'], title: 'Study on Paulinian Values in Global Partnerships', author: 'Theology Department', date: 'June 1, 2025', url: '#details?docId=22' },
+            { id: 23, type: 'docx', category: 'Dissertation', keywords: ['Mental Health', 'Wellness', 'Global Study', 'Psychology', 'Advocacy'], title: 'Global Mental Wellness Initiatives: A Comparative Study', author: 'Psychology Faculty', date: 'June 15, 2025', url: '#details?docId=23' },
+            { id: 24, type: 'pptx', category: 'Synergy', keywords: ['Leadership', 'Ethics', 'Global Context', 'Workshop', 'Paulinian', 'Mobility'], title: 'Developing Ethical Leadership in a Global Context', author: 'Business School Ethics Committee', date: 'July 1, 2025', url: '#details?docId=24' }
+        ];
         let documentItemsData = []; 
+
+        // Utility Functions
+        function truncateText(text, maxLength) {
+            if (!text) return "N/A"; 
+            if (maxLength > 0 && text.length > maxLength) { 
+                return text.substring(0, maxLength) + "...";
+            }
+            return text;
+        }
         
-        // Fetch saved documents from the API
-        async function fetchSavedDocuments() {
-            try {
-                // Show loading state
-                documentContainer.innerHTML = '<div class="text-center p-8"><i class="fas fa-spinner fa-spin text-2xl text-green-700"></i><p class="mt-2">Loading your saved documents...</p></div>';
+        function getAuthorIcon(authorString) {
+            if (!authorString) return 'fas fa-user';
+            const lowerAuthor = authorString.toLowerCase();
+            if (lowerAuthor.includes('&') || lowerAuthor.includes(' and ') || lowerAuthor.includes('et al.') || lowerAuthor.includes(',')) {
+                return 'fas fa-users';
+            }
+            return 'fas fa-user';
+        }
+
+        function showToast(message, type = 'success', duration = TOAST_DURATION) {
+            clearTimeout(toastTimeout);
+            toastMessage.textContent = message;
+            toastNotification.className = ''; 
+            toastNotification.classList.add(CSS_CLASS_SHOW);
+            if (type === CSS_CLASS_ERROR) {
+                toastNotification.classList.add(CSS_CLASS_ERROR);
+            }
+            toastTimeout = setTimeout(() => {
+                toastNotification.classList.remove(CSS_CLASS_SHOW);
+            }, duration);
+        }
+
+
+        // DOM Manipulation Functions
+        function createDocumentElement(doc) {
+            const item = document.createElement('div'); 
+            item.setAttribute('data-category', doc.category); 
+            item.setAttribute('data-keywords', (doc.keywords || []).join(', ')); 
+            item.setAttribute('data-id', doc.id);
+            
+            const displayedTitle = truncateText(doc.title, MAX_TITLE_LENGTH); 
+            const displayedAuthor = truncateText(doc.author, MAX_AUTHOR_LENGTH); 
+            const authorIcon = getAuthorIcon(doc.author);
+            
+            let keywordsDisplayHTML = '';
+            if (doc.keywords && doc.keywords.length > 0) {
+                if (currentView === 'list') { 
+                    const pills = doc.keywords.map(kw => `<span class="keyword-pill clickable-keyword" data-keyword="${kw}">${kw}</span>`).join('');
+                    keywordsDisplayHTML = `<div class="keywords-pill-container">${pills}</div>`;
+                } else { 
+                    keywordsDisplayHTML = `<span class="keywords-trigger" data-doc-id="${doc.id}"><i class="fas fa-tags fa-fw"></i> View Keywords (${doc.keywords.length})</span>`;
+                }
+            }
+
+            const checkboxHTML = `
+                <div class="document-checkbox-container">
+                    <input type="checkbox" class="document-checkbox form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" data-doc-id="${doc.id}">
+                </div>`;
+
+            if (currentView === 'grid') {
+                item.classList.add('document-item-base', 'rounded-lg', 'shadow-sm', 'p-5', 'flex', 'flex-col', 'relative'); 
+                let gridTopControls = `<div class="grid-item-top-controls">
+                                            ${checkboxHTML}
+                                            <button class="action-btn delete-btn btn btn-outline-danger individual-delete-btn" title="Delete"><i class="fas fa-trash-alt"></i></button>
+                                        </div>`;
+
+                item.innerHTML = `
+                    ${gridTopControls}
+                    <div class="document-info flex-grow mb-4 text-left mt-10"> 
+                        <h3 class="document-title text-md font-semibold text-gray-800 mb-1" title="${doc.title}">${displayedTitle}</h3>
+                        <div class="meta-item text-xs text-gray-600 mb-1">
+                            <i class="${authorIcon} fa-fw"></i>
+                            <span class="clickable-author" data-author-name="${doc.author || "N/A"}" title="View profile: ${doc.author || "N/A"}">${displayedAuthor}</span>
+                        </div>
+                        <div class="meta-item text-xs text-gray-500 mb-0.5" title="Saved: ${doc.date}">
+                            <i class="fas fa-calendar-plus fa-fw"></i>
+                            <span>${doc.date}</span>
+                        </div>
+                         <div class="meta-item text-xs text-gray-500 mt-1" style="color: var(--theme-primary-blue); font-weight: 500;">
+                            <i class="fas fa-folder-open fa-fw meta-category-icon"></i>
+                            <span class="clickable-category" data-category-name="${doc.category}" title="Filter by: ${doc.category}">${doc.category}</span>
+                         </div>
+                         <div class="meta-item text-xs mt-1">
+                            ${keywordsDisplayHTML || '<span class="text-gray-500 text-xs"><i class="fas fa-tags fa-fw meta-keywords-icon"></i> No keywords</span>'}
+                         </div>
+                    </div>
+                    <div class="document-actions mt-auto pt-3 border-t var(--neutral-border-color) flex flex-col sm:flex-row justify-center gap-2">
+                        <button class="action-btn open-btn btn btn-outline-primary w-full sm:w-auto"><i class="fas fa-eye text-xs"></i> Open</button>
+                        <button class="action-btn download-btn btn btn-secondary w-full sm:w-auto"><i class="fas fa-download text-xs"></i> Download</button>
+                        </div>
+                `;
+            } else if (currentView === 'list') {
+                item.classList.add('document-item-base', 'rounded-lg', 'flex', 'items-center'); 
+                item.innerHTML = `
+                    <div class="document-checkbox-container p-2">
+                        <input type="checkbox" class="document-checkbox form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" data-doc-id="${doc.id}">
+                    </div>
+                    <div class="list-info-col flex-grow"> 
+                        <h3 class="document-title" title="${doc.title}">${displayedTitle}</h3> 
+                        <div class="document-meta-primary"> 
+                             <span class="meta-item document-author">
+                                <i class="${authorIcon} fa-fw"></i>
+                                <span class="clickable-author" data-author-name="${doc.author || "N/A"}" title="View profile: ${doc.author || "N/A"}">${displayedAuthor}</span>
+                            </span>
+                        </div>
+                        <div class="document-meta-secondary"> 
+                            <span class="meta-item document-date" title="Saved: ${doc.date}">
+                                <i class="fas fa-calendar-plus fa-fw"></i> ${doc.date}
+                            </span>
+                             <span class="meta-item document-category-meta uppercase">
+                                <i class="fas fa-folder-open fa-fw meta-category-icon"></i>
+                                <span class="clickable-category" data-category-name="${doc.category}" title="Filter by: ${doc.category}">${doc.category}</span>
+                             </span>
+                             <div class="meta-item text-xs keywords-meta-container"> 
+                                 <i class="fas fa-tags fa-fw meta-keywords-icon mr-1"></i> 
+                                ${keywordsDisplayHTML || '<span class="text-gray-500 text-xs">No keywords</span>'}
+                             </div>
+                        </div>
+                    </div>
+                    <div class="list-actions-col">
+                        <button class="action-btn open-btn btn btn-outline-primary" title="Open"><i class="fas fa-eye"></i></button>
+                        <button class="action-btn download-btn btn btn-secondary" title="Download"><i class="fas fa-download"></i></button>
+                        <button class="action-btn delete-btn btn btn-outline-danger individual-delete-btn" title="Delete"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                `;
+            } else if (currentView === 'table') {
+                const tr = document.createElement('tr'); 
+                tr.classList.add('document-item-base'); 
+                tr.setAttribute('data-category', doc.category); 
+                tr.setAttribute('data-keywords', (doc.keywords || []).join(', ')); 
+                tr.setAttribute('data-id', doc.id);
                 
-                const token = localStorage.getItem('sessionToken');
+                let tableKeywordsTriggerHTML = 'N/A';
+                if (doc.keywords && doc.keywords.length > 0) {
+                    tableKeywordsTriggerHTML = `<span class="keywords-trigger" data-doc-id="${doc.id}"><i class="fas fa-tags fa-fw"></i> View (${doc.keywords.length})</span>`;
+                }
+
+                tr.innerHTML = `
+                    <td class="text-center col-checkbox">
+                        <input type="checkbox" class="document-checkbox form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" data-doc-id="${doc.id}">
+                    </td>
+                    <td class="col-title"><span class="document-title-in-table block" title="${doc.title}">${displayedTitle}</span></td> 
+                    <td class="col-author"><span class="block clickable-author" data-author-name="${doc.author || "N/A"}" title="View profile: ${doc.author || "N/A"}">${displayedAuthor}</span></td> 
+                    <td class="col-category"><span class="clickable-category" data-category-name="${doc.category}" title="Filter by: ${doc.category}">${doc.category}</span></td> 
+                    <td class="col-keywords">${tableKeywordsTriggerHTML}</td>
+                    <td>${doc.date}</td>
+                    <td class="text-right col-actions">
+                        <div class="flex justify-end gap-1">
+                            <button class="action-btn open-btn btn btn-outline-primary" title="Open"><i class="fas fa-eye"></i></button>
+                            <button class="action-btn download-btn btn btn-secondary" title="Download"><i class="fas fa-download"></i></button>
+                            <button class="action-btn delete-btn btn btn-outline-danger individual-delete-btn" title="Delete"><i class="fas fa-trash-alt"></i></button>
+                        </div>
+                    </td>
+                `;
+                return tr; 
+            }
+            if (selectedDocuments.includes(doc.id)) {
+                item.classList.add('selected');
+                const checkbox = item.querySelector('.document-checkbox');
+                if (checkbox) checkbox.checked = true;
+            }
+            return item; 
+        }
+
+        function renderPaginationControls(totalItems, filteredItemsCount) {
+            paginationControlsContainer.innerHTML = ''; 
+            if (filteredItemsCount <= itemsPerPage && totalItems <= itemsPerPage) { 
+                return;
+            }
+            
+            const totalPages = Math.ceil(filteredItemsCount / itemsPerPage);
+            if (totalPages <= 1) return; 
+
+            const prevButton = document.createElement('button');
+            prevButton.innerHTML = `<i class="fas fa-chevron-left"></i> <span class="hidden sm:inline ml-1">Prev</span>`;
+            prevButton.classList.add('pagination-btn');
+            prevButton.disabled = currentPage === 1;
+            prevButton.addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    filterAndDisplayDocuments();
+                }
+            });
+            paginationControlsContainer.appendChild(prevButton);
+
+            let startPage = Math.max(1, currentPage - 1);
+            let endPage = Math.min(totalPages, currentPage + 1);
+            if (currentPage === 1) endPage = Math.min(totalPages, 3);
+            if (currentPage === totalPages) startPage = Math.max(1, totalPages - 2);
+
+            if (startPage > 1) {
+                const firstPageBtn = document.createElement('button');
+                firstPageBtn.textContent = '1';
+                firstPageBtn.classList.add('pagination-btn');
+                firstPageBtn.addEventListener('click', () => { currentPage = 1; filterAndDisplayDocuments(); });
+                paginationControlsContainer.appendChild(firstPageBtn);
+                if (startPage > 2) {
+                    const ellipsis = document.createElement('span');
+                    ellipsis.textContent = '...';
+                    ellipsis.classList.add('px-3', 'py-1', 'text-gray-500');
+                    paginationControlsContainer.appendChild(ellipsis);
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                const pageButton = document.createElement('button');
+                pageButton.textContent = i;
+                pageButton.classList.add('pagination-btn');
+                if (i === currentPage) {
+                    pageButton.classList.add('active');
+                }
+                pageButton.addEventListener('click', () => {
+                    currentPage = i;
+                    filterAndDisplayDocuments();
+                });
+                paginationControlsContainer.appendChild(pageButton);
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    const ellipsis = document.createElement('span');
+                    ellipsis.textContent = '...';
+                    ellipsis.classList.add('px-3', 'py-1', 'text-gray-500');
+                    paginationControlsContainer.appendChild(ellipsis);
+                }
+                const lastPageBtn = document.createElement('button');
+                lastPageBtn.textContent = totalPages;
+                lastPageBtn.classList.add('pagination-btn');
+                lastPageBtn.addEventListener('click', () => { currentPage = totalPages; filterAndDisplayDocuments(); });
+                paginationControlsContainer.appendChild(lastPageBtn);
+            }
+
+            const nextButton = document.createElement('button');
+            nextButton.innerHTML = `<span class="hidden sm:inline mr-1">Next</span> <i class="fas fa-chevron-right"></i>`;
+            nextButton.classList.add('pagination-btn');
+            nextButton.disabled = currentPage === totalPages;
+            nextButton.addEventListener('click', () => {
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    filterAndDisplayDocuments();
+                }
+            });
+            paginationControlsContainer.appendChild(nextButton);
+        }
+
+        // Core Logic Functions
+        async function fetchDocumentsFromAPI() {
+            try {
+                documentContainer.classList.add('loading-content');
+                
+                // Get user info from localStorage or sessionStorage
+                const userInfo = JSON.parse(sessionStorage.getItem('userInfo') || localStorage.getItem('userInfo') || '{}');
+                const token = userInfo?.token;
+                
                 if (!token) {
-                    // If no token, redirect to login
-                    window.location.href = '/login.html';
-                    return;
+                    showToast('You must be logged in to view your library', CSS_CLASS_ERROR);
+                    return [];
                 }
                 
-                const response = await fetch('/api/user/library/documents', {
-                    method: 'GET',
+                console.log('Fetching saved documents with token...');
+                const response = await fetch(API_ENDPOINTS.GET_DOCUMENTS, {
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
@@ -811,154 +1137,554 @@
                 });
                 
                 if (!response.ok) {
-                    if (response.status === 401) {
-                        // Unauthorized - token expired or invalid
-                        window.location.href = '/login.html';
-                        return;
-                    }
-                    throw new Error(`API error: ${response.status}`);
+                    const errorText = await response.text();
+                    console.error(`Error response ${response.status}: ${errorText}`);
+                    throw new Error(`Server error: ${response.status}`);
                 }
                 
                 const data = await response.json();
                 
                 if (!data.success) {
-                    throw new Error(data.error || 'Failed to fetch saved documents');
+                    throw new Error(data.error || 'Error fetching documents');
                 }
                 
-                // Format the documents to match our display structure
-                documentItemsData = data.documents.map(item => {
-                    // Extract document details from the API response
-                    const doc = item.document || {};
-                    
-                    // Create keywords array from document data if available
-                    const keywords = [];
-                    if (doc.keywords && Array.isArray(doc.keywords)) {
-                        keywords.push(...doc.keywords);
+                // Process and format the documents for display
+                return (data.documents || []).map(doc => {
+                    // Validate document object
+                    if (!doc || typeof doc !== 'object') {
+                        console.warn('Invalid document object in API response:', doc);
+                        return null;
                     }
                     
+                    // Get author names directly from the database result
+                    const authorsList = Array.isArray(doc.author_names) ? doc.author_names.filter(name => name) : [];
+                    
+                    // Get keywords directly from the database result
+                    const keywordsList = Array.isArray(doc.keywords) ? doc.keywords.filter(keyword => keyword) : [];
+                    
                     return {
-                        id: item.doc_id,
-                        type: doc.file_path ? doc.file_path.split('.').pop() : 'pdf',
+                        id: doc.doc_id || 0,
+                        // Get file type from file extension or default to pdf
+                        type: doc.file_path ? doc.file_path.split('.').pop().toLowerCase() : 'pdf',
                         category: doc.document_type || 'General Document',
-                        keywords: keywords,
+                        keywords: keywordsList,
                         title: doc.title || 'Untitled Document',
-                        author: item.author_names ? item.author_names.join(', ') : (doc.authors ? doc.authors.map(a => a.full_name).join(', ') : 'Unknown Author'),
-                        date: item.saved_at_formatted || new Date(item.saved_at).toLocaleDateString(),
-                        url: `/document/${doc.id}`,
-                        docDetails: doc // Store the full document details for reference
+                        author: authorsList.length > 0 ? authorsList.join(', ') : 'Unknown Author',
+                        date: new Date(doc.saved_at || Date.now()).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                        }),
+                        url: `#details?docId=${doc.doc_id || 0}`
                     };
+                }).filter(doc => doc !== null); // Remove any invalid documents
+            } catch (error) {
+                console.error('Error fetching documents:', error);
+                showToast('Failed to load your documents', CSS_CLASS_ERROR);
+                return []; // Return empty array to allow the UI to continue working
+            } finally {
+                documentContainer.classList.remove('loading-content');
+            }
+        }
+
+        async function deleteDocumentFromAPI(docId) {
+            try {
+                // Get user info from localStorage or sessionStorage
+                const userInfo = JSON.parse(sessionStorage.getItem('userInfo') || localStorage.getItem('userInfo') || '{}');
+                const token = userInfo?.token;
+                
+                if (!token) {
+                    showToast('You must be logged in to delete documents', CSS_CLASS_ERROR);
+                    return false;
+                }
+                
+                const response = await fetch(`${API_ENDPOINTS.DELETE_DOCUMENT}${docId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
                 });
                 
-                // Populate category filter dropdown with available categories
-                populateCategoryFilter();
-                // Populate keywords filter dropdown with all unique keywords
-                populateKeywordsFilter();
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || 'Failed to delete document');
+                }
                 
-                // Display the documents
-                filterAndDisplayDocuments();
-                
+                const data = await response.json().catch(() => ({ success: false }));
+                return data.success;
             } catch (error) {
-                console.error('Error fetching saved documents:', error);
-                documentContainer.innerHTML = `
-                    <div class="text-center p-8 text-red-600">
-                        <i class="fas fa-exclamation-circle text-2xl"></i>
-                        <p class="mt-2">Error loading your saved documents. Please try again later.</p>
-                        <button class="btn btn-primary mt-4" onclick="fetchSavedDocuments()">
-                            <i class="fas fa-sync-alt"></i> Retry
-                        </button>
-                    </div>
-                `;
+                console.error("Error deleting document:", error);
+                showToast('Failed to delete document. Please try again later.', CSS_CLASS_ERROR);
+                return false;
             }
         }
         
-        // Populate category filter dropdown with available categories
-        function populateCategoryFilter() {
-            // Clear existing options except the first one (All Categories)
-            while (filterByCategorySelect.options.length > 1) {
-                filterByCategorySelect.remove(1);
+        function filterAndDisplayDocuments() {
+            documentContainer.classList.add('loading-content'); 
+            
+            setTimeout(() => {
+                const searchTerm = searchBar.value.toLowerCase().trim();
+                const filterCategoryValue = filterByCategorySelect.value; 
+                const filterKeywordValue = filterByKeywordsSelect.value; 
+                const sortValue = sortBySelect.value; 
+
+                let filteredItemsData = documentItemsData.filter(doc => {
+                    const title = doc.title.toLowerCase();
+                    const author = (doc.author || "").toLowerCase(); 
+                    const category = doc.category;
+                    const keywords = (doc.keywords || []).map(k => k.toLowerCase()); 
+
+                    const matchesSearch = searchTerm === '' || title.includes(searchTerm) || author.includes(searchTerm);
+                    const matchesCategory = (filterCategoryValue === 'all' || category === filterCategoryValue);
+                    const matchesKeyword = (filterKeywordValue === 'all' || keywords.includes(filterKeywordValue.toLowerCase()));
+                    
+                    return matchesSearch && matchesCategory && matchesKeyword;
+                });
+
+                if (sortValue === 'title-asc') filteredItemsData.sort((a, b) => a.title.localeCompare(b.title));
+                else if (sortValue === 'title-desc') filteredItemsData.sort((a, b) => b.title.localeCompare(a.title));
+                else if (sortValue === 'date-saved-desc') filteredItemsData.sort((a, b) => new Date(b.date) - new Date(a.date));
+                else if (sortValue === 'date-saved-asc') filteredItemsData.sort((a, b) => new Date(a.date) - new Date(b.date));
+                else if (sortValue === 'category') filteredItemsData.sort((a,b) => (a.category || "").localeCompare(b.category || "")); 
+
+                const totalFilteredItems = filteredItemsData.length;
+                const startIndex = (currentPage - 1) * itemsPerPage;
+                const endIndex = startIndex + itemsPerPage;
+                const paginatedItems = filteredItemsData.slice(startIndex, endIndex);
+
+                renderDocuments(paginatedItems);
+                renderPaginationControls(documentItemsData.length, totalFilteredItems); 
+                
+                requestAnimationFrame(() => {
+                    documentContainer.classList.remove('loading-content'); 
+                });
+            }, 150); 
+        }
+        
+        function renderDocuments(docsToRender) {
+            documentContainer.innerHTML = ''; 
+            if (currentView === 'table') {
+                const tableWrapper = document.createElement('div');
+                tableWrapper.classList.add('table-scroll-wrapper');
+                const table = document.createElement('table');
+                table.classList.add('min-w-full', 'w-full', 'bg-white', 'shadow-sm', 'rounded-lg', 'overflow-hidden'); 
+                table.innerHTML = `
+                    <thead style="background-color: #cdd8cd;"> <tr>
+                        <th class="text-center px-2 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider col-checkbox">
+                            <input type="checkbox" id="select-all-table-checkbox" class="document-checkbox form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" title="Select all on page">
+                        </th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-title">Title</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-author">Author</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-category">Category</th> 
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-keywords">Keywords</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Saved</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider col-actions">Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody></tbody>
+                `;
+                const tbody = table.querySelector('tbody');
+                if (docsToRender.length > 0) {
+                    docsToRender.forEach(doc => {
+                        const docElement = createDocumentElement(doc); 
+                        tbody.appendChild(docElement);
+                    });
+                    tableWrapper.appendChild(table);
+                    documentContainer.appendChild(tableWrapper);
+                    const selectAllTableCheckbox = document.getElementById('select-all-table-checkbox');
+                    if(selectAllTableCheckbox) {
+                        selectAllTableCheckbox.addEventListener('change', handleSelectAllCheckboxChange);
+                    }
+
+                    noDocumentsMessage.classList.add('hidden'); 
+                    documentContainer.classList.remove('hidden');
+                } else {
+                    documentContainer.classList.add('hidden'); 
+                    noDocumentsMessage.classList.remove('hidden');
+                }
+            } else { 
+                if (docsToRender.length > 0) {
+                    docsToRender.forEach(doc => {
+                        const docElement = createDocumentElement(doc);
+                        documentContainer.appendChild(docElement);
+                    });
+                    noDocumentsMessage.classList.add('hidden');
+                    documentContainer.classList.remove('hidden');
+                } else {
+                    noDocumentsMessage.classList.remove('hidden');
+                    documentContainer.classList.add('hidden');
+                }
+            }
+            attachCheckboxListeners(); 
+        }
+        
+        function changeView(newView) {
+            currentPage = 1; 
+            currentView = newView;
+            
+            documentContainer.className = 'document-view-wrapper'; // Reset classes
+            let viewButtonText = "Views"; 
+            if (newView === 'grid') {
+                // MODIFIED: Updated grid classes for responsiveness
+                documentContainer.classList.add('view-grid', 'grid', 'grid-cols-1', 'sm:grid-cols-2', 'md:grid-cols-2', 'lg:grid-cols-3', 'xl:grid-cols-3', '2xl:grid-cols-3', 'gap-6');
+                viewButtonText = "Grid View";
+            } else if (newView === 'list') {
+                documentContainer.classList.add('view-list');
+                viewButtonText = "List View";
+            } else if (newView === 'table') {
+                documentContainer.classList.add('view-table'); 
+                viewButtonText = "Table View";
             }
             
-            // Get unique categories from the documents
-            const categories = [...new Set(documentItemsData.map(doc => doc.category))];
+            if(currentViewTextLabel) { 
+                currentViewTextLabel.textContent = viewButtonText;
+            }
+
+            viewOptionsPopup.querySelectorAll('.view-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('data-view') === newView);
+            });
             
-            // Add each category as an option
-            categories.forEach(category => {
-                if (category) {
-                    const option = document.createElement('option');
-                    option.value = category;
-                    option.textContent = category;
-                    filterByCategorySelect.appendChild(option);
+            filterAndDisplayDocuments(); 
+            localStorage.setItem('libraryPreferredView', newView);
+        }
+
+        // Event Handlers
+        searchBar.addEventListener('input', () => { currentPage = 1; filterAndDisplayDocuments(); });
+        filterByCategorySelect.addEventListener('change', () => { currentPage = 1; filterAndDisplayDocuments(); }); 
+        filterByKeywordsSelect.addEventListener('change', () => { currentPage = 1; filterAndDisplayDocuments(); });
+        sortBySelect.addEventListener('change', () => { currentPage = 1; filterAndDisplayDocuments(); });
+
+        toggleViewsBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); 
+            viewsPopupActive = !viewsPopupActive;
+            viewOptionsPopup.classList.toggle('active', viewsPopupActive);
+            toggleViewsBtn.classList.toggle('active', viewsPopupActive);
+
+            if (viewsPopupActive) {
+                const btnRect = toggleViewsBtn.getBoundingClientRect();
+                
+                // Position directly below the button
+                viewOptionsPopup.style.top = `${btnRect.bottom + window.scrollY + 5}px`;
+                
+                // Center horizontally with the button
+                const leftPosition = btnRect.left + window.scrollX + (btnRect.width / 2) - (viewOptionsPopup.offsetWidth / 2);
+                viewOptionsPopup.style.left = `${leftPosition}px`;
+                
+                // Make sure the popup doesn't go outside the viewport
+                setTimeout(() => {
+                    const popupRect = viewOptionsPopup.getBoundingClientRect();
+                    if (popupRect.right > window.innerWidth - 10) {
+                        const adjustment = popupRect.right - (window.innerWidth - 10);
+                        viewOptionsPopup.style.left = `${parseInt(viewOptionsPopup.style.left) - adjustment}px`;
+                    }
+                    if (popupRect.left < 10) {
+                        viewOptionsPopup.style.left = '10px';
+                    }
+                }, 0);
+            }
+            
+            const chevronIcon = toggleViewsBtn.querySelector('.chevron-icon');
+            if (chevronIcon) {
+                chevronIcon.classList.toggle('fa-chevron-down', !viewsPopupActive);
+                chevronIcon.classList.toggle('fa-chevron-up', viewsPopupActive);
+            }
+        });
+
+        viewOptionsPopup.addEventListener('click', (e) => {
+            const button = e.target.closest('.view-btn');
+            if (button) {
+                const newView = button.getAttribute('data-view');
+                if (newView !== currentView) {
+                    changeView(newView);
                 }
+                viewsPopupActive = false;
+                viewOptionsPopup.classList.remove('active');
+                toggleViewsBtn.classList.remove('active');
+                 const chevronIcon = toggleViewsBtn.querySelector('.chevron-icon');
+                if (chevronIcon) {
+                    chevronIcon.classList.remove('fa-chevron-up');
+                    chevronIcon.classList.add('fa-chevron-down');
+                }
+            }
+        });
+        
+        let currentKeywordGlassPopup = null; 
+
+        function toggleKeywordGlassPopup(docId, triggerElement) {
+            const popup = document.getElementById('keyword-popup-glass');
+            
+            if (currentKeywordGlassPopup && currentKeywordGlassPopup.trigger === triggerElement) {
+                popup.classList.remove('active');
+                currentKeywordGlassPopup = null;
+                return;
+            }
+            
+            if (currentKeywordGlassPopup) { 
+                currentKeywordGlassPopup.element.classList.remove('active');
+            }
+            
+            const doc = documentItemsData.find(d => d.id === docId);
+            if (doc && doc.keywords && doc.keywords.length > 0) {
+                popup.innerHTML = doc.keywords.map(kw => 
+                    `<span class="keyword-pill keyword-popup-pill" data-keyword="${kw}">${kw}</span>`
+                ).join('');
+                
+                const rect = triggerElement.getBoundingClientRect(); 
+                
+                popup.style.top = `${rect.bottom + window.scrollY + 5}px`; 
+                let left = rect.left + window.scrollX;
+
+                popup.style.display = 'block'; 
+                const popupRect = popup.getBoundingClientRect();
+                 if (left + popupRect.width > window.innerWidth - 20) { 
+                    left = window.innerWidth - popupRect.width - 20;
+                }
+                if (left < 10) left = 10; 
+
+                popup.style.left = `${left}px`;
+                
+                popup.classList.add('active'); 
+                currentKeywordGlassPopup = { element: popup, trigger: triggerElement };
+            }
+        }
+
+        function updateDeleteSelectedButtonState() {
+            const individualDeleteButtons = document.querySelectorAll('.individual-delete-btn');
+            if (selectedDocuments.length > 0) {
+                deleteSelectedBtn.style.display = 'inline-flex'; 
+                deleteSelectedBtn.classList.add('visible'); 
+                deleteSelectedBtn.disabled = false;
+                deleteSelectedBtn.textContent = `Delete Selected (${selectedDocuments.length})`;
+                individualDeleteButtons.forEach(btn => btn.classList.add('hidden-by-multiselect'));
+            } else {
+                deleteSelectedBtn.classList.remove('visible'); 
+                setTimeout(() => { 
+                    if (selectedDocuments.length === 0) { 
+                         deleteSelectedBtn.style.display = 'none'; 
+                    }
+                }, 300); 
+                deleteSelectedBtn.disabled = true;
+                deleteSelectedBtn.textContent = 'Delete Selected';
+                individualDeleteButtons.forEach(btn => btn.classList.remove('hidden-by-multiselect'));
+            }
+        }
+
+        function handleCheckboxChange(event) {
+            const checkbox = event.target;
+            const docId = parseInt(checkbox.getAttribute('data-doc-id'));
+            const itemElement = checkbox.closest('.document-item-base'); 
+
+            if (checkbox.checked) {
+                if (!selectedDocuments.includes(docId)) {
+                    selectedDocuments.push(docId);
+                }
+                if (itemElement) itemElement.classList.add('selected'); 
+            } else {
+                selectedDocuments = selectedDocuments.filter(id => id !== docId);
+                if (itemElement) itemElement.classList.remove('selected'); 
+            }
+            updateDeleteSelectedButtonState();
+        }
+        
+        function handleSelectAllCheckboxChange(event) {
+            const isChecked = event.target.checked;
+            const checkboxes = documentContainer.querySelectorAll('.document-checkbox'); 
+            selectedDocuments = []; 
+
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = isChecked;
+                const docId = parseInt(checkbox.getAttribute('data-doc-id'));
+                const itemElement = checkbox.closest('.document-item-base');
+                if (isChecked) {
+                    if (!selectedDocuments.includes(docId)) { 
+                        selectedDocuments.push(docId);
+                    }
+                    if (itemElement) itemElement.classList.add('selected');
+                } else {
+                    if (itemElement) itemElement.classList.remove('selected');
+                }
+            });
+            updateDeleteSelectedButtonState();
+        }
+
+        function attachCheckboxListeners() {
+            const checkboxes = documentContainer.querySelectorAll('.document-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.removeEventListener('change', handleCheckboxChange); 
+                checkbox.addEventListener('change', handleCheckboxChange);
             });
         }
 
-        function handleDeleteItem(docId, itemElement, docTitle) {
-            if (!confirm(`Remove "${docTitle}" from your library?`)) {
-                return;
-            }
+        // Variables for the delete popup
+        let deletePopupItem = null;
+        let deletePopupDocId = null;
+        let deletePopupDocTitle = null;
+        let pendingBulkDelete = false;
+        const deleteConfirmationPopup = document.getElementById('delete-confirmation-popup');
+        const deletePopupTitle = document.getElementById('delete-popup-title');
+        const deletePopupMessage = document.getElementById('delete-popup-message');
+        const deletePopupCancelBtn = document.getElementById('delete-popup-cancel-btn');
+        const deletePopupConfirmBtn = document.getElementById('delete-popup-confirm-btn');
+
+        // Show the delete confirmation popup for a single item
+        function showDeleteConfirmation(docId, itemElement, docTitle) {
+            deletePopupItem = itemElement;
+            deletePopupDocId = docId;
+            deletePopupDocTitle = docTitle;
+            pendingBulkDelete = false;
             
-            // Start animation
-            itemElement.classList.add(CSS_CLASS_DELETING);
+            // Update popup content for single document
+            deletePopupTitle.textContent = 'Delete Document';
+            deletePopupMessage.textContent = `Are you sure you want to remove "${docTitle}" from your library?`;
             
-            // Get session token for authentication
-            const token = localStorage.getItem('sessionToken');
-            if (!token) {
-                showToast('Authentication required', CSS_CLASS_ERROR);
-                return;
-            }
+            // Show the popup
+            deleteConfirmationPopup.classList.add('show');
+            deleteConfirmationPopup.classList.remove('hidden');
             
-            // Call API to remove document from library
-            fetch(`/api/user/library?documentId=${docId}`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`API error: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    // Update local data
-                    documentItemsData = documentItemsData.filter(doc => doc.id !== docId);
-                    selectedDocuments = selectedDocuments.filter(id => id !== docId);
-                    
-                    // After animation, remove from DOM
+            // Focus the cancel button for better keyboard accessibility
+            setTimeout(() => deletePopupCancelBtn.focus(), 100);
+        }
+
+        // Show delete confirmation for bulk delete
+        function showBulkDeleteConfirmation() {
+            deletePopupItem = null;
+            deletePopupDocId = null;
+            deletePopupDocTitle = null;
+            pendingBulkDelete = true;
+            
+            // Update popup content for bulk delete
+            deletePopupTitle.textContent = 'Delete Selected Documents';
+            deletePopupMessage.textContent = `Are you sure you want to remove ${selectedDocuments.length} selected document(s) from your library?`;
+            
+            // Show the popup
+            deleteConfirmationPopup.classList.add('show');
+            deleteConfirmationPopup.classList.remove('hidden');
+            
+            // Focus the cancel button for better keyboard accessibility
+            setTimeout(() => deletePopupCancelBtn.focus(), 100);
+        }
+
+        // Hide the delete confirmation popup
+        function hideDeleteConfirmation() {
+            deleteConfirmationPopup.classList.remove('show');
+            // Add a small delay before hiding completely to allow for animation
+            setTimeout(() => {
+                deleteConfirmationPopup.classList.add('hidden');
+                // Reset variables
+                deletePopupItem = null;
+                deletePopupDocId = null;
+                deletePopupDocTitle = null;
+                pendingBulkDelete = false;
+            }, 300);
+        }
+
+        // Execute the actual deletion after confirmation
+        async function executeDeleteItem() {
+            if (!deletePopupDocId || !deletePopupItem) return;
+            
+            const docId = deletePopupDocId;
+            const itemElement = deletePopupItem;
+            
+                const success = await deleteDocumentFromAPI(docId);
+                
+                if (success) {
+                    documentItemsData = documentItemsData.filter(d => d.id !== docId);
+                    selectedDocuments = selectedDocuments.filter(id => id !== docId); 
+
+                    itemElement.classList.add(CSS_CLASS_DELETING);
+
                     itemElement.addEventListener('animationend', () => {
                         itemElement.remove();
+                        showToast('Document removed from library.');
                         updateDeleteSelectedButtonState();
-                        
-                        const itemsLeftOnPage = Array.from(documentContainer.children).filter(child => 
-                            child.matches('.document-item-base:not(.deleting)')
-                        ).length;
-                        
+                        const itemsLeftOnPage = Array.from(documentContainer.children).filter(child => child.matches('.document-item-base:not(.deleting)')).length;
                         if (itemsLeftOnPage === 0 && currentPage > 1) {
                             currentPage--;
-                            filterAndDisplayDocuments();
-                        } else if (itemsLeftOnPage === 0) {
-                            // Show "no documents" message if needed
-                            checkEmptyState();
                         }
-                        
-                        showToast(`"${docTitle}" removed from your library.`);
+                        filterAndDisplayDocuments(); 
                     }, { once: true });
-                } else {
-                    // Undo animation if failed
-                    itemElement.classList.remove(CSS_CLASS_DELETING);
-                    showToast(data.error || 'Failed to remove document', CSS_CLASS_ERROR);
-                }
-            })
-            .catch(error => {
-                console.error('Error removing document:', error);
-                // Undo animation if failed
-                itemElement.classList.remove(CSS_CLASS_DELETING);
-                showToast('Error removing document. Please try again.', CSS_CLASS_ERROR);
-            });
+            }
         }
+
+        // Execute the bulk deletion after confirmation
+        async function executeBulkDelete() {
+            if (selectedDocuments.length === 0) return;
+
+            const itemsToDelete = [...selectedDocuments]; 
+            const elementsToRemove = [];
+            const animationPromises = [];
+            const deletePromises = [];
+
+            for (const id of itemsToDelete) {
+                deletePromises.push(deleteDocumentFromAPI(id));
+                const itemElement = documentContainer.querySelector(`.document-item-base[data-id="${id}"]`);
+                if (itemElement) {
+                    elementsToRemove.push(itemElement);
+                    itemElement.classList.add(CSS_CLASS_DELETING);
+                    animationPromises.push(new Promise(resolve => {
+                        itemElement.addEventListener('animationend', resolve, { once: true });
+                    }));
+                }
+            }
+
+            // Wait for all delete requests
+            const results = await Promise.all(deletePromises);
+            // If all deletions were successful, update UI
+            if (results.every(result => result === true)) {
+                documentItemsData = documentItemsData.filter(doc => !itemsToDelete.includes(doc.id));
+                selectedDocuments = []; 
+
+                await Promise.all(animationPromises);
+                elementsToRemove.forEach(el => el.remove());
+                showToast(`${itemsToDelete.length} document(s) removed from library.`);
+                updateDeleteSelectedButtonState(); 
+                const itemsLeftOnPage = Array.from(documentContainer.children).filter(child => child.matches('.document-item-base:not(.deleting)')).length;
+                 if (itemsLeftOnPage === 0 && currentPage > 1) {
+                    currentPage--;
+                }
+                filterAndDisplayDocuments(); 
+            } else {
+                showToast('Some documents could not be deleted. Please try again.', CSS_CLASS_ERROR);
+            }
+        }
+
+        // Function to handle delete button click (replaced the original function)
+        async function handleDeleteItem(docId, itemElement, docTitle) {
+            if (!itemElement) return;
+            showDeleteConfirmation(docId, itemElement, docTitle);
+        }
+
+        // Function to handle bulk delete (replaced the original function)
+        async function handleBulkDelete() {
+            if (selectedDocuments.length === 0) return;
+            showBulkDeleteConfirmation();
+        }
+
+        // Add event listeners for the delete confirmation popup buttons
+        deletePopupCancelBtn.addEventListener('click', hideDeleteConfirmation);
+        
+        deletePopupConfirmBtn.addEventListener('click', () => {
+            if (pendingBulkDelete) {
+                executeBulkDelete();
+            } else {
+                executeDeleteItem();
+            }
+            hideDeleteConfirmation();
+        });
+
+        // Close popup when clicking outside or pressing Escape
+        deleteConfirmationPopup.addEventListener('click', (e) => {
+            if (e.target === deleteConfirmationPopup) {
+                hideDeleteConfirmation();
+            }
+        });
+        
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && deleteConfirmationPopup.classList.contains('show')) {
+                hideDeleteConfirmation();
+            }
+        });
 
         documentContainer.addEventListener('click', function(e) {
             const itemElementBase = e.target.closest('.document-item-base'); 
@@ -972,15 +1698,19 @@
             const target = e.target;
 
             if (target.closest('.open-btn')) {
+                e.preventDefault();
+                // Handle document viewing based on document type
                 if (doc.url) {
-                    window.location.href = doc.url;
+                    // For document viewing functionality
+                    openDocument(doc);
                 } else {
                     showToast(`No URL available for "${doc.title}"`, CSS_CLASS_ERROR);
                 }
                 return;
             }
             if (target.closest('.download-btn')) {
-                showToast(`Simulating download of: "${doc.title}"`);
+                e.preventDefault();
+                downloadDocument(doc);
                 return;
             }
             if (target.closest('.delete-btn')) { 
@@ -1084,6 +1814,228 @@
 
         // Initial Setup
         function initializePage() {
+            // Check for token in URL and ensure it's saved to session storage
+            const urlParams = new URLSearchParams(window.location.search);
+            const tokenFromUrl = urlParams.get('token');
+            
+            if (tokenFromUrl) {
+                console.log('Found token in URL, ensuring it is saved to session storage');
+                try {
+                    // Get existing user info or create new object
+                    const userInfo = JSON.parse(sessionStorage.getItem('userInfo') || '{}');
+                    
+                    // Update the token if needed
+                    if (!userInfo.token || userInfo.token !== tokenFromUrl) {
+                        userInfo.token = tokenFromUrl;
+                
+                        // Ensure isLoggedIn flag is set
+                        if (!userInfo.isLoggedIn) {
+                            userInfo.isLoggedIn = true;
+                        }
+                        
+                        // Save back to session storage
+                        sessionStorage.setItem('userInfo', JSON.stringify(userInfo));
+                        console.log('Updated session storage with token from URL');
+                        }
+                    } catch (e) {
+                    console.error('Error handling token from URL:', e);
+                }
+                
+                // Remove token from URL to prevent sharing/leaking
+                const cleanUrl = window.location.pathname;
+                window.history.replaceState({}, document.title, cleanUrl);
+            }
+            
+            refreshDocumentList();
+            
+            // Set up event listeners
+            searchBar.addEventListener('input', debounce(filterAndDisplayDocuments, 350));
+            sortBySelect.addEventListener('change', filterAndDisplayDocuments);
+            filterByCategorySelect.addEventListener('change', filterAndDisplayDocuments);
+            filterByKeywordsSelect.addEventListener('change', filterAndDisplayDocuments);
+            toggleFiltersBtn.addEventListener('click', toggleFilterExpansion);
+            document.addEventListener('click', closePopups);
+            
+            // Handle URI fragment for direct navigation
+            handleUriFragmentNavigation();
+        }
+
+        initializePage(); 
+
+        // Function to open documents based on their type
+        function openDocument(doc) {
+            // Record view for analytics purposes
+            recordDocumentView(doc.id);
+            
+            try {
+                // Navigate to the document viewer page in the current tab
+                window.location.href = `/pages/user-single.html?id=${doc.id}`;
+            } catch (error) {
+                console.error('Error opening document:', error);
+                showToast('Error opening document. Please try again.', 'error');
+            }
+        }
+        
+        // Function to record document views for analytics
+        async function recordDocumentView(docId) {
+            try {
+                // Get user info from localStorage or sessionStorage
+                const userInfo = JSON.parse(sessionStorage.getItem('userInfo') || localStorage.getItem('userInfo') || '{}');
+                const token = userInfo?.token;
+                
+                if (!token) {
+                    console.warn('Cannot record view: No authentication token found');
+                    return;
+                }
+                
+                // Call API to record the view
+                await fetch('/api/analytics/document-view', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ documentId: docId })
+                });
+                
+                console.log('Document view recorded:', docId);
+            } catch (error) {
+                console.error('Error recording document view:', error);
+                // Non-critical error, doesn't need user notification
+            }
+        }
+
+        // Function to handle document downloads
+        async function downloadDocument(doc) {
+            try {
+                // Get user info for authentication
+                const userInfo = JSON.parse(sessionStorage.getItem('userInfo') || localStorage.getItem('userInfo') || '{}');
+                const token = userInfo?.token;
+                
+                if (!token) {
+                    showToast('You must be logged in to download documents', 'error');
+                    return;
+                }
+                
+                // Show download started toast
+                showToast(`Starting download for "${doc.title}"`);
+                
+                // Track the download in analytics
+                recordDocumentDownload(doc.id);
+                
+                // Create a download link with authentication
+                const downloadUrl = `/api/documents/${doc.id}/download?token=${token}`;
+                
+                // Create a hidden link element to trigger the download
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.target = '_blank'; // Open in new tab as fallback
+                a.download = doc.title || `document-${doc.id}`;
+                a.style.display = 'none';
+                document.body.appendChild(a);
+                
+                // Trigger the download
+                a.click();
+                
+                // Clean up
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                }, 100);
+                
+            } catch (error) {
+                console.error('Error downloading document:', error);
+                showToast('Error downloading document. Please try again.', 'error');
+            }
+        }
+        
+        // Function to record document downloads for analytics
+        async function recordDocumentDownload(docId) {
+            try {
+                // Get user info from localStorage or sessionStorage
+                const userInfo = JSON.parse(sessionStorage.getItem('userInfo') || localStorage.getItem('userInfo') || '{}');
+                const token = userInfo?.token;
+                
+                if (!token) {
+                    console.warn('Cannot record download: No authentication token found');
+                    return;
+                }
+                
+                // Collect download data for analytics
+                const downloadData = {
+                    documentId: docId,
+                    timestamp: new Date().toISOString(),
+                    userId: userInfo.userId || userInfo.id,
+                    userName: userInfo.name || userInfo.username,
+                    userEmail: userInfo.email
+                };
+                
+                // Try the analytics-specific endpoint first
+                try {
+                    const response = await fetch('/api/analytics/document-download', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(downloadData)
+                    });
+                    
+                    if (response.ok) {
+                        console.log('Document download recorded:', docId);
+                        return;
+                    }
+                } catch (endpointError) {
+                    console.warn('Analytics endpoint not available, trying fallback:', endpointError);
+                }
+                
+                // Fallback - try to use the document views endpoint
+                try {
+                    const fallbackResponse = await fetch('/api/document-views', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            ...downloadData,
+                            actionType: 'download' // Add action type to differentiate from views
+                        })
+                    });
+                    
+                    if (fallbackResponse.ok) {
+                        console.log('Document download recorded via fallback endpoint:', docId);
+                        return;
+                    }
+                } catch (fallbackError) {
+                    console.warn('Fallback endpoint failed:', fallbackError);
+                }
+                
+                // Last resort - log to console for development purposes
+                console.log('Download would be recorded for document:', docId, downloadData);
+                
+            } catch (error) {
+                console.error('Error recording document download:', error);
+                // Non-critical error, doesn't need user notification
+            }
+        }
+
+        // Refresh document list from API
+        async function refreshDocumentList() {
+            // Check if user is authenticated
+            const userInfo = JSON.parse(sessionStorage.getItem('userInfo') || localStorage.getItem('userInfo') || '{}');
+            const token = userInfo?.token;
+            
+            if (!token) {
+                console.warn('No authentication token found');
+                // Redirect to login page if in production
+                if (location.hostname !== 'localhost' && !location.hostname.includes('127.0.0.1')) {
+                    window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+                    return;
+                }
+                // In development, show a toast but continue with mock data
+                showToast('Authentication required. Using mock data in development mode.', 'error');
+            }
+            
             const preferredView = localStorage.getItem('libraryPreferredView') || 'list'; 
             documentContainer.classList.add('loading-content'); 
             
@@ -1091,10 +2043,55 @@
                 btn.classList.toggle('active', btn.getAttribute('data-view') === preferredView);
             });
             
-            changeView(preferredView); 
+            // Fetch documents from API
+            try {
+                documentItemsData = await fetchDocumentsFromAPI();
+                
+                // Update user info with library count
+                if (token) {
+                    try {
+                        const userInfo = JSON.parse(sessionStorage.getItem('userInfo') || '{}');
+                        // Update library count in the user info
+                        userInfo.libraryCount = documentItemsData.length;
+                        // Save back to session storage
+                        sessionStorage.setItem('userInfo', JSON.stringify(userInfo));
+                        console.log('Updated user info with library count:', documentItemsData.length);
+                        
+                        // Refresh the navbar if needed to show updated count
+                        if (window.NavbarModule && typeof window.NavbarModule.updateProfileInfo === 'function') {
+                            window.NavbarModule.updateProfileInfo(userInfo);
+                        }
+                    } catch (e) {
+                        console.error('Error updating library count in user info:', e);
+                    }
+                }
+                
+                // If no documents or error occurred, use mock data for development/testing
+                if (documentItemsData.length === 0) {
+                    if (location.hostname === 'localhost' || location.hostname.includes('127.0.0.1')) {
+                        console.log('Using mock data for development');
+                        documentItemsData = [...mockDocuments];
+                        showToast('Using sample documents for development', 'error');
+                    } else {
+                        // In production with no documents
+                        showToast('Your library is empty. Add documents to see them here.');
+                    }
+                }
+            } catch (error) {
+                console.error('Error initializing page:', error);
+                // Use mock data in development if API fails
+                if (location.hostname === 'localhost' || location.hostname.includes('127.0.0.1')) {
+                    documentItemsData = [...mockDocuments];
+                    console.log('Using mock data after API error');
+                    showToast('Using sample documents due to an API error', 'error');
+                } else {
+                    // In production with API error
+                    documentItemsData = [];
+                    showToast('Error connecting to the document library. Please try again later.', 'error');
+                }
+            }
             
-            // Fetch saved documents from the API
-            fetchSavedDocuments();
+            changeView(preferredView);
             
             requestAnimationFrame(() => {
                 setTimeout(() => { 
@@ -1102,103 +2099,6 @@
                 }, 50); 
             });
         }
-
-        initializePage(); 
-
-        function handleBulkDelete() {
-            if (selectedDocuments.length === 0) return;
-            const numToDelete = selectedDocuments.length;
-            if (!confirm(`Are you sure you want to remove ${numToDelete} selected document(s) from your library?`)) {
-                return;
-            }
-
-            const itemsToDelete = [...selectedDocuments]; 
-            const elementsToRemove = [];
-            const animationPromises = [];
-            const token = localStorage.getItem('sessionToken');
-            
-            if (!token) {
-                showToast('Authentication required', CSS_CLASS_ERROR);
-                return;
-            }
-
-            // Start animations for all selected items
-            itemsToDelete.forEach(id => {
-                const itemElement = documentContainer.querySelector(`.document-item-base[data-id="${id}"]`);
-                if (itemElement) {
-                    elementsToRemove.push(itemElement);
-                    itemElement.classList.add(CSS_CLASS_DELETING);
-                    animationPromises.push(new Promise(resolve => {
-                        itemElement.addEventListener('animationend', resolve, { once: true });
-                    }));
-                }
-            });
-            
-            // Create an array of API deletion promises
-            const deletePromises = itemsToDelete.map(docId => {
-                return fetch(`/api/user/library?documentId=${docId}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`Failed to delete document ${docId}: ${response.status}`);
-                    }
-                    return response.json();
-                });
-            });
-            
-            // Execute all API deletions in parallel
-            Promise.all(deletePromises)
-                .then(results => {
-                    // Wait for all animations to complete
-                    return Promise.all(animationPromises).then(() => results);
-                })
-                .then(results => {
-                    // Filter out any failed deletions
-                    const successfulDeletions = results.filter(r => r.success).length;
-                    const failedDeletions = numToDelete - successfulDeletions;
-                    
-                    // Remove elements from DOM
-                    elementsToRemove.forEach(el => el.remove());
-                    
-                    // Update local data
-                    documentItemsData = documentItemsData.filter(doc => !itemsToDelete.includes(doc.id));
-                    selectedDocuments = []; 
-                    
-                    // Show result message
-                    if (failedDeletions > 0) {
-                        showToast(`${successfulDeletions} document(s) removed. ${failedDeletions} failed.`, CSS_CLASS_ERROR);
-                    } else {
-                        showToast(`${successfulDeletions} document(s) removed from library.`);
-                    }
-                    
-                    // Update UI state
-                    updateDeleteSelectedButtonState(); 
-                    const itemsLeftOnPage = Array.from(documentContainer.children).filter(child => 
-                        child.matches('.document-item-base:not(.deleting)')
-                    ).length;
-                    
-                    if (itemsLeftOnPage === 0 && currentPage > 1) {
-                        currentPage--;
-                    }
-                    
-                    filterAndDisplayDocuments();
-                })
-                .catch(error => {
-                    console.error('Error in bulk deletion:', error);
-                    showToast('Error removing documents. Please try again.', CSS_CLASS_ERROR);
-                    
-                    // Undo animations for any items that weren't removed
-                    elementsToRemove.forEach(el => {
-                        el.classList.remove(CSS_CLASS_DELETING);
-                    });
-                });
-        }
-
     </script>
 
     <!-- Navbar loading script -->
