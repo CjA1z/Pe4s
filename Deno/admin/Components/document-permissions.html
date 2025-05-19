@@ -558,9 +558,13 @@
             padding: 1.5rem;
             max-width: 90%;
             width: 450px;
-            z-index: 1100;
+            z-index: 3000; /* Higher z-index to ensure it appears above ALL other elements */
             display: none;
-            animation: fadeIn 0.2s ease-out;
+            animation: fadeIn 0.3s ease-out;
+            /* Add additional visibility properties */
+            opacity: 1;
+            visibility: visible;
+            transition: opacity 0.3s, visibility 0.3s;
         }
         
         @keyframes fadeIn {
@@ -682,6 +686,47 @@
         #detailedConfirmation .file-status-icon {
             display: inline-block;
             margin-right: 0.5rem;
+        }
+
+        #detailedConfirmation .file-status-badge {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            font-weight: 500;
+            text-align: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        #detailedConfirmation .file-status-badge::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%);
+            animation: shine 2s infinite;
+            pointer-events: none;
+        }
+        
+        @keyframes shine {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        
+        /* Existing header-icon and file-status-icon styles */
+        #detailedConfirmation .header-icon {
+            font-size: 1.5rem;
+        }
+        
+        #detailedConfirmation .file-status-icon {
+            display: inline-block;
+            margin-right: 0.5rem;
+            font-size: 1.25rem; /* Larger icon size */
         }
     </style>
 </head>
@@ -838,8 +883,58 @@
         </div>
     </div>
 
+    <!-- Rejection Confirmation Modal -->
+    <div id="rejectionConfirmationModal" class="modal-overlay">
+        <div class="modal-content" style="border-top-color: var(--danger-red);">
+            <span class="close-button" id="closeRejectionConfirmationModalButton">&times;</span>
+            <h2 class="text-xl font-semibold mb-4 text-center text-red-700">Request Rejected</h2>
+            
+            <div class="text-center mb-6">
+                <div class="inline-block bg-red-100 rounded-full p-3 mb-4">
+                    <i class="fas fa-times-circle text-3xl text-red-600"></i>
+                </div>
+                <p class="text-lg font-medium text-gray-800 mb-2">The request has been rejected successfully</p>
+                <p class="text-sm text-gray-600" id="rejectionConfirmationDetails">The requester will be notified by email.</p>
+            </div>
+            
+            <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-info-circle text-red-600"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm text-red-800" id="rejectionReasonDisplay">
+                            Rejection reason will appear here
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="rejectionEmailStatus" class="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-6 hidden">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-exclamation-triangle text-yellow-600"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm text-yellow-800" id="rejectionEmailMessage">
+                            Email notification status will appear here
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex justify-center gap-3 mt-6">
+                <button id="rejectionConfirmationCloseButton" class="modal-button secondary-button">Close</button>
+            </div>
+        </div>
+    </div>
+
 
     <div id="confirmationMessage" class="confirmation-message"> Action successful! </div>
+
+    <div id="detailedConfirmation" class="success">
+        <!-- This will be populated dynamically -->
+    </div>
 
     <script>
         // --- Mock Data ---
@@ -934,7 +1029,15 @@
             created_at: { header: 'Date Requested', sortable: true, format: formatDate, toggleable: true }, // Database field name
             status: { header: 'Status', sortable: true, format: (val, req) => formatStatus(val, req), toggleable: false }, // Status always visible
             reviewed_at: { header: 'Processed At', sortable: true, format: formatDateTime, toggleable: true }, // Database field name
-            actions: { header: 'Actions', sortable: false, format: (val, req) => `<a href="${req.document_url || req.documentUrl || '#'}" target="_blank" class="view-doc-button" data-action="view" title="View Document">View</a>`, toggleable: false } // Actions always visible
+            actions: { 
+                header: 'Actions', 
+                sortable: false, 
+                format: (val, req) => {
+                    const docUrl = req.document_url || req.documentUrl || '#';
+                    return `<a href="${docUrl}" target="_blank" class="view-doc-button" data-action="view" data-needs-auth="true" title="View Document">View</a>`;
+                }, 
+                toggleable: false 
+            } // Actions always visible
         };
 
         // Define different column order presets
@@ -967,24 +1070,31 @@
         /** Loads requests, column order, and visible columns from localStorage or initializes defaults. */
         async function loadData() {
             try {
-                // Get user info from sessionStorage
-                const userInfo = JSON.parse(sessionStorage.getItem('userInfo') || '{}');
-                if (!userInfo.token) {
+                // Get auth token using our helper function
+                const token = getAuthToken();
+                if (!token) {
+                    // Try to refresh token before failing
+                    const newToken = await refreshAuthToken();
+                    if (!newToken) {
                     throw new Error('No authentication token found. Please log in again.');
+                    }
                 }
 
-                // Check if user is admin
+                // Get user info to check role
+                const userInfo = JSON.parse(sessionStorage.getItem('userInfo') || '{}');
                 if (!userInfo.role || userInfo.role.toLowerCase() !== 'admin') {
                     throw new Error('You do not have permission to access this page. Admin access required.');
                 }
 
-                // Fetch requests from API
+                // Fetch requests from API using current token (which might be refreshed)
+                const currentToken = getAuthToken(); // Get token again in case it was refreshed
+                
                 console.log('Fetching document requests...');
                 const response = await fetch('/api/document-requests', {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${userInfo.token}`
+                        'Authorization': `Bearer ${currentToken}`
                     },
                     credentials: 'include'
                 });
@@ -1308,6 +1418,11 @@
                         td.classList.add('px-6', 'py-4', 'whitespace-nowrap', 'text-sm');
 
                         let cellContent = getRequestData(request, colKey, 'N/A');
+                        
+                        // Special handling for book_title
+                        if (colKey === 'book_title') {
+                            cellContent = formatBookTitle(request);
+                        }
 
                         // Apply specific formatting or classes
                         if (colDef.format) {
@@ -1330,7 +1445,7 @@
                         // Apply truncation to book title cell
                         if (colKey === 'book_title') {
                             td.classList.add('truncate-cell');
-                            td.title = getRequestData(request, colKey, ''); // Add title attribute for full name on hover
+                            td.title = formatBookTitle(request, true); // Use plain text for the tooltip
                         }
 
                         tr.appendChild(td);
@@ -1377,20 +1492,35 @@
                 }
 
                 // Get title and author with our helper function
-                const bookTitle = getRequestData(request, 'book_title', 'N/A');
+                const bookTitle = formatBookTitle(request);
                 const authorName = getRequestData(request, 'author_name', 'Unknown');
                 const volume = getRequestData(request, 'volume', '');
-                const volumeText = volume ? `(Vol. ${volume})` : '';
+                const volumeText = volume && !getRequestData(request, 'is_compiled', false) ? `(Vol. ${volume})` : '';
                 const documentId = getRequestData(request, 'document_id', 'N/A');
                 const fullName = getRequestData(request, 'full_name', 'N/A');
                 const affiliation = getRequestData(request, 'affiliation', 'N/A');
                 const requestDate = getRequestData(request, 'created_at');
+                
+                // Get and format document URL 
+                let docUrl = getRequestData(request, 'document_url', '');
+                
+                // Check if document URL is valid
+                let documentLinkHtml = '';
+                if (!docUrl || docUrl === '#' || docUrl === '/#') {
+                    documentLinkHtml = `<p class="text-red-500 text-sm mt-1"><i class="fas fa-exclamation-circle mr-1"></i> Document not available</p>`;
+                } else {
+                    // Fix document URL if it's relative
+                    if (!docUrl.startsWith('http') && !docUrl.startsWith('/')) {
+                        docUrl = '/' + docUrl;
+                    }
+                    documentLinkHtml = `<a href="${docUrl}" target="_blank" class="view-doc-button" data-action="view" data-needs-auth="true" data-original-url="${docUrl}">View Document</a>`;
+                }
 
                 // Added title attribute to h3 for full title on hover
                 tile.innerHTML = `
                     <div class="tile-header">
                         <span class="tile-request-id">ID: ${request.id}</span>
-                        <h3 class="tile-title" title="${bookTitle}">${bookTitle} ${volumeText}</h3>
+                        <h3 class="tile-title" title="${formatBookTitle(request, true)}">${bookTitle} ${volumeText}</h3>
                         <p class="tile-author">by ${authorName}</p>
                     </div>
                     <div class="tile-body">
@@ -1398,6 +1528,9 @@
                         <p class="tile-requester"><strong>Requester:</strong> ${fullName}</p>
                         <p><strong>Affiliation:</strong> <span class="wrap-text">${affiliation}</span></p>
                         <p><strong>Requested:</strong> ${formatDate(requestDate)}</p>
+                        <div class="mt-2"> 
+                            ${documentLinkHtml}
+                        </div>
                      </div>
                     <div class="tile-actions">
                         ${statusOrActionHtml}
@@ -1405,6 +1538,9 @@
                 container.appendChild(tile);
             });
             requestsContentContainer.appendChild(container);
+            
+            // Process document links to add auth tokens
+            updateAllDocumentLinks();
         }
 
         /** MODIFIED: Renders the Expandable List View with subtle background/border, truncates title, adds Document ID. */
@@ -1423,15 +1559,28 @@
                 const fullName = getRequestData(request, 'full_name', 'N/A');
                 const email = getRequestData(request, 'email', 'N/A');
                 const affiliation = getRequestData(request, 'affiliation', 'N/A');
-                const bookTitle = getRequestData(request, 'book_title', 'N/A');
+                const bookTitle = formatBookTitle(request);
                 const authorName = getRequestData(request, 'author_name', 'Unknown');
                 const volume = getRequestData(request, 'volume', '');
-                const volumeText = volume ? `<span class="list-volume">(Vol. ${volume})</span>` : '';
+                const volumeText = volume && !getRequestData(request, 'is_compiled', false) ? `<span class="list-volume">(Vol. ${volume})</span>` : '';
                 const documentId = getRequestData(request, 'document_id', 'N/A');
                 const requestDate = getRequestData(request, 'created_at');
                 const processedDate = getRequestData(request, 'reviewed_at');
-                const documentUrl = getRequestData(request, 'document_url', '#');
-                const reviewNotes = getRequestData(request, 'review_notes', '');
+                
+                // Get and format document URL 
+                let docUrl = getRequestData(request, 'document_url', '');
+                
+                // Check if document URL is valid
+                let documentLinkHtml = '';
+                if (!docUrl || docUrl === '#' || docUrl === '/#') {
+                    documentLinkHtml = `<p class="text-red-500 text-sm mt-1"><i class="fas fa-exclamation-circle mr-1"></i> Document not available</p>`;
+                } else {
+                    // Fix document URL if it's relative
+                    if (!docUrl.startsWith('http') && !docUrl.startsWith('/')) {
+                        docUrl = '/' + docUrl;
+                    }
+                    documentLinkHtml = `<a href="${docUrl}" target="_blank" class="view-doc-button" data-action="view" data-needs-auth="true" data-original-url="${docUrl}">View</a>`;
+                }
 
                 const summary = document.createElement('div');
                 summary.classList.add('list-item-summary');
@@ -1449,14 +1598,14 @@
                     statusOrActionHtml = `<span class="status-label ${statusClass}">${statusText}</span>`;
                 }
 
-                // Added title attribute to list-book-title span
+                // Added title attribute to list-book-title span with plain text format
                 summary.innerHTML = `
                     <div class="list-info">
                         <span class="list-request-id">ID: ${request.id}</span>
                         <span class="list-requester-name" title="${fullName}">${fullName}</span>
                         <span class="list-email" title="${email}">${email}</span>
                         <span class="list-affiliation" title="${affiliation}">${affiliation}</span>
-                        <span class="list-book-title" title="${bookTitle}">${bookTitle} ${volumeText}</span>
+                        <span class="list-book-title" title="${formatBookTitle(request, true)}">${bookTitle} ${volumeText}</span>
                         <span class="list-author">by ${authorName}</span>
                     </div>
                     <div class="list-actions">
@@ -1489,8 +1638,8 @@
                     : '';
                     
                 // ADDED: Display rejection reason if status is rejected
-                const rejectionReasonHtml = (status === 'rejected' && reviewNotes)
-                    ? `<p class="rejection-reason-display"><strong>Rejection Reason:</strong><br>${reviewNotes}</p>`
+                const rejectionReasonHtml = (status === 'rejected' && request.review_notes)
+                    ? `<p class="rejection-reason-display"><strong>Rejection Reason:</strong><br>${request.review_notes}</p>`
                     : '';
 
                 details.innerHTML = `
@@ -1504,7 +1653,7 @@
                     ${volume ? `<p><strong>Volume:</strong> ${volume}</p>` : ''}
                     <p><strong>Document ID:</strong> ${documentId}</p> 
                     <div class="mt-2"> 
-                        <a href="${documentUrl}" target="_blank" class="view-doc-button" data-action="view">View</a>
+                        ${documentLinkHtml}
                     </div>
                     <hr class="my-2 border-gray-200">
                     <div class="mb-2">
@@ -1521,6 +1670,9 @@
                 list.appendChild(listItem);
             });
             requestsContentContainer.appendChild(list);
+            
+            // Process document links to add auth tokens
+            updateAllDocumentLinks();
         }
 
         /** Creates and returns the pagination controls element with numbered buttons. */
@@ -1608,8 +1760,8 @@
         /** MODIFIED: Opens the details modal, adds Document ID, shows rejection reason. */
         function openDetailsModal(requestId) {
             // Convert the requestId to match the database format (might be a number or string)
-            const databaseId = typeof requestId === 'string' && !isNaN(requestId) ? parseInt(requestId) : requestId;
-            console.log("Looking for request with ID:", databaseId);
+            const databaseId = typeof requestId === 'string' && !isNaN(parseInt(requestId)) ? parseInt(requestId) : requestId;
+            console.log("[DEBUG] openDetailsModal: Looking for request with ID:", databaseId);
             
             // Find the request and be more flexible with the ID comparison
             const request = requests.find(req => {
@@ -1619,10 +1771,12 @@
             });
             
             if (!request) { 
-                console.error("Request not found:", requestId, "Available IDs:", requests.map(r => r.id)); 
+                console.error("[DEBUG] Request not found:", requestId, "Available IDs:", requests.map(r => r.id)); 
                 alert("Details not found."); 
                 return; 
             }
+            
+            console.log("[DEBUG] Found request:", request);
             
             // Map database field names (snake_case) to frontend variables (camelCase) if needed
             detailRequestId.textContent = request.id || 'N/A'; 
@@ -1631,12 +1785,61 @@
             detailAffiliation.textContent = request.affiliation || 'N/A'; 
             
             // Handle book-related fields (may need to map from document data)
-            detailBookTitle.textContent = request.book_title || request.bookTitle || 'N/A'; 
+            detailBookTitle.textContent = formatBookTitle(request);
             detailAuthorName.textContent = request.author_name || request.authorName || 'N/A'; 
-            detailVolume.textContent = request.volume || 'N/A'; 
             
-            // Handle URLs
-            detailDocumentLink.href = request.document_url || request.documentUrl || '#';
+            // Only show volume separately if not a compiled document
+            const isCompiled = getRequestData(request, 'is_compiled', false);
+            detailVolume.textContent = isCompiled ? 'N/A' : (request.volume || 'N/A'); 
+            
+            // Handle URLs - Add authentication token to document URL
+            let docUrl = request.document_url || request.documentUrl || '';
+            
+            // Set document link based on URL availability
+            if (!docUrl || docUrl === '#' || docUrl === '/#') {
+                // Document URL is missing or invalid - hide the link and show a message
+                detailDocumentLink.style.display = 'none';
+                
+                // Check if we already created a message element
+                let noDocMessage = modalDetailsContent.querySelector('#noDocumentMessage');
+                if (!noDocMessage) {
+                    noDocMessage = document.createElement('p');
+                    noDocMessage.id = 'noDocumentMessage';
+                    noDocMessage.className = 'text-red-500 text-sm mt-1';
+                    noDocMessage.innerHTML = '<i class="fas fa-exclamation-circle mr-1"></i> Document not currently available';
+                    
+                    // Insert after the document link container
+                    const viewButtonDiv = detailDocumentLink.parentElement;
+                    if (viewButtonDiv) {
+                        viewButtonDiv.appendChild(noDocMessage);
+                    }
+                } else {
+                    noDocMessage.style.display = 'block';
+                }
+                
+                console.log("[DEBUG] Document URL is missing or invalid:", docUrl);
+            } else {
+                // Fix document URL if it's relative (doesn't start with http or /)
+                if (!docUrl.startsWith('http') && !docUrl.startsWith('/')) {
+                    docUrl = '/' + docUrl;
+                    console.log("[DEBUG] Converted relative URL to absolute:", docUrl);
+                }
+                
+                // Show the link and hide any error message
+                detailDocumentLink.style.display = 'inline-block';
+                const noDocMessage = modalDetailsContent.querySelector('#noDocumentMessage');
+                if (noDocMessage) {
+                    noDocMessage.style.display = 'none';
+                }
+                
+                // Set href and apply authentication
+            detailDocumentLink.href = docUrl;
+                detailDocumentLink.classList.add('view-doc-button');
+                detailDocumentLink.setAttribute('target', '_blank');
+                
+                // Apply authentication to the link
+            updateDocumentLink(detailDocumentLink, docUrl);
+            }
             
             // Handle date fields
             const requestDate = request.created_at || request.requestedAt;
@@ -1689,8 +1892,6 @@
             } else {
                 modalActions.innerHTML = `<p class="text-gray-600 font-medium">Request already ${status}.</p>`;
             }
-            
-            detailDocumentLink.classList.add('view-doc-button');
 
             // Add Document ID to modal
             const existingDocIdP = modalDetailsContent.querySelector('#modalDocIdP');
@@ -1716,6 +1917,8 @@
              }
 
             requestDetailsModal.classList.add('visible');
+            
+            console.log("[DEBUG] Modal opened with document URL:", docUrl);
         }
 
         /** Closes the details modal. */
@@ -1817,10 +2020,108 @@
 
                     // Get the request with all updated information
                     const request = requests[requestIndex];
-                    await sendRejectionEmail(request, reason);
+                    
+                    console.log("[DEBUG] About to send rejection email for request:", request.id);
+                    try {
+                        const emailResult = await sendRejectionEmail(request, reason);
+                        console.log("[DEBUG] Rejection email sending result:", emailResult);
+                        
+                        // Check if the emailResult indicates a network failure rather than API response
+                        if (emailResult && emailResult.message && 
+                            (emailResult.message.includes("Failed to fetch") || 
+                             emailResult.message.includes("NetworkError"))) {
+                            console.error("[DEBUG] Network error when sending email:", emailResult.message);
+                            
+                            // Try a second attempt with a different approach
+                            try {
+                                console.log("[DEBUG] Trying alternative rejection email method...");
+                                const backupEmailResult = await fetch('/api/email/send-rejection', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        email: getRequestData(request, 'email', ''),
+                                        fullName: getRequestData(request, 'full_name', 'User'),
+                                        documentTitle: getRequestData(request, 'book_title', 'Document'),
+                                        reason: reason,
+                                        requestId: request.id,
+                                        timestamp: new Date().toISOString(),
+                                        debug: true
+                                    })
+                                });
+                                
+                                if (backupEmailResult.ok) {
+                                    console.log("[DEBUG] Backup email method succeeded!");
+                                    const backupData = await backupEmailResult.json();
+                                    emailResult.success = backupData.success || true;
+                                    emailResult.message = backupData.message || "Email sent via backup method";
+                                }
+                            } catch (backupError) {
+                                console.error("[DEBUG] Backup email method also failed:", backupError);
+                            }
+                        }
+                    } catch (emailError) {
+                        console.error("[DEBUG] Rejection email sending error:", emailError);
+                        // Continue with process even if email fails
+                    }
+                    
+                    // Show the new dedicated rejection confirmation modal
+                    const rejectionModal = document.getElementById('rejectionConfirmationModal');
+                    const rejectionReasonDisplay = document.getElementById('rejectionReasonDisplay');
+                    const rejectionEmailStatus = document.getElementById('rejectionEmailStatus');
+                    const rejectionEmailMessage = document.getElementById('rejectionEmailMessage');
+                    const rejectionConfirmationDetails = document.getElementById('rejectionConfirmationDetails');
+                    
+                    // Log visibility status of modal elements for debugging
+                    console.log("[MODAL DEBUG] Modal elements found:", {
+                        rejectionModal: !!rejectionModal,
+                        rejectionReasonDisplay: !!rejectionReasonDisplay,
+                        rejectionEmailStatus: !!rejectionEmailStatus,
+                        rejectionEmailMessage: !!rejectionEmailMessage,
+                        rejectionConfirmationDetails: !!rejectionConfirmationDetails
+                    });
+                    
+                    // Set the rejection reason in the modal
+                    rejectionReasonDisplay.textContent = reason;
+                    
+                    // Show email status based on the result
+                    if (emailResult && emailResult.success) {
+                        rejectionEmailStatus.classList.add('hidden');
+                        rejectionConfirmationDetails.textContent = 'The requester has been notified by email of this rejection.';
+                    } else {
+                        rejectionEmailStatus.classList.remove('hidden');
+                        rejectionEmailMessage.textContent = `There was an issue sending the email notification: ${emailResult?.message || 'Unknown error'}`;
+                        rejectionConfirmationDetails.textContent = 'The request was rejected, but email notification could not be sent.';
+                    }
+                    
+                    // Show the rejection confirmation modal with multiple methods to ensure visibility
+                    rejectionModal.classList.add('visible');
+                    rejectionModal.style.visibility = 'visible';
+                    rejectionModal.style.opacity = '1';
+                    rejectionModal.style.display = 'flex';
+                    
+                    console.log("[MODAL DEBUG] Made rejection modal visible");
+                    
+                    // Set a delayed check to verify modal is visible
+                    setTimeout(() => {
+                        const isVisible = window.getComputedStyle(rejectionModal).visibility === 'visible';
+                        console.log(`[MODAL DEBUG] Modal visibility check after 100ms: ${isVisible ? 'VISIBLE' : 'HIDDEN'}`);
+                        
+                        if (!isVisible) {
+                            // Force visibility with important declaration
+                            rejectionModal.setAttribute('style', 
+                                'visibility: visible !important; ' +
+                                'opacity: 1 !important; ' +
+                                'display: flex !important; ' +
+                                'z-index: 2000 !important;'
+                            );
+                            console.log("[MODAL DEBUG] Applied forced visibility to modal");
+                        }
+                    }, 100);
+                    
+                    // Also show a simple notification
+                    showConfirmationMessage(`Request ${requestId} rejected`, 'error');
                 }
-
-                showConfirmationMessage(`Request ${requestId} rejected. Email notification sent.`, 'error');
+                
                  closeRejectionModal();
                 closeDetailsModal();
                 applyFiltersAndSort();
@@ -1848,47 +2149,175 @@
          */
         async function sendRejectionEmail(request, reason) {
             try {
+                // Log debug info for email troubleshooting
+                console.log(`[EMAIL DEBUG] ========== REJECTION EMAIL DEBUG ==========`);
+                console.log(`[EMAIL DEBUG] Starting email process for request ID: ${request.id}`);
+                console.log(`[EMAIL DEBUG] Request object:`, request);
+                console.log(`[EMAIL DEBUG] Rejection reason:`, reason);
+                
                 // Get request details using our helper function
                 const fullName = getRequestData(request, 'full_name', 'User');
                 const email = getRequestData(request, 'email', '');
                 const bookTitle = getRequestData(request, 'book_title', 'Document');
                 
+                console.log(`[EMAIL DEBUG] Extracted data: 
+                  - Recipient: ${fullName} (${email})
+                  - Document: ${bookTitle}
+                  - Reason length: ${reason ? reason.length : 0} characters`);
+                
                 if (!email) {
-                    console.error('Cannot send rejection email: recipient email not found');
-                    return false;
+                    console.error('[EMAIL DEBUG] ERROR: Cannot send rejection email - recipient email not found');
+                    return { success: false, message: 'Missing recipient email' };
                 }
                 
+                // Use the correct API endpoint for rejection emails
+                const endpoints = [
+                    '/api/email/send-rejection'
+                ];
+                
+                let lastError = null;
+                
+                // Try each endpoint until one works
+                for (const endpoint of endpoints) {
+                    try {
+                        console.log(`[EMAIL DEBUG] Attempting to send email via endpoint: ${endpoint}`);
+                        
+                        // Prepare request body
+                        const requestBody = {
+                            email,
+                            fullName,
+                            documentTitle: bookTitle,
+                            reason,
+                            requestId: request.id,
+                            documentId: request.document_id || request.documentId,
+                            debug: true,
+                            timestamp: new Date().toISOString()
+                        };
+                        
+                        console.log(`[EMAIL DEBUG] Request payload:`, requestBody);
+                
                 // Make API call to send the rejection email
-                const response = await fetch('/api/email/send-rejection', {
+                        console.log(`[EMAIL DEBUG] ⚠️ MAKING FETCH CALL TO ${endpoint} with payload:`, requestBody);
+                        
+                        const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        email,
-                        fullName,
-                        documentTitle: bookTitle,
-                        reason
-                    })
-                });
+                            body: JSON.stringify(requestBody),
+                            // Force no-cache to prevent caching issues
+                            cache: 'no-cache'
+                        });
+                        
+                        console.log(`[EMAIL DEBUG] API response status code: ${response.status}`);
                 
                 if (!response.ok) {
                     const errorText = await response.text();
-                    console.error(`Error sending rejection email: ${errorText}`);
-                    return false;
+                            console.error(`[EMAIL DEBUG] API error response: ${errorText}`);
+                            
+                            // Try to parse the error response if it's JSON
+                            let errorDetail = errorText;
+                            try {
+                                const errorJson = JSON.parse(errorText);
+                                errorDetail = errorJson.message || errorJson.error || errorText;
+                            } catch (e) {
+                                // Not JSON, use the text as is
+                            }
+                            
+                            lastError = { 
+                                success: false, 
+                                endpoint,
+                                status: response.status,
+                                message: `API error: ${response.status} ${errorDetail.substring(0, 100)}`
+                            };
+                            
+                            // Try next endpoint
+                            continue;
+                        }
+                        
+                        // Parse the response
+                        try {
+                            const responseData = await response.json();
+                            console.log(`[EMAIL DEBUG] API response data:`, responseData);
+                            
+                            if (responseData.success) {
+                                console.log(`[EMAIL DEBUG] ✅ Email successfully sent to ${email} via ${endpoint}`);
+                                return {
+                                    ...responseData,
+                                    endpoint
+                                };
+                            } else {
+                                console.error(`[EMAIL DEBUG] API returned success=false:`, responseData);
+                                lastError = {
+                                    ...responseData,
+                                    endpoint,
+                                    status: response.status
+                                };
+                                
+                                // Try next endpoint
+                                continue;
+                            }
+                        } catch (parseError) {
+                            console.error(`[EMAIL DEBUG] Error parsing API response:`, parseError);
+                            
+                            // If response was OK but couldn't parse as JSON, consider it a success
+                            if (response.ok) {
+                                console.log(`[EMAIL DEBUG] ✅ Non-JSON success response from ${endpoint}`);
+                                return { 
+                                    success: true, 
+                                    message: 'Email sent (non-JSON response)',
+                                    endpoint 
+                                };
+                            } else {
+                                lastError = { 
+                                    success: false, 
+                                    message: `Parse error: ${parseError.message}`,
+                                    endpoint,
+                                    status: response.status
+                                };
+                                
+                                // Try next endpoint
+                                continue;
+                            }
+                        }
+                    } catch (endpointError) {
+                        console.error(`[EMAIL DEBUG] Error with endpoint ${endpoint}:`, endpointError);
+                        lastError = { 
+                            success: false, 
+                            message: `Endpoint error: ${endpointError.message}`,
+                            endpoint
+                        };
+                        
+                        // Try next endpoint
+                        continue;
+                    }
                 }
                 
-                console.log(`Rejection email sent to ${email} for document: ${bookTitle}`);
-                return true;
+                // If we get here, all endpoints failed
+                console.error(`[EMAIL DEBUG] ❌ All email endpoints failed. Last error:`, lastError);
+                return lastError || { success: false, message: 'All email endpoints failed' };
+                
             } catch (error) {
-                console.error('Error sending rejection email:', error);
-                return false;
+                console.error('[EMAIL DEBUG] Uncaught error sending rejection email:', error);
+                return { 
+                    success: false, 
+                    message: error.message || 'Unknown error sending rejection email'
+                };
             }
         }
 
         /** MODIFIED: Handles Approve/Reject action, opens rejection modal if needed. */
         async function handleAction(requestId, action) {
             try {
+                console.log(`[DEBUG] handleAction: requestId=${requestId}, action=${action}`);
+                
+                // Convert requestId to appropriate format if needed
+                const databaseId = typeof requestId === 'string' && !isNaN(parseInt(requestId)) 
+                    ? parseInt(requestId, 10) 
+                    : requestId;
+                
+                console.log(`[DEBUG] Using database ID: ${databaseId}`);
+                
                 // Get user info from sessionStorage
                 const userInfo = JSON.parse(sessionStorage.getItem('userInfo') || '{}');
                 if (!userInfo.token) {
@@ -1905,7 +2334,9 @@
                 openRejectionModal(requestId);
             } else if (action === 'approved') {
                     // Process approval through API
-                    const response = await fetch(`/api/document-requests/${requestId}/status`, {
+                    console.log(`[DEBUG] Sending approval PATCH request to /api/document-requests/${databaseId}/status`);
+                    
+                    const response = await fetch(`/api/document-requests/${databaseId}/status`, {
                         method: 'PATCH',
                         headers: {
                             'Content-Type': 'application/json',
@@ -1919,13 +2350,21 @@
                         })
                     });
 
+                    console.log(`[DEBUG] Response status: ${response.status}`);
+
                     if (!response.ok) {
                         const errorText = await response.text();
+                        console.error(`[DEBUG] Error response: ${errorText}`);
                         throw new Error(`Failed to approve request: ${response.status} ${errorText}`);
                     }
 
-                    // Update local state
-                const requestIndex = requests.findIndex(req => req.id === requestId);
+                    // Update local state - FIXED: Make ID comparison more flexible
+                    const requestIndex = requests.findIndex(req => 
+                        String(req.id) === String(requestId) || req.id == requestId
+                    );
+                    
+                    console.log(`[DEBUG] Updating request at index: ${requestIndex}`);
+                    
                     if (requestIndex !== -1) {
                     requests[requestIndex].status = 'approved';
                         requests[requestIndex].rejectionReason = null;
@@ -1934,42 +2373,72 @@
                         // Get the request with all updated information
                         const request = requests[requestIndex];
                         
-                        // Show an immediate notification that the request was approved - using BOTH methods
-                        showDetailedConfirmation({
-                            message: `Request ${requestId} approved`,
-                            details: `The request has been approved. Attempting to send email notification...`,
-                            type: 'success',
-                            fileStatus: 'pending'
-                        });
-                        
-                        // Also use the simple alert as a guaranteed notification
-                        alert(`Request ${requestId} approved. Attempting to send email notification...`);
+                        console.log("[DEBUG] Request approved - proceeding to send email");
                         
                         // Try to send the email
+                        try {
                         const emailResult = await sendApprovalEmail(request);
-                        console.log("Email sending result:", emailResult);
-                        
-                        // Always show a result notification regardless of emailResult status
-                        setTimeout(() => {
-                            // Use both notification methods for reliability
-                            if (emailResult === true) {
-                                alert(`SUCCESS: Email with document was sent to the requester.`);
+                            console.log("[DEBUG] Email sending result:", emailResult);
+                            
+                            // Update the confirmation based on email result
+                            if (emailResult && emailResult.success) {
+                                // First show a simple confirmation message
+                                showConfirmationMessage(`Request ${requestId} approved`, 'success');
+                                
+                                // Check if email is being processed in the background
+                                if (emailResult.backgroundProcessing) {
+                                    // Show confirmation for background processing
+                                    setTimeout(() => {
+                                        showDetailedConfirmation({
+                                            message: `Request Approved`,
+                                            details: `The request has been approved and an email notification is being processed. This will be sent shortly.`,
+                                            type: 'success',
+                                            fileStatus: 'processing'
+                                        });
+                                    }, 200);
+                                } else {
+                                    // Show confirmation based on file existence
+                                    setTimeout(() => {
                                 showDetailedConfirmation({
                                     message: `Email successfully sent`,
-                                    details: `The approval email was successfully sent with the document attached.`,
-                                    type: 'success',
-                                    fileStatus: 'attached'
+                                    details: emailResult.fileExists 
+                                        ? `The approval email was sent with the document attached.` 
+                                        : `The email was sent, but the document file could not be found.`,
+                                    type: emailResult.fileExists ? 'success' : 'warning',
+                                    fileStatus: emailResult.fileExists ? 'attached' : 'missing'
                                 });
+                                    }, 200);
+                                }
                             } else {
-                                alert(`WARNING: The request was approved, but there may have been an issue sending the document. Check console for details.`);
+                                // First show a simple confirmation message
+                                showConfirmationMessage(`Request ${requestId} approved with email warning`, 'warning');
+                                
+                                // Then show the detailed popup with a slight delay
+                                setTimeout(() => {
                                 showDetailedConfirmation({
-                                    message: `Document delivery issue`,
-                                    details: `The request was approved, but there may have been an issue sending the document. Check browser console (F12) for details.`,
+                                    message: `Email issue`,
+                                    details: `The request was approved, but there may have been an issue sending the notification email.`,
                                     type: 'warning',
                                     fileStatus: 'uncertain'
                                 });
+                                }, 200);
                             }
-                        }, 1000); // Slight delay to avoid multiple popups at once
+                        } catch (emailError) {
+                            console.error("[DEBUG] Error in email sending:", emailError);
+                            
+                            // First show a simple confirmation message
+                            showConfirmationMessage(`Request ${requestId} approved but email failed`, 'error');
+                            
+                            // Then show the detailed popup with a slight delay
+                            setTimeout(() => {
+                            showDetailedConfirmation({
+                                message: `Email error`,
+                                details: `The request was approved, but there was an error sending the notification: ${emailError.message}`,
+                                type: 'error',
+                                fileStatus: 'failed'
+                            });
+                            }, 200);
+                        }
                     }
 
                     closeDetailsModal();
@@ -1992,198 +2461,164 @@
             }
         }
 
-        /** * Sends an approval email with the PDF document attached * @param {Object} request - The approved request object * @returns {boolean} - Whether the email was successfully sent with document attached */async function sendApprovalEmail(request) {    try {        // First, log ALL request data to help diagnose fields        console.log(`[DOCUMENT REQUEST] Complete request object for debugging:`, request);        console.log(`[DOCUMENT REQUEST] =================================================`);        console.log(`[DOCUMENT REQUEST] Starting email process for approval of request ID: ${request.id}`);                // Get request details using our helper function        const fullName = getRequestData(request, 'full_name', 'User');        const email = getRequestData(request, 'email', '');        const bookTitle = getRequestData(request, 'book_title', 'Document');        const documentId = getRequestData(request, 'document_id', '');                console.log(`[DOCUMENT REQUEST] Sending approval email for document "${bookTitle}" (ID: ${documentId}) to ${fullName} <${email}>`);                if (!email) {            console.error('Cannot send approval email: recipient email not found');            alert(`ERROR: Cannot send approval email - recipient email address not found`);            return false;        }                // Verify document ID before sending        if (!documentId) {            console.error('[DOCUMENT REQUEST] Missing document ID for email attachment');            alert(`ERROR: Cannot attach document - Missing document ID`);            return false;        }                // Log additional field variations to help debug potential field name mismatches        console.log(`[DOCUMENT REQUEST] Document ID check - Different field names:`);        console.log(`  - document_id: ${request.document_id || 'not found'}`);        console.log(`  - documentId: ${request.documentId || 'not found'}`);        console.log(`  - doc_id: ${request.doc_id || 'not found'}`);        console.log(`  - id (if this is document id): ${request.id || 'not found'}`);
+        /** * Sends an approval email with the PDF document attached * @param {Object} request - The approved request object * @returns {Promise<object|boolean>} - The result from the email service */
+        async function sendApprovalEmail(request) {
+            try {
+                // Log the request object to help diagnose fields
+                console.log(`[DOCUMENT REQUEST] Starting email process for approval of request:`, request);
                 
-                // First, check if the document file exists and can be located
-                console.log(`[DOCUMENT REQUEST] Pre-checking document file existence for ID: ${documentId}`);
-                try {
-                    console.log(`[DOCUMENT REQUEST] Checking file existence for document ID: ${documentId}`);
-                    const fileCheckResponse = await fetch('/api/email/check-document-files', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            documentId,
-                            debug: true  // Request extra debugging info
-                        })
-                    });
-                    
-                    if (!fileCheckResponse.ok) {
-                        console.error(`[DOCUMENT REQUEST] File check API returned error: ${fileCheckResponse.status}`);
-                        showDetailedConfirmation({
-                            message: `File Check Failed`,
-                            details: `The document file check API returned an error. Status: ${fileCheckResponse.status}`,
-                            type: 'warning',
-                            fileStatus: 'uncertain'
-                        });
+                // Get request details
+                const fullName = getRequestData(request, 'full_name', 'User');
+                const email = getRequestData(request, 'email', '');
+                const bookTitle = getRequestData(request, 'book_title', 'Document');
+                
+                // Get document ID using multiple possible field names
+                let documentId = null;
+                const potentialIdFields = ['document_id', 'documentId', 'doc_id', 'bookId'];
+                for (const field of potentialIdFields) {
+                    if (request[field] && !isNaN(parseInt(request[field]))) {
+                        documentId = request[field];
+                        console.log(`[DOCUMENT REQUEST] Found document ID in field '${field}': ${documentId}`);
+                        break;
                     }
-                    
-                    const fileCheckData = await fileCheckResponse.json();
-                    console.log(`[DOCUMENT REQUEST] File check API response:`, fileCheckData);
-                    
-                    if (fileCheckData.success && fileCheckData.foundCount > 0) {
-                        console.log(`[DOCUMENT REQUEST] ✅ Document file found: ${fileCheckData.foundFiles[0].path} (${fileCheckData.foundFiles[0].size} bytes)`);
-                        
-                        // Display all found paths for debugging
-                        if (fileCheckData.foundFiles.length > 1) {
-                            console.log(`[DOCUMENT REQUEST] Multiple matching files found:`);
-                            fileCheckData.foundFiles.forEach((file, index) => {
-                                console.log(`  ${index+1}. ${file.path} (${file.size} bytes)`);
-                            });
-                        }
-                        
-                        // Log searched paths that didn't contain the file
-                        if (fileCheckData.searchedPaths) {
-                            console.log(`[DOCUMENT REQUEST] All searched paths:`, fileCheckData.searchedPaths);
-                        }
-                    } else {
-                        console.warn(`[DOCUMENT REQUEST] ⚠️ Document file not found in any location!`);
-                        
-                        // Log searched paths to help diagnose the issue
-                        if (fileCheckData.searchedPaths) {
-                            console.log(`[DOCUMENT REQUEST] Searched in these locations:`, fileCheckData.searchedPaths);
-                        }
-                        
-                        // Get additional search paths to try
-                        let additionalDetails = '';
-                        if (fileCheckData.searchedPaths && fileCheckData.searchedPaths.length > 0) {
-                            additionalDetails = `\n\nSearched in ${fileCheckData.searchedPaths.length} locations including: ${fileCheckData.searchedPaths.slice(0, 3).join(', ')}${fileCheckData.searchedPaths.length > 3 ? '...' : ''}`;
-                        }
-                        
-                        // Show warning to admin
-                        const continueAnyway = confirm(`WARNING: The document file for "${bookTitle}" (ID: ${documentId}) was not found in the storage directories. It will likely not be attached to the email.${additionalDetails}\n\nDo you want to continue sending the approval email anyway?`);
-                        
-                        if (!continueAnyway) {
-                            showDetailedConfirmation({
-                                message: `Email Sending Cancelled`,
-                                details: `Document file "${documentId}" not found in any storage location.`,
-                                type: 'error',
-                                fileStatus: 'missing'
-                            });
-                            return false;
-                        }
-                        
-                        // Continue but warn user
-                        showDetailedConfirmation({
-                            message: `Warning: Proceeding Without File`,
-                            details: `Approval email will be sent without document attachment because the file could not be found.`,
-                            type: 'warning',
-                            fileStatus: 'missing'
-                        });
-                    }
-                } catch (fileCheckError) {
-                    console.error(`[DOCUMENT REQUEST] Error checking document file:`, fileCheckError);
-                    showDetailedConfirmation({
-                        message: `File Check Error`,
-                        details: `Error while checking if document file exists: ${fileCheckError.message || 'Unknown error'}`,
-                        type: 'warning',
-                        fileStatus: 'uncertain'
-                    });
-                    // Continue anyway, but we've logged the error and shown a warning
                 }
                 
-                                // Then, check if the document file exists via the verify-file API                try {                    console.log(`[DOCUMENT REQUEST] Verifying document file exists for ID: ${documentId}`);                    const verifyResponse = await fetch(`/api/documents/${documentId}/verify-file`);                                        if (!verifyResponse.ok) {                        let verifyErrorText = '';                        try {                            const verifyData = await verifyResponse.json();                            verifyErrorText = JSON.stringify(verifyData);                        } catch (e) {                            verifyErrorText = await verifyResponse.text();                        }                                                console.warn(`[DOCUMENT REQUEST] Document file verification warning: ${verifyErrorText}`);                        alert(`WARNING: Document file verification failed: ${verifyResponse.status} ${verifyErrorText.substring(0, 100)}`);                        // We'll continue anyway but log the warning                    } else {                        const verifyData = await verifyResponse.json();                        console.log(`[DOCUMENT REQUEST] ✅ Document file verified: ${verifyData.filePath}`);                                                // Try to display additional file information if available                        if (verifyData.filePath) {                            console.log(`[DOCUMENT REQUEST] Document file path: ${verifyData.filePath}`);                            console.log(`[DOCUMENT REQUEST] File exists: ${verifyData.fileExists === true ? 'Yes' : 'No'}`);                            if (verifyData.fileSize) {                                console.log(`[DOCUMENT REQUEST] File size: ${verifyData.fileSize} bytes`);                            }                                                        // Check if the file path seems valid                            const filePathSections = verifyData.filePath.split('/');                            if (filePathSections.length > 0) {                                const fileName = filePathSections[filePathSections.length - 1];                                console.log(`[DOCUMENT REQUEST] File name from path: ${fileName}`);                                                                // Check if file name contains document ID                                if (fileName.includes(documentId)) {                                    console.log(`[DOCUMENT REQUEST] ✅ File name contains document ID`);                                } else {                                    console.warn(`[DOCUMENT REQUEST] ⚠️ File name does not contain document ID!`);                                    alert(`WARNING: The file path (${fileName}) doesn't seem to match the document ID (${documentId})`);                                }                            }                        }                    }                } catch (verifyError) {                    console.warn(`[DOCUMENT REQUEST] Error verifying document file:`, verifyError);                    alert(`ERROR checking file: ${verifyError.message || 'Unknown error'}`);                    // Continue anyway, the email API will try alternative paths                }
-                
-                                // Make API call to send the email with document attachment                console.log(`[DOCUMENT REQUEST] Calling email API to send document ID ${documentId} to ${email}`);                                // Create request body with debugging flag                const requestBody = {                    email,                    fullName,                    documentTitle: bookTitle,                    documentId,                    debug: true,                    // Request extra debugging info                    forceAttachment: true,          // Try harder to attach the file                    checkAllDirectories: true       // Look in all possible directories for the file                };                                console.log(`[DOCUMENT REQUEST] Email API request body:`, requestBody);                                // Try the email API call with additional error handling                let response;                try {                    response = await fetch('/api/email/send-approval', {                        method: 'POST',                        headers: {                            'Content-Type': 'application/json'                        },                        body: JSON.stringify(requestBody)                    });                                        console.log(`[DOCUMENT REQUEST] Email API response status:`, response.status);                                        if (!response.ok) {                        alert(`ERROR: Email API returned status ${response.status}`);                    }                } catch (fetchError) {                    console.error(`[DOCUMENT REQUEST] Error calling email API:`, fetchError);                    alert(`ERROR calling email API: ${fetchError.message || 'Network error'}`);                    return false;                }
-                
-                // Parse the response for better error handling
-                let responseData;
-                try {
-                    responseData = await response.json();
-                } catch (jsonError) {
-                    const errorText = await response.text();
-                    console.error(`[DOCUMENT REQUEST] Error parsing email API response: ${errorText}`);
-                    showDetailedConfirmation({
-                        message: `Email API Response Error`,
-                        details: `Failed to parse response: ${errorText.substring(0, 100)}${errorText.length > 100 ? '...' : ''}`,
-                        type: 'error',
-                        fileStatus: 'failed'
-                    });
-                    return false;
+                // Fallbacks for document ID
+                if (!documentId) {
+                    if (request.id && !isNaN(parseInt(request.id))) {
+                        documentId = request.id;
+                        console.log(`[DOCUMENT REQUEST] Using request.id as document ID (fallback): ${documentId}`);
+                    } else if (request.documentUrl) {
+                        const urlParts = request.documentUrl.split('/');
+                        const lastPart = urlParts[urlParts.length - 1];
+                        if (!isNaN(parseInt(lastPart))) {
+                            documentId = lastPart;
+                            console.log(`[DOCUMENT REQUEST] Extracted document ID from URL: ${documentId}`);
+                        }
+                    }
                 }
+                
+                console.log(`[DOCUMENT REQUEST] Final document ID for email attachment: ${documentId}`);
+                
+                if (!email) {
+                    console.error('[DOCUMENT REQUEST] Cannot send approval email: recipient email not found');
+                    return { success: false, message: 'Missing recipient email' };
+                }
+                        
+                if (!documentId) {
+                    console.error('[DOCUMENT REQUEST] Missing document ID for email attachment');
+                    return { success: false, message: 'Missing document ID', fileExists: false };
+                }
+                
+                // Call email API
+                console.log(`[DOCUMENT REQUEST] Calling email API to send document ID ${documentId} to ${email}`);
+                
+                // Create request body with debugging flag
+                const requestBody = {
+                    email,
+                    fullName,
+                    documentTitle: bookTitle,
+                    documentId,
+                    requestId: request.id,
+                    debug: true,
+                    forceAttachment: true,
+                    checkAllDirectories: true
+                };
+                
+                // Check for child documents (for entire collection requests)
+                if (request.child_documents && Array.isArray(request.child_documents) && request.child_documents.length > 0) {
+                    console.log(`[DOCUMENT REQUEST] Request includes ${request.child_documents.length} child documents`);
+                    requestBody.childDocumentIds = request.child_documents;
+                    requestBody.isEntireCollection = true;
+                } else if (request.is_entire_collection || request.isEntireCollection) {
+                    console.log(`[DOCUMENT REQUEST] Request is for entire collection, but no child documents found. Will attempt to fetch them.`);
+                    requestBody.isEntireCollection = true;
+                }
+                
+                console.log(`[DOCUMENT REQUEST] Email API request body:`, requestBody);
+                
+                // Call the API
+                const response = await fetch('/api/email/send-approval', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+                
+                console.log(`[DOCUMENT REQUEST] Email API response status:`, response.status);
                 
                 if (!response.ok) {
-                    console.error(`[DOCUMENT REQUEST] Email API error: ${JSON.stringify(responseData)}`);
-                    showDetailedConfirmation({
-                        message: `Email API Error`,
-                        details: `Error: ${responseData.message || 'Unknown error'}. Status: ${response.status}`,
-                        type: 'error',
-                        fileStatus: 'failed'
-                    });
-                    return false;
+                    const errorText = await response.text();
+                    console.error(`[DOCUMENT REQUEST] Email API error: ${errorText}`);
+                    return { 
+                        success: false, 
+                        message: `API error: ${response.status} ${errorText.substring(0, 100)}`,
+                        fileExists: false
+                    };
                 }
                 
-                console.log(`[DOCUMENT REQUEST] Email service response:`, responseData);
-                console.log(`[DEBUG] Email response check - success property:`, responseData.success ? 'true' : 'false');
-                console.log(`[DEBUG] Email response check - documentPath property:`, responseData.documentPath ? `exists: ${responseData.documentPath}` : 'missing');
-                console.log(`[DEBUG] Email response check - fileExists property:`, responseData.fileExists !== undefined ? `exists: ${responseData.fileExists}` : 'missing');
-
-                if (responseData.success) {
-                    console.log(`[DOCUMENT REQUEST] ✅ Document "${bookTitle}" (ID: ${documentId}) successfully sent to ${email}`);
-                    // Log attachment details if available
-                    if (responseData.documentPath) {
-                        console.log(`[DOCUMENT REQUEST] Document path used: ${responseData.documentPath}`);
-                        
-                        if (responseData.fileExists === true) {
-                            console.log(`[DOCUMENT REQUEST] File verified: ${responseData.documentPath} (${responseData.fileSize || 'unknown'} bytes)`);
-                            console.log(`[FILE SENT SUCCESSFULLY] ✅✅✅ THE FILE WAS SUCCESSFULLY SENT TO ${email} (${fullName})`);
-                            
-                            // Show detailed popup about successful file attachment
-                            showDetailedConfirmation({
-                                message: `Document successfully sent to ${email}`,
-                                details: `File "${bookTitle}" was attached to the email.`,
-                                type: 'success',
-                                fileStatus: 'attached'
-                            });
-                        } else {
-                            console.log(`[DOCUMENT REQUEST] ⚠️ File not found: ${responseData.documentPath}`);
-                            if (responseData.verificationError) {
-                                console.log(`[DOCUMENT REQUEST] Error: ${responseData.verificationError}`);
-                            }
-                            console.log(`[FILE NOT SENT] ⚠️⚠️⚠️ APPROVAL EMAIL SENT WITHOUT FILE ATTACHMENT TO ${email} (${fullName})`);
-                            
-                            // Show detailed popup about missing attachment
-                            showDetailedConfirmation({
-                                message: `Approval email sent WITHOUT ATTACHMENT`,
-                                details: `File "${bookTitle}" could not be found at: ${responseData.documentPath.split('/').pop()}`,
-                                type: 'warning',
-                                fileStatus: 'missing'
-                            });
-                        }
-                    } else {
-                        console.log(`[FILE ATTACHMENT WARNING] ⚠️ Email sent but no documentPath was returned - file attachment status uncertain`);
-                        
-                        // Show detailed popup about uncertain attachment status
-                        showDetailedConfirmation({
-                            message: `Approval email sent, attachment status UNKNOWN`,
-                            details: `Email was sent to ${email}, but the file attachment status is uncertain.`,
-                            type: 'warning',
-                            fileStatus: 'uncertain'
-                        });
-                    }
-                    return true;
-                } else {
-                    console.error(`[DOCUMENT REQUEST] ❌ Email API reported failure: ${responseData.message || 'Unknown reason'}`);
+                // Parse the response
+                const responseData = await response.json();
+                console.log(`[DOCUMENT REQUEST] Email API response:`, responseData);
+                
+                // Check if this is a background job response
+                if (responseData.backgroundProcessing) {
+                    console.log(`[DOCUMENT REQUEST] Email is being processed in the background (Job ID: ${responseData.jobId})`);
                     
-                    // Show detailed error popup
-                    showDetailedConfirmation({
-                        message: `Email delivery FAILED`,
-                        details: `Error: ${responseData.message || 'Unknown error'}`,
-                        type: 'error',
-                        fileStatus: 'failed'
-                    });
-                    return false;
+                    // Add job ID to response for potential future status checks
+                    return {
+                        success: true,
+                        backgroundProcessing: true,
+                        jobId: responseData.jobId,
+                        fileExists: responseData.fileExists || false,
+                        message: "Email is being processed in the background",
+                        documentPath: responseData.documentPath || ''
+                    };
+                }
+                
+                // Handle regular synchronous response
+                if (responseData.success !== undefined) {
+                    // Make sure we always have a fileExists property
+                    if (responseData.fileExists === undefined) {
+                        // Check for indirect indicators that a file was attached
+                        responseData.fileExists = 
+                            responseData.documentPath || 
+                            responseData.attachment_success || 
+                            (responseData.fileSize && responseData.fileSize > 0) || 
+                            false;
+                    }
+                    
+                    // Log what we're returning
+                    console.log(`[DOCUMENT REQUEST] Returning response with fileExists=${responseData.fileExists}:`, responseData);
+                    
+                    return responseData;
+                } else {
+                    // Construct our own response from whatever the API returned
+                    const result = {
+                        success: true,
+                        fileExists: responseData.fileExists || 
+                                    responseData.documentPath || 
+                                    responseData.attachment_success || 
+                                    (responseData.fileSize && responseData.fileSize > 0) || 
+                                    false,
+                        documentPath: responseData.documentPath || '',
+                        message: responseData.message || 'Email sent successfully'
+                    };
+                    
+                    // Log what we're returning
+                    console.log(`[DOCUMENT REQUEST] Constructed response with fileExists=${result.fileExists}:`, result);
+                    
+                    return result;
                 }
             } catch (error) {
                 console.error('[DOCUMENT REQUEST] Error sending approval email:', error);
-                showDetailedConfirmation({
-                    message: `Error sending approval email: ${error.message || 'Unknown error'}`,
-                    details: `An error occurred while sending approval email. Please try again.`,
-                    type: 'error',
+                return { 
+                    success: false, 
+                    message: error.message || 'Unknown error sending email',
+                    fileExists: false,
                     fileStatus: 'failed'
-                });
-                return false;
+                };
             }
         }
 
@@ -2363,10 +2798,27 @@
                 event.stopPropagation(); // Prevent summary click/toggle or modal open
                 const action = targetElement.value;
                 const requestId = targetElement.dataset.requestId;
-                if (action && requestId) {
-                    handleAction(requestId, action); // Will open rejection modal if 'rejected'
+                
+                console.log(`[DEBUG] Dropdown changed: action=${action}, requestId=${requestId}`);
+                
+                // Find the request - FIXED: Use loose equality for ID comparison
+                const requestIndex = requests.findIndex(req => 
+                    String(req.id) === String(requestId) || req.id == requestId
+                );
+                
+                console.log(`[DEBUG] Found request at index: ${requestIndex}`);
+                
+                if (action && requestId && requestIndex !== -1) {
+                    // Get the full request object to have complete data
+                    const request = requests[requestIndex];
+                    
+                    // For both approval and rejection, directly call handleAction without opening the details modal
+                    handleAction(requestId, action);
+                } else {
+                    console.error(`[ERROR] Invalid selection: action=${action}, requestId=${requestId}, found=${requestIndex !== -1}`);
                 }
-                 // Reset dropdown back to 'Pending' after selection (optional, for better UX)
+                
+                // Reset dropdown back to 'Pending' after selection (for better UX)
                 if (targetElement.tagName === 'SELECT') {
                     targetElement.value = "";
                 }
@@ -2412,78 +2864,367 @@
 
 
         // --- Initial Load ---
-        document.addEventListener('DOMContentLoaded', () => {
-             loadingMessage.style.display = 'none';
-             loadData(); // Use loadData to load requests, column order, and visibility
-        });
-
-        /** Handles rejection of a request with a reason. */
-        async function rejectRequest(requestId, reason) {
-            try {
-                // Get user info from sessionStorage
-                const userInfo = JSON.parse(sessionStorage.getItem('userInfo') || '{}');
-                if (!userInfo.token) {
-                    throw new Error('No authentication token found. Please log in again.');
-                }
-
-                // Check if user is admin
-                if (!userInfo.role || userInfo.role.toLowerCase() !== 'admin') {
-                    throw new Error('You do not have permission to perform this action. Admin access required.');
-                }
-
-                // Process rejection through API
-                const response = await fetch(`/api/document-requests/${requestId}/status`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${userInfo.token}`
-                    },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                        status: 'rejected',
-                        reviewedBy: userInfo.id || 'admin',
-                        reviewNotes: reason || 'Rejected by admin'
-                    })
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('[Init] Document permissions page loading');
+            
+            // Check for authentication errors
+            const authOk = handlePageErrors();
+            
+            // Initialize document links with authentication even if auth check fails
+            setTimeout(initDocumentLinks, 500); // Small delay to ensure DOM is fully loaded
+            
+            // Add event listeners for the rejection confirmation modal
+            const rejectionConfirmationModal = document.getElementById('rejectionConfirmationModal');
+            const closeRejectionConfirmationModalButton = document.getElementById('closeRejectionConfirmationModalButton');
+            const rejectionConfirmationCloseButton = document.getElementById('rejectionConfirmationCloseButton');
+            
+            // Close modal when X button is clicked
+            if (closeRejectionConfirmationModalButton) {
+                closeRejectionConfirmationModalButton.addEventListener('click', () => {
+                    rejectionConfirmationModal.classList.remove('visible');
                 });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`Failed to reject request: ${response.status} ${errorText}`);
-                }
-
-                // Update local state
-                const requestIndex = requests.findIndex(req => req.id === requestId);
-                if (requestIndex !== -1) {
-                    requests[requestIndex].status = 'rejected';
-                    requests[requestIndex].rejectionReason = reason;
-                    requests[requestIndex].processedAt = new Date().toISOString();
-                }
-
-                // Send notification email
-                sendNotificationEmail(requests[requestIndex], 'rejected');
-                showConfirmationMessage(`Request ${requestId} rejected. Email notification sent.`, 'success');
-                closeRejectionModal();
-                closeDetailsModal();
-                applyFiltersAndSort();
-            } catch (error) {
-                console.error('Error rejecting request:', error);
-                showConfirmationMessage('Failed to reject request. Please try again.', 'error');
-                
-                // If it's an authentication error, show login button
-                if (error.message.includes('authentication') || error.message.includes('permission')) {
+            }
+            
+            // Close modal when Close button is clicked
+            if (rejectionConfirmationCloseButton) {
+                rejectionConfirmationCloseButton.addEventListener('click', () => {
+                    rejectionConfirmationModal.classList.remove('visible');
+                });
+            }
+            
+            // Close modal when clicking outside
+            if (rejectionConfirmationModal) {
+                rejectionConfirmationModal.addEventListener('click', (event) => {
+                    if (event.target === rejectionConfirmationModal) {
+                        rejectionConfirmationModal.classList.remove('visible');
+                    }
+                });
+            }
+            
+            // Load the rest of the page content even if auth fails
+            // This allows viewing the UI even without full permissions
+            fetch('./side_bar.html')
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById('sidebar-container').innerHTML = data;
+                    
+                    // Initialize sidebar functionality after loading
+                    if (typeof highlightActiveSidebarLink === 'function') {
+                      highlightActiveSidebarLink();
+                    }
+                    
+                    // Setup logout if it exists
+                    if (typeof setupLogout === 'function') {
+                      setupLogout();
+                    }
+                })
+                .catch(error => console.error('Error loading sidebar:', error));
+    
+            fetch('./navbar_header.html')
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById('navbar-header').innerHTML = data;
+                })
+                .catch(error => console.error('Error loading navbar:', error));
+            
+            // Try to load data, but don't block UI if it fails
+            if (authOk) {
+             loadingMessage.style.display = 'none';
+                loadData().catch(error => {
+                    console.error('[Init] Error loading request data:', error);
+                    
+                    // Show a message but don't redirect to login immediately
                     requestsContentContainer.innerHTML = `
-                        <div class="text-center text-red-600 py-4">
-                            <p>Error: ${error.message}</p>
-                            <button onclick="window.location.href='/log-in.html'" class="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
-                                Log in again
+                        <div class="text-center text-orange-600 py-4">
+                            <p>Some features may be limited due to authentication issues.</p>
+                            <p class="text-sm mt-2">${error.message}</p>
+                            <button id="tryAuthAgainBtn" class="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                                Authenticate
                             </button>
                         </div>`;
+                        
+                    document.getElementById('tryAuthAgainBtn')?.addEventListener('click', function() {
+                        window.location.href = '/log-in.html';
+                    });
+                });
+            } else {
+                // Auth already failed, but we'll still show parts of the UI
+                loadingMessage.style.display = 'none';
+            }
+        });
+        
+        // Function to initialize all document links with authentication tokens
+        function initDocumentLinks() {
+            console.log('[Document Links] Initializing document link authentication');
+            
+            // Process any existing links first
+            updateAllDocumentLinks();
+            
+            // Set up a mutation observer to add auth tokens to document links added dynamically
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach(mutation => {
+                    if (mutation.type === 'childList') {
+                        mutation.addedNodes.forEach(node => {
+                            if (node.nodeType === 1) { // Element node
+                                // Check if the node itself is a link that needs auth
+                                if ((node.classList && node.classList.contains('view-doc-button') || 
+                                     node.hasAttribute('data-needs-auth')) && 
+                                    !node.hasAttribute('data-auth-processed')) {
+                                    updateDocumentLink(node, node.getAttribute('href'));
+                                    node.setAttribute('data-auth-processed', 'true');
+                                }
+                                
+                                // Check for links inside the added node
+                                const links = node.querySelectorAll('a.view-doc-button, a[data-needs-auth="true"]');
+                                links.forEach(link => {
+                                    if (!link.hasAttribute('data-auth-processed')) {
+                                        updateDocumentLink(link, link.getAttribute('href'));
+                                        link.setAttribute('data-auth-processed', 'true');
+                                    }
+                                });
+                            }
+                        });
+                    }
+                });
+            });
+            
+            // Start observing the document with the configured parameters
+            observer.observe(document.body, { childList: true, subtree: true });
+            console.log('[Document Links] Observer set up for document links');
+            
+            // Set a periodic check for links that need updating
+            setInterval(updateAllDocumentLinks, 30000); // Check every 30 seconds
+            
+            // Try to refresh the token once at startup
+            refreshAuthToken().then(newToken => {
+                if (newToken) {
+                    // If we got a new token, update all links
+                    updateAllDocumentLinks();
                 }
+            });
+        }
+        
+        // Helper function to update all document links
+        function updateAllDocumentLinks() {
+            console.log('[Document Links] Updating all document links');
+            
+            // Reduce verbosity with a counter
+            let updatedCount = 0;
+            let skippedCount = 0;
+            
+            // Process all view-doc-button links and data-needs-auth links
+            document.querySelectorAll('a.view-doc-button, a[data-needs-auth="true"]').forEach(link => {
+                // Get the original URL, falling back to href if needed
+                const originalUrl = link.getAttribute('data-original-url') || link.href;
+                
+                // Don't process empty links or javascript: links
+                if (!originalUrl || originalUrl === '#' || originalUrl === '/#' || originalUrl.startsWith('javascript:')) {
+                    skippedCount++;
+                    return;
+                }
+                
+                // Remove protocols and domain from href when comparing to avoid false differences
+                const cleanHref = link.href.replace(/^https?:\/\/[^\/]+/, '');
+                const cleanOriginal = originalUrl.replace(/^https?:\/\/[^\/]+/, '');
+                
+                // Skip links that already have auth tokens and contain the original URL
+                if ((cleanHref.includes('auth_token=') || cleanHref.includes('use_cookie_auth=')) && 
+                    cleanHref.includes(cleanOriginal)) {
+                    skippedCount++;
+                    return;
+                }
+                
+                // Update the link
+                updateDocumentLink(link, originalUrl);
+                link.setAttribute('data-auth-processed', 'true');
+                updatedCount++;
+            });
+            
+            if (updatedCount > 0 || skippedCount > 0) {
+                console.log(`[Document Links] Updated ${updatedCount} links, skipped ${skippedCount}`);
+            }
+        }
+
+        /** 
+         * Formats the book title based on document type, specifically handling compiled documents 
+         * For compiled documents, displays as (category type, volume no, issue no, 
+         * dept table for SYNERGY, start and end year)
+         * @param {Object} request - The request object containing document data
+         * @param {boolean} plainText - Whether to return plain text (true) or HTML (false)
+         * @returns {string} Formatted title with appropriate styling
+         */
+        function formatBookTitle(request, plainText = false) {
+            // Check if the document is compiled
+            const isCompiled = getRequestData(request, 'is_compiled', false);
+            
+            // If not compiled, just return the regular title
+            if (!isCompiled) {
+                return getRequestData(request, 'book_title', 'N/A');
+            }
+            
+            // For compiled documents, format according to the specification
+            const documentType = getRequestData(request, 'document_type', '').toUpperCase();
+            const categoryType = getRequestData(request, 'category', documentType);
+            const volume = getRequestData(request, 'volume', '');
+            const issueNo = getRequestData(request, 'issue', '');
+            const startYear = getRequestData(request, 'start_year', '');
+            const endYear = getRequestData(request, 'end_year', '');
+            const department = getRequestData(request, 'department', '');
+            
+            // Build parts of the title
+            const parts = [];
+            
+            // First add category type
+            parts.push(categoryType || 'Document');
+            
+            // Add volume if available
+            if (volume) {
+                parts.push(`Vol. ${volume}`);
+            }
+            
+            // Add issue if available
+            if (issueNo) {
+                parts.push(`Issue ${issueNo}`);
+            }
+            
+            // For Synergy, add department info
+            if (documentType === 'SYNERGY' && department) {
+                parts.push(department);
+            }
+            
+            // Create the base title with comma separation
+            let formattedTitle = parts.join(', ');
+            
+            // Add years as a suffix in parentheses if available
+            if (startYear && endYear) {
+                formattedTitle += ` (${startYear}-${endYear})`;
+            } else if (startYear) {
+                formattedTitle += ` (${startYear})`;
+            } else if (endYear) {
+                formattedTitle += ` (${endYear})`;
+            }
+            
+            // Use appropriate format based on context
+            if (plainText) {
+                // Plain text version for contexts where HTML won't work
+                return `[Compiled] ${formattedTitle}`;
+            } else {
+                // HTML version with a badge for rich contexts
+                return `<span style="display: inline-flex; align-items: center;"><span style="background-color: #e0f2fe; color: #0369a1; font-size: 0.75rem; padding: 0.125rem 0.5rem; border-radius: 9999px; margin-right: 0.5rem; font-weight: 600;">COMPILED</span>${formattedTitle}</span>`;
+            }
+        }
+
+        /** Handles page errors and automatically refreshes authentication if needed */
+        function handlePageErrors() {
+            // Check for authentication token using our helper function
+            const token = getAuthToken();
+            if (!token) {
+                console.warn('[Auth] No authentication token found. Showing login prompt.');
+                
+                // Try to refresh token before showing login prompt
+                refreshAuthToken().then(newToken => {
+                    if (newToken) {
+                        console.log('[Auth] Authentication refreshed successfully on page load');
+                        // Reload the page to use the new token
+                        window.location.reload();
+                    } else {
+                        showLoginPrompt();
+                    }
+                });
+                
+                return false;
+            }
+            
+            // Set up global error handler for fetch requests
+            window.addEventListener('unhandledrejection', function(event) {
+                console.error('[Error] Unhandled promise rejection:', event.reason);
+                
+                // Check if it's an auth error
+                if (event.reason && typeof event.reason === 'object') {
+                    const errorText = event.reason.message || String(event.reason);
+                    if (
+                        errorText.includes('authentication') || 
+                        errorText.includes('token') || 
+                        errorText.includes('unauthorized') ||
+                        errorText.includes('permission')
+                    ) {
+                        console.warn('[Auth] Authentication issue detected:', errorText);
+                        
+                        // Try to refresh token first
+                        refreshAuthToken().then(newToken => {
+                            if (newToken) {
+                                console.log('[Auth] Successfully refreshed token after error');
+                                // Reload the page to use the new token
+                                window.location.reload();
+                            } else {
+                                showLoginPrompt();
+                            }
+                        });
+                    }
+                }
+            });
+            
+            // All checks passed
+            return true;
+        }
+
+        /** Shows a login prompt when authentication fails */
+        function showLoginPrompt() {
+            // Create a login prompt overlay
+            let overlay = document.getElementById('authentication-overlay');
+            
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'authentication-overlay';
+                overlay.style.position = 'fixed';
+                overlay.style.top = '0';
+                overlay.style.left = '0';
+                overlay.style.width = '100%';
+                overlay.style.height = '100%';
+                overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+                overlay.style.display = 'flex';
+                overlay.style.alignItems = 'center';
+                overlay.style.justifyContent = 'center';
+                overlay.style.zIndex = '2000';
+                
+                const loginBox = document.createElement('div');
+                loginBox.style.backgroundColor = 'white';
+                loginBox.style.padding = '2rem';
+                loginBox.style.borderRadius = '0.5rem';
+                loginBox.style.maxWidth = '400px';
+                loginBox.style.width = '90%';
+                loginBox.style.textAlign = 'center';
+                
+                loginBox.innerHTML = `
+                    <h2 style="color: #047857; margin-bottom: 1rem;">Authentication Required</h2>
+                    <p style="margin-bottom: 1.5rem;">Your session has expired or you are not logged in. Please log in again to continue.</p>
+                    <button id="loginRedirectBtn" style="background-color: #047857; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 0.375rem; cursor: pointer; font-weight: bold;">Log In</button>
+                    <button id="closeAuthOverlayBtn" style="background-color: #6B7280; color: white; border: none; padding: 0.75rem 1rem; border-radius: 0.375rem; margin-left: 0.5rem; cursor: pointer;">Cancel</button>
+                `;
+                
+                overlay.appendChild(loginBox);
+                document.body.appendChild(overlay);
+                
+                document.getElementById('loginRedirectBtn').addEventListener('click', function() {
+                    window.location.href = '/log-in.html';
+                });
+                
+                document.getElementById('closeAuthOverlayBtn').addEventListener('click', function() {
+                    document.getElementById('authentication-overlay').remove();
+                });
+            } else {
+                // If overlay already exists, just show it
+                overlay.style.display = 'flex';
             }
         }
 
         /** Helps get data from a request object, checking both snake_case (DB) and camelCase (frontend) naming */
         function getRequestData(request, key, fallback = 'N/A') {
+            if (!request) {
+                console.error("[DEBUG] getRequestData called with null/undefined request");
+                return fallback;
+            }
+            
             // First check for exact key match
             if (request[key] !== undefined) {
                 return request[key];
@@ -2529,143 +3270,520 @@
         }
 
         /**
-         * Shows a detailed confirmation popup with message, details, and optional icon based on file status.
-         * @param {Object} options - The confirmation options
-         * @param {string} options.message - Main message to display
-         * @param {string} options.details - Additional details to display
-         * @param {string} options.type - Message type: 'success', 'warning', or 'error'
-         * @param {string} options.fileStatus - Status of the file: 'attached', 'missing', 'uncertain', or 'failed'
+         * Shows a detailed confirmation popup with enhanced visibility
+         * @param {Object} options - Options for the confirmation
          */
         function showDetailedConfirmation(options) {
-            console.log(`[POPUP] Showing detailed confirmation:`, options);
-            // Create or get the detailed confirmation element
-            let detailedConfirm = document.getElementById('detailedConfirmation');
-            if (!detailedConfirm) {
-                detailedConfirm = document.createElement('div');
-                detailedConfirm.id = 'detailedConfirmation';
-                document.body.appendChild(detailedConfirm);
+            const confirmationEl = document.getElementById('detailedConfirmation');
+            if (!confirmationEl) {
+                console.error('[CRITICAL] detailedConfirmation element not found in DOM');
+                alert(`${options.message}: ${options.details}`); // Fallback to alert
+                return;
             }
-
-            // Reset classes then add type class
-            detailedConfirm.className = options.type; // Add the type class (success, warning, error)
-
-            // Set appropriate icon based on type and fileStatus
-            let headerIconClass = '';
-            let statusIconHTML = '';
-
-            // Set header icon based on message type
-            switch (options.type) {
-                case 'success':
-                    headerIconClass = 'fas fa-check-circle';
-                    break;
-                case 'warning':
-                    headerIconClass = 'fas fa-exclamation-triangle';
-                    break;
-                case 'error':
-                    headerIconClass = 'fas fa-times-circle';
-                    break;
-            }
-
-            // Add file status icon based on file status
-            switch (options.fileStatus) {
-                case 'attached':
-                    statusIconHTML = '<i class="fas fa-paperclip text-emerald-600"></i>';
-                    break;
-                case 'missing':
-                    statusIconHTML = '<i class="fas fa-unlink text-amber-600"></i>';
-                    break;
-                case 'uncertain':
-                    statusIconHTML = '<i class="fas fa-question-circle text-amber-600"></i>';
-                    break;
-                case 'failed':
-                    statusIconHTML = '<i class="fas fa-exclamation-circle text-red-600"></i>';
-                    break;
-                case 'pending':
-                    statusIconHTML = '<i class="fas fa-spinner fa-spin text-blue-600"></i>';
-                    break;
-                default:
-                    statusIconHTML = '';
-                    break;
-            }
-
-            // Set the content with proper class names
-            detailedConfirm.innerHTML = `
-                <div class="content-container">
-                    <button id="closeDetailedConfirm" class="close-button">
-                        <i class="fas fa-times"></i>
-                    </button>
-                    
+            
+            console.log('[DEBUG] Showing detailed confirmation popup');
+            
+            // Create content
+            confirmationEl.innerHTML = `
+                <div class="content-container" id="detailedConfirmationContent">
+                    <button class="close-button" id="confirmationCloseBtn">&times;</button>
                     <div class="flex items-center mb-4">
-                        <i class="${headerIconClass} header-icon text-2xl mr-3"></i>
-                        <h3 class="message-title">${options.message}</h3>
+                        <span class="header-icon mr-3">
+                            ${getIconForType(options.type)}
+                        </span>
+                        <h3 class="message-title" id="confirmationTitle">${options.message}</h3>
                     </div>
-                    
-                    <p class="message-details">
-                        <span class="file-status-icon">${statusIconHTML}</span>
-                        ${options.details}
-                    </p>
-                    
+                    <p class="message-details" id="confirmationDetails">${options.details}</p>
+                    ${options.fileStatus ? createFileStatusBadge(options.fileStatus) : ''}
                     <div class="buttons-container">
-                        <button id="detailedConfirmOk" class="ok-button">
-                            OK
-                        </button>
+                        <button class="ok-button" id="confirmationOkBtn">OK</button>
                     </div>
                 </div>
             `;
-
-            // Show the confirmation
-            detailedConfirm.style.display = 'block';
-
-            // Add event listeners for close and OK buttons
-            document.getElementById('closeDetailedConfirm').addEventListener('click', () => {
-                detailedConfirm.style.display = 'none';
+            
+            // Set type class
+            confirmationEl.className = options.type || 'success';
+            
+            // Make sure it's in the document
+            if (!document.body.contains(confirmationEl)) {
+            document.body.appendChild(confirmationEl);
+            }
+            
+            // Ensure visibility with stronger display settings
+            confirmationEl.style.display = 'block';
+            confirmationEl.style.opacity = '1';
+            confirmationEl.style.visibility = 'visible';
+            confirmationEl.style.zIndex = '3000';
+            
+            // Add event listeners
+            const closeBtn = document.getElementById('confirmationCloseBtn');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => {
+                confirmationEl.style.display = 'none';
             });
-
-            document.getElementById('detailedConfirmOk').addEventListener('click', () => {
-                detailedConfirm.style.display = 'none';
+            }
+            
+            const okBtn = document.getElementById('confirmationOkBtn');
+            if (okBtn) {
+                okBtn.addEventListener('click', () => {
+                confirmationEl.style.display = 'none';
             });
-
-            // Also close on click outside
-            const closeOnOutsideClick = (e) => {
-                if (e.target !== detailedConfirm && !detailedConfirm.contains(e.target)) {
-                    detailedConfirm.style.display = 'none';
-                    document.removeEventListener('click', closeOnOutsideClick);
-                }
-            };
-
-            // Add a small delay to prevent immediate closing
+            }
+            
+            // Force visibility check and reapply if needed
             setTimeout(() => {
-                document.addEventListener('click', closeOnOutsideClick);
-            }, 100);
+                console.log('[DEBUG] Confirmation popup display state:', 
+                    window.getComputedStyle(confirmationEl).display);
+                
+                // Triple check visibility
+                if (window.getComputedStyle(confirmationEl).display !== 'block') {
+                    console.log('[DEBUG] Forcing visibility with !important style');
+                    confirmationEl.setAttribute('style', 
+                        'display: block !important; ' +
+                        'z-index: 3000 !important; ' +
+                        'opacity: 1 !important; ' +
+                        'visibility: visible !important; ' +
+                        'position: fixed !important; ' +
+                        'top: 50% !important; ' +
+                        'left: 50% !important; ' +
+                        'transform: translate(-50%, -50%) !important;'
+                    );
+                }
+            }, 50);
         }
 
-    </script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-          fetch('./side_bar.html')
-              .then(response => response.text())
-              .then(data => {
-                  document.getElementById('sidebar-container').innerHTML = data;
-                  
-                  // Initialize sidebar functionality after loading
-                  if (typeof highlightActiveSidebarLink === 'function') {
-                    highlightActiveSidebarLink();
-                  }
-                  
-                  // Setup  ut if it exists
-                  if (typeof setupLogout === 'function') {
-                    setupLogout();
-                  }
-              })
-              .catch(error => console.error('Error loading sidebar:', error));
-  
-          fetch('./navbar_header.html')
-              .then(response => response.text())
-              .then(data => {
-                  document.getElementById('navbar-header').innerHTML = data;
-              })
-              .catch(error => console.error('Error loading navbar:', error));
-        });
+        // Helper functions for the confirmation popup
+        function getIconForType(type) {
+            switch (type) {
+                case 'success': return '<i class="fas fa-check-circle header-icon" style="color: var(--primary-green);"></i>';
+                case 'warning': return '<i class="fas fa-exclamation-triangle header-icon" style="color: var(--gold-accent);"></i>';
+                case 'error': return '<i class="fas fa-times-circle header-icon" style="color: var(--danger-red);"></i>';
+                default: return '<i class="fas fa-info-circle header-icon" style="color: var(--primary-green);"></i>';
+            }
+        }
+
+        function createFileStatusBadge(status) {
+            let icon, label, color;
+            
+            switch (status) {
+                case 'attached':
+                    icon = 'fa-file-pdf';
+                    label = 'Document Attached';
+                    color = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+                    break;
+                case 'missing':
+                    icon = 'fa-file-excel';
+                    label = 'Document Not Found';
+                    color = 'bg-red-100 text-red-800 border-red-200';
+                    break;
+                case 'processing':
+                    icon = 'fa-cog fa-spin';
+                    label = 'Email Processing in Background';
+                    color = 'bg-blue-100 text-blue-800 border-blue-200';
+                    break;
+                case 'uncertain':
+                case 'pending':
+                case 'failed':
+                default:
+                    icon = 'fa-file-search';
+                    label = 'Document Status Uncertain';
+                    color = 'bg-amber-100 text-amber-800 border-amber-200';
+            }
+            
+            return `
+            <div id="fileStatusBadge" class="file-status-badge ${color} my-3">
+                <i class="fas ${icon} file-status-icon"></i>
+                <span>${label}</span>
+            </div>`;
+        }
+
+        /** Formats a file size in bytes to a human-readable format */
+        function formatFileSize(bytes) {
+            if (!bytes || isNaN(bytes) || bytes <= 0) return 'unknown size';
+            const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+            let i = 0;
+            let size = Number(bytes);
+            while (size >= 1024 && i < units.length - 1) {
+                size /= 1024;
+                i++;
+            }
+            return `${size.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+        }
+
+        /** Handles rejection of a request with a reason. */
+        async function rejectRequest(requestId, reason) {
+            try {
+                // Get token using our helper function
+                const token = getAuthToken();
+                if (!token) {
+                    throw new Error('No authentication token found. Please log in again.');
+                }
+
+                // Check if user is admin
+                const userInfo = JSON.parse(sessionStorage.getItem('userInfo') || '{}');
+                if (!userInfo.role || userInfo.role.toLowerCase() !== 'admin') {
+                    throw new Error('You do not have permission to perform this action. Admin access required.');
+                }
+
+                // Process rejection through API
+                const response = await fetch(`/api/document-requests/${requestId}/status`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        status: 'rejected',
+                        reviewedBy: userInfo.id || 'admin',
+                        reviewNotes: reason || 'Rejected by admin'
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Failed to reject request: ${response.status} ${errorText}`);
+                }
+
+                // Update local state
+                const requestIndex = requests.findIndex(req => req.id === requestId);
+                if (requestIndex !== -1) {
+                    requests[requestIndex].status = 'rejected';
+                    requests[requestIndex].rejectionReason = reason;
+                    requests[requestIndex].processedAt = new Date().toISOString();
+                }
+
+                // Show confirmation
+                showConfirmationMessage(`Request ${requestId} rejected successfully.`, 'success');
+                closeRejectionModal();
+                closeDetailsModal();
+                applyFiltersAndSort();
+            } catch (error) {
+                console.error('Error rejecting request:', error);
+                showConfirmationMessage('Failed to reject request. Please try again.', 'error');
+                
+                // If it's an authentication error, show login button
+                if (error.message.includes('authentication') || error.message.includes('permission')) {
+                    requestsContentContainer.innerHTML = `
+                        <div class="text-center text-red-600 py-4">
+                            <p>Error: ${error.message}</p>
+                            <button onclick="window.location.href='/log-in.html'" class="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                                Log in again
+                            </button>
+                        </div>`;
+                }
+            }
+        }
+
+        /** Updates the document link to include authentication token */
+        function updateDocumentLink(linkElement, documentUrl) {
+            if (!linkElement) {
+                console.error('[Document Link] Missing link element');
+                return;
+            }
+            
+            if (!documentUrl || documentUrl === '#' || documentUrl === '/#') {
+                console.error('[Document Link] Invalid URL:', documentUrl);
+                // For invalid URLs, make the link show an error on click
+                linkElement.onclick = function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    alert('Document link is not available');
+                    return false;
+                };
+                return;
+            }
+            
+            try {
+                console.log('[Document Link] Updating document link with auth token for URL:', documentUrl);
+                
+                // Store the original URL without modification to preserve it
+                const originalUrl = documentUrl;
+                
+                // Fix document URL if it's a relative path
+                if (!documentUrl.startsWith('http') && !documentUrl.startsWith('/')) {
+                    // Convert relative paths to absolute paths
+                    documentUrl = '/' + documentUrl;
+                    console.log('[Document Link] Converting to absolute path:', documentUrl);
+                }
+                
+                // Make sure javascript: links aren't processed
+                if (documentUrl.startsWith('javascript:')) {
+                    console.log('[Document Link] Skipping javascript: link');
+                    return;
+                }
+                
+                // Set a click handler that will refresh the auth at the time of click
+                linkElement.onclick = function(e) {
+                    // Prevent the default navigation
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Final check for valid URL
+                    if (!originalUrl || originalUrl === '#' || originalUrl === '/#') {
+                        console.error('[Document Link] Invalid URL detected at click time:', originalUrl);
+                        alert('Document is not available');
+                    return false;
+                }
+                    
+                    // Fix document URL if it's a relative path
+                    let urlToUse = originalUrl;
+                    if (!urlToUse.startsWith('http') && !urlToUse.startsWith('/')) {
+                        urlToUse = '/' + urlToUse;
+                        console.log('[Document Link] Fixed relative URL at click time:', urlToUse);
+                    }
+                    
+                    console.log('[Document Link] Navigating to document URL:', urlToUse);
+                    
+                    // Get the most up-to-date token at click time
+                    const token = getAuthToken();
+                    
+                    // Prepare the final URL with auth parameter
+                    let finalUrl;
+                    const hasParams = urlToUse.includes('?');
+                    const separator = hasParams ? '&' : '?';
+                    
+                    if (token) {
+                        console.log('[Document Link] Using token authentication');
+                        finalUrl = `${urlToUse}${separator}auth_token=${token}&ts=${Date.now()}`;
+                    } else {
+                        console.log('[Document Link] Using cookie authentication');
+                        finalUrl = `${urlToUse}${separator}use_cookie_auth=true&ts=${Date.now()}`;
+                    }
+                    
+                    // Force opening in a new tab for document viewing
+                    console.log('[Document Link] Opening document in new tab:', finalUrl);
+                    try {
+                        window.open(finalUrl, '_blank');
+                    } catch (err) {
+                        console.error('[Document Link] Error opening window:', err);
+                        // Fallback - try directly setting location
+                        alert('Document viewer will open in a new tab');
+                        setTimeout(() => {
+                            window.open(finalUrl, '_blank');
+                        }, 100);
+                    }
+                    
+                    return false; // Prevent default and stop propagation
+                };
+                
+                // Also update the href for non-JS users (though click handler will intercept with JS enabled)
+                const token = getAuthToken();
+                
+                // Keep the original URL as a data attribute for reference
+                linkElement.setAttribute('data-original-url', originalUrl);
+                linkElement.setAttribute('data-needs-auth', 'true');
+                
+                // Set target to _blank to open in new tab
+                linkElement.setAttribute('target', '_blank');
+                
+                // Update href with authentication for non-JS fallback
+                let hrefWithAuth;
+                const hasParams = documentUrl.includes('?');
+                const separator = hasParams ? '&' : '?';
+                
+                if (token) {
+                    hrefWithAuth = `${documentUrl}${separator}auth_token=${token}`;
+                } else {
+                    hrefWithAuth = `${documentUrl}${separator}use_cookie_auth=true`;
+                }
+                
+                linkElement.href = hrefWithAuth;
+                
+            } catch (error) {
+                console.error('[Document Link] Error updating document link with auth token:', error);
+                
+                // Fallback to basic href without authentication
+                linkElement.href = documentUrl;
+            }
+        }
+
+        /**
+         * Helper function to get the authentication token from multiple sources
+         * @returns {string|null} The authentication token or null if not found
+         */
+        function getAuthToken() {
+            try {
+                // Check session storage first (main source)
+                const sessionData = sessionStorage.getItem('userInfo');
+                if (sessionData) {
+                    const userInfo = JSON.parse(sessionData);
+                    if (userInfo && userInfo.token) {
+                        return userInfo.token;
+                    }
+                }
+                
+                // Try localStorage as fallback
+                const localData = localStorage.getItem('userInfo');
+                if (localData) {
+                    const userInfo = JSON.parse(localData);
+                    if (userInfo && userInfo.token) {
+                        return userInfo.token;
+                    }
+                }
+                
+                // Try other known storage locations
+                const authToken = localStorage.getItem('authToken') || 
+                                 sessionStorage.getItem('authToken') ||
+                                 localStorage.getItem('token') ||
+                                 sessionStorage.getItem('token');
+                                 
+                if (authToken) {
+                    return authToken;
+                }
+                
+                // If we reach here, no token was found
+                return null;
+            } catch (error) {
+                console.error('[Auth] Error getting auth token:', error);
+                return null;
+            }
+        }
+
+        /**
+         * Tries to fetch a fresh auth token from the server
+         * @returns {Promise<string|null>} A promise that resolves to the token or null
+         */
+        async function refreshAuthToken() {
+            try {
+                console.log('[Auth] Attempting to refresh authentication token');
+                
+                // Try a different endpoint - users endpoint is more likely to exist than profile
+                const response = await fetch('/api/auth/status', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    const userData = await response.json();
+                    if (userData && userData.token) {
+                        // Save the token in both storages for redundancy
+                        const userInfo = { token: userData.token, role: userData.role || 'user' };
+                        sessionStorage.setItem('userInfo', JSON.stringify(userInfo));
+                        localStorage.setItem('userInfo', JSON.stringify(userInfo));
+                        
+                        console.log('[Auth] Successfully refreshed auth token');
+                        return userData.token;
+                    }
+                }
+                
+                // If the first endpoint fails, try a fallback endpoint
+                console.log('[Auth] First refresh endpoint failed, trying fallback');
+                const fallbackResponse = await fetch('/api/users/current', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include'
+                });
+                
+                if (fallbackResponse.ok) {
+                    const fallbackData = await fallbackResponse.json();
+                    if (fallbackData && fallbackData.token) {
+                        // Save the token
+                        const userInfo = { token: fallbackData.token, role: fallbackData.role || 'user' };
+                        sessionStorage.setItem('userInfo', JSON.stringify(userInfo));
+                        localStorage.setItem('userInfo', JSON.stringify(userInfo));
+                        
+                        console.log('[Auth] Successfully refreshed auth token from fallback endpoint');
+                        return fallbackData.token;
+                    }
+                }
+                
+                // If we get here, could not get a new token
+                console.error('[Auth] Failed to refresh auth token from any endpoint');
+                return null;
+            } catch (error) {
+                console.error('[Auth] Error refreshing auth token:', error);
+                return null;
+            }
+        }
+        
+        // Function to initialize all document links with authentication tokens
+        function initDocumentLinks() {
+            console.log('[Document Links] Initializing document link authentication');
+            
+            // Process any existing links first
+            updateAllDocumentLinks();
+            
+            // Set up a mutation observer to add auth tokens to document links added dynamically
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach(mutation => {
+                    if (mutation.type === 'childList') {
+                        mutation.addedNodes.forEach(node => {
+                            if (node.nodeType === 1) { // Element node
+                                // Check if the node itself is a link that needs auth
+                                if ((node.classList && node.classList.contains('view-doc-button') || 
+                                     node.hasAttribute('data-needs-auth')) && 
+                                    !node.hasAttribute('data-auth-processed')) {
+                                    updateDocumentLink(node, node.getAttribute('href'));
+                                    node.setAttribute('data-auth-processed', 'true');
+                                }
+                                
+                                // Check for links inside the added node
+                                const links = node.querySelectorAll('a.view-doc-button, a[data-needs-auth="true"]');
+                                links.forEach(link => {
+                                    if (!link.hasAttribute('data-auth-processed')) {
+                                        updateDocumentLink(link, link.getAttribute('href'));
+                                        link.setAttribute('data-auth-processed', 'true');
+                                    }
+                                });
+                            }
+                        });
+                    }
+                });
+            });
+            
+            // Start observing the document with the configured parameters
+            observer.observe(document.body, { childList: true, subtree: true });
+            console.log('[Document Links] Observer set up for document links');
+            
+            // Set a periodic check for links that need updating
+            setInterval(updateAllDocumentLinks, 30000); // Check every 30 seconds
+            
+            // Try to refresh the token once at startup
+            refreshAuthToken().then(newToken => {
+                if (newToken) {
+                    // If we got a new token, update all links
+                    updateAllDocumentLinks();
+                }
+            });
+        }
+        
+        // Helper function to update all document links
+        function updateAllDocumentLinks() {
+            console.log('[Document Links] Updating all document links');
+            
+            // Process all view-doc-button links and data-needs-auth links
+            document.querySelectorAll('a.view-doc-button, a[data-needs-auth="true"]').forEach(link => {
+                // Get the original URL, falling back to href if needed
+                const originalUrl = link.getAttribute('data-original-url') || link.href;
+                
+                // Don't process empty links or javascript: links
+                if (!originalUrl || originalUrl === '#' || originalUrl.startsWith('javascript:')) {
+                    return;
+                }
+                
+                // Remove protocols and domain from href when comparing to avoid false differences
+                const cleanHref = link.href.replace(/^https?:\/\/[^\/]+/, '');
+                const cleanOriginal = originalUrl.replace(/^https?:\/\/[^\/]+/, '');
+                
+                // Skip links that already have auth tokens
+                if (cleanHref.includes('auth_token=') || cleanHref.includes('use_cookie_auth=')) {
+                    if (cleanHref.includes(cleanOriginal)) {
+                        console.log('[Document Links] Link already has auth, skipping:', cleanOriginal);
+                        return;
+                    }
+                }
+                
+                console.log('[Document Links] Updating link:', originalUrl);
+                updateDocumentLink(link, originalUrl);
+                link.setAttribute('data-auth-processed', 'true');
+            });
+        }
       </script>
   
 

@@ -534,11 +534,92 @@
         .search-result-category-keywords { margin-bottom: 0.5rem; display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
         .search-result-category-tag { font-size: 0.7rem; font-weight: 500; padding: 0.125rem 0.5rem; border-radius: 9999px; background-color: var(--theme-green-lighter-bg); color: var(--theme-green-darker-text); text-transform: uppercase; letter-spacing: 0.05em; }
         .search-result-item:hover .search-result-category-tag { background-color: var(--theme-green-dark); color: white; }
-        .search-result-keywords-container { display: flex; flex-wrap: wrap; gap: 0.375rem; }
-        .keyword-pill { font-size: 0.7rem; background-color: #e5e7eb; color: #4b5563; padding: 0.125rem 0.625rem; border-radius: 9999px; transition: background-color 0.2s ease, color 0.2s ease; }
-        .search-result-item:hover .keyword-pill { background-color: var(--theme-gold); color: var(--theme-green-darker-text); }
-        .search-result-desc { font-size: 0.875rem; color: #6b7280; line-height: 1.5; transition: color 0.2s ease-in-out; }
-        .search-result-item:hover .search-result-desc { color: #374151; }
+        
+        /* Enhanced search results styling */
+        .search-result-keywords-container { 
+            display: flex; 
+            flex-wrap: wrap; 
+            gap: 0.375rem;
+        }
+        
+        .keyword-pill { 
+            font-size: 0.7rem; 
+            background-color: #e5e7eb; 
+            color: #4b5563; 
+            padding: 0.125rem 0.625rem; 
+            border-radius: 9999px; 
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            border: 1px solid transparent;
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        
+        .search-result-item:hover .keyword-pill { 
+            background-color: var(--theme-gold-lighter-bg); 
+            color: var(--theme-green-darker-text);
+            border-color: var(--theme-gold);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 3px rgba(0,0,0,0.1);
+        }
+        
+        .search-result-category-keywords {
+            margin-bottom: 0.75rem;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .search-result-author {
+            font-weight: 500;
+            color: #4b5563;
+            transition: color 0.2s ease;
+        }
+        
+        .search-result-item:hover .search-result-author {
+            color: var(--theme-green-dark);
+        }
+        
+        .search-result-date {
+            color: #6b7280;
+            font-weight: 500;
+            background-color: #f3f4f6;
+            padding: 0.125rem 0.5rem;
+            border-radius: 4px;
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+        
+        .search-result-item:hover .search-result-date {
+            background-color: var(--theme-green-lighter-bg);
+            color: var(--theme-green-dark);
+        }
+        
+        .search-result-meta-primary {
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            font-size: 0.75rem; 
+            color: #4b5563; 
+            margin-bottom: 0.5rem;
+            padding-bottom: 0.375rem;
+            border-bottom: 1px dotted rgba(203, 213, 225, 0.5);
+        }
+        
+        .search-result-desc { 
+            font-size: 0.875rem; 
+            color: #6b7280; 
+            line-height: 1.5; 
+            transition: color 0.2s ease-in-out; 
+        }
+        
+        .search-result-item:hover .search-result-desc { 
+            color: #374151; 
+        }
+        
+        /* Original styles continue here */
         .author-result-item .search-result-title { font-size: 1.1rem; }
         .author-result-item .search-result-meta-primary { font-size: 0.8rem; color: var(--theme-green-dark); }
         .author-result-item .article-count { font-style: italic; }
@@ -661,8 +742,8 @@
             <div id="search-results-overlay">
                  <p id="searchPlaceholderOverlay" class="search-no-results">Start typing, apply filters, or press <span class="kbd-shortcut">Ctrl+K</span> or <span class="kbd-shortcut">/</span> to search.</p>
             </div>
-            <div id="showAllResultsContainer" class="show-all-results-button-container hidden">
-                <button id="showAllResultsBtn" type="button" class="show-all-results-btn">Show All Results</button>
+            <div id="showAllResultsContainer" class="show-all-results-button-container">
+                <button id="showAllResultsBtn" type="button" class="show-all-results-btn" onclick="window.location.href = '/pages/searchResultsPage.html?q=' + encodeURIComponent(document.getElementById('searchInputOverlay').value)">Show All Results</button>
             </div>
         </div>
     </div>
@@ -969,12 +1050,24 @@
             // Add search parameter
             if (searchQuery) url.searchParams.append('search', searchQuery);
             
-            // Add category filter (as document_type)
-                    if (filters.category && filters.category.length > 0) {
-                filters.category.forEach(category => {
-                    // Document types are uppercase in the API
-                    url.searchParams.append('type', category.toUpperCase());
-                });
+            // Store selected categories for client-side filtering
+            const selectedCategories = filters.category && filters.category.length > 0 
+                ? filters.category.map(cat => cat.toUpperCase()) 
+                : [];
+                
+            console.log("Selected categories for filtering:", selectedCategories);
+            
+            // For backward compatibility, just fetch all documents without category filter
+            // if multiple categories are selected - we'll filter on client side
+            if (selectedCategories.length === 1) {
+                // Apply single category filter directly - this should work with existing API
+                url.searchParams.append('category', selectedCategories[0]);
+                // Also try document_type as an alternative parameter name
+                url.searchParams.append('document_type', selectedCategories[0]);
+            } else if (selectedCategories.length > 1) {
+                // For multiple categories, we'll fetch more documents and filter client-side
+                // The limit needs to be higher to ensure we get enough results after filtering
+                url.searchParams.set('limit', '50');
             }
             
             // Add other filters
@@ -982,8 +1075,10 @@
             if (filters.keywords) url.searchParams.append('keyword', filters.keywords);
             if (filters.year) url.searchParams.append('year', filters.year);
             
-            // Add pagination
-            url.searchParams.append('limit', '10');
+            // Add pagination (increase limit if multiple categories to ensure enough results after filtering)
+            if (!selectedCategories.length || selectedCategories.length <= 1) {
+                url.searchParams.append('limit', '10');
+            }
             url.searchParams.append('page', '1');
             
             console.log('Performing document search:', url.toString());
@@ -992,21 +1087,61 @@
             const documentData = await fetchData(url.toString());
             let documents = documentData?.documents || [];
             
-            // Process documents to add correct URLs based on document type
+            // Apply client-side filtering for multiple categories if needed
+            if (selectedCategories.length > 1 && documents.length > 0) {
+                documents = documents.filter(doc => {
+                    // Get document's category/type and normalize for comparison
+                    const documentType = doc.document_type || doc.category || '';
+                    const normalizedType = documentType.toUpperCase();
+                    
+                    // Keep document if its type matches any of our selected categories
+                    return selectedCategories.includes(normalizedType);
+                });
+                
+                console.log(`Filtered ${documentData?.documents?.length || 0} documents to ${documents.length} matching selected categories`);
+            }
+            
+            // Process documents to add correct URLs and normalize metadata
             documents = documents.map(doc => {
                 // Determine if this is a compiled document
                 const isCompiled = doc.is_compiled === true || 
-                                  doc.document_type?.toLowerCase() === 'compiled' || 
-                                  doc.child_count > 0;
+                                   doc.document_type?.toLowerCase() === 'compiled' || 
+                                   doc.child_count > 0;
                 
-                // For user navbar, direct to the appropriate user page
+                // For user navbar, direct to the appropriate page
                 const documentUrl = isCompiled 
                     ? `/pages/user-compiled.html?id=${doc.id}` 
                     : `/pages/user-single.html?id=${doc.id}`;
                 
+                // Normalize metadata fields for consistent rendering
+                let normalizedKeywords = [];
+                
+                // Process keywords into a consistent format
+                if (doc.keywords) {
+                    if (Array.isArray(doc.keywords)) {
+                        normalizedKeywords = doc.keywords;
+                    } else if (typeof doc.keywords === 'string') {
+                        normalizedKeywords = doc.keywords.split(',').map(k => k.trim()).filter(k => k);
+                    }
+                } else if (doc.tags && Array.isArray(doc.tags)) {
+                    normalizedKeywords = doc.tags;
+                }
+                
+                // Ensure publication date is preserved
+                // This will be formatted by the renderer function
+                const publicationDate = doc.publication_date || null;
+                
+                // Log document metadata for debugging
+                console.log(`Document ID: ${doc.id}, Title: ${doc.title}, Publication Date: ${publicationDate}`);
+                
+                // Return enriched document object
                 return {
                     ...doc,
-                    url: documentUrl
+                    url: documentUrl,
+                    keywords: normalizedKeywords,
+                    // Ensure these fields exist even if empty
+                    author_name: doc.author_name || doc.author || doc.creator || '',
+                    publication_date: publicationDate
                 };
             });
             
@@ -1018,7 +1153,6 @@
                     authorUrl.searchParams.append('q', searchQuery);
                     
                     const authorResults = await fetchData(authorUrl.toString());
-                    console.log("Author search results:", authorResults);
                     
                     // Map authors to the expected format
                     authorHits = (Array.isArray(authorResults) ? authorResults : [])
@@ -1026,6 +1160,7 @@
                             title: author.full_name,
                             name: author.full_name,
                             document_count: author.worksCount || 0,
+                            articleCount: author.worksCount || 0,
                             department: author.department || '',
                             url: `/pages/authorprofile.html?id=${author.id}`
                         }));
@@ -1049,6 +1184,7 @@
                                 name: keyword,
                                 keyword: keyword,
                                 title: keyword,
+                                relatedArticleCount: 1,
                                 document_count: 1
                             }));
                     }
@@ -1080,9 +1216,9 @@
             };
         } catch (error) {
             console.error("Error performing search:", error);
-            return { 
-                query: searchQuery, 
-                results: { 
+            return {
+                query: searchQuery,
+                results: {
                     documents: { label: "Documents", hits: [], count: 0 },
                     authors: { label: "Authors", hits: [], count: 0 },
                     keywords: { label: "Matching Keywords", hits: [], count: 0 }
@@ -1437,19 +1573,51 @@
         const specificCategoryButtons = Array.from(categoryButtonsContainerOverlay.querySelectorAll(`.${CATEGORY_FILTER_BUTTON_CLASS}:not([${DATA_CATEGORY_ATTR}=""])`));
 
         if (isAllButton) {
+            // If "All" button was clicked and isn't already active
             if (!clickedButton.classList.contains(ACTIVE_CLASS)) {
+                // Deactivate all specific category buttons
                 specificCategoryButtons.forEach(btn => btn.classList.remove(ACTIVE_CLASS));
+                // Activate "All" button
                 clickedButton.classList.add(ACTIVE_CLASS);
+                
+                // Add a visual indicator showing it's the "All" filter
+                clickedButton.setAttribute('title', 'All Categories');
             }
         } else {
+            // If a specific category was clicked, toggle its active state
             clickedButton.classList.toggle(ACTIVE_CLASS);
-            const anySpecificActive = specificCategoryButtons.some(btn => btn.classList.contains(ACTIVE_CLASS));
+            
+            // Check if any specific category is now active
+            const activeSpecificButtons = specificCategoryButtons.filter(btn => btn.classList.contains(ACTIVE_CLASS));
+            const anySpecificActive = activeSpecificButtons.length > 0;
+            
+            // Update tooltips to show multi-selection state
+            if (clickedButton.classList.contains(ACTIVE_CLASS)) {
+                clickedButton.setAttribute('title', 'Selected - Click to deselect');
+            } else {
+                clickedButton.setAttribute('title', 'Click to select');
+            }
+            
+            // Show count of active filters if multiple are selected
+            if (activeSpecificButtons.length > 1) {
+                const activeCategories = activeSpecificButtons.map(btn => btn.getAttribute(DATA_CATEGORY_ATTR));
+                console.log(`${activeSpecificButtons.length} categories selected:`, activeCategories);
+                
+                // Update tooltips with additional info about multiple selection
+                activeSpecificButtons.forEach(btn => {
+                    btn.setAttribute('title', `Selected - Click to deselect (${activeSpecificButtons.length} categories selected)`);
+                });
+            }
 
             if (allCategoryButton) {
+                // If any specific category is active, deactivate "All" button
                 if (anySpecificActive) {
                     allCategoryButton.classList.remove(ACTIVE_CLASS);
+                    allCategoryButton.setAttribute('title', 'Click to clear filters and show all categories');
                 } else {
+                    // If no specific categories are active, reactivate "All" button
                     allCategoryButton.classList.add(ACTIVE_CLASS);
+                    allCategoryButton.setAttribute('title', 'All Categories');
                 }
             }
         }
@@ -1614,24 +1782,90 @@
     }
     function createDocumentResultHTML(item, queryToHighlight) {
         const titleHighlighted = highlightText(item.title, queryToHighlight);
-        const descHighlighted = highlightText(item.description, queryToHighlight);
-        let keywordsHTML = '';
-        if (item.keywords && Array.isArray(item.keywords)) {
-            keywordsHTML = item.keywords.map(kw => `<span class="keyword-pill">${kw}</span>`).join('');
-        } else if (typeof item.keywords === 'string') { // Handle comma-separated string just in case
-            keywordsHTML = item.keywords.split(',').map(kw => kw.trim()).filter(kw => kw).map(kw => `<span class="keyword-pill">${kw}</span>`).join('');
+        const descHighlighted = item.abstract ? highlightText(item.abstract, queryToHighlight) : 
+                           (item.description ? highlightText(item.description, queryToHighlight) : '');
+        
+        // Get document category/type for display
+        let documentCategory = '';
+        if (item.document_type) {
+            documentCategory = item.document_type.charAt(0).toUpperCase() + item.document_type.slice(1).toLowerCase();
+        } else if (item.category) {
+            documentCategory = item.category.charAt(0).toUpperCase() + item.category.slice(1).toLowerCase();
         }
+
+        // Create CSS class for the category tag based on document type
+        let categoryTagClass = 'search-result-category-tag';
+        if (documentCategory.toLowerCase() === 'thesis') {
+            categoryTagClass += ' bg-red-100 text-red-800 border border-red-200';
+        } else if (documentCategory.toLowerCase() === 'dissertation') {
+            categoryTagClass += ' bg-green-100 text-green-800 border border-green-200';
+        } else if (documentCategory.toLowerCase() === 'confluence') {
+            categoryTagClass += ' bg-yellow-100 text-yellow-800 border border-yellow-200';
+        } else if (documentCategory.toLowerCase() === 'synergy') {
+            categoryTagClass += ' bg-blue-100 text-blue-800 border border-blue-200';
+        }
+        
+        // Enhanced keyword handling
+        let keywordsHTML = '';
+        if (item.keywords) {
+            if (Array.isArray(item.keywords) && item.keywords.length > 0) {
+                keywordsHTML = item.keywords.map(kw => {
+                    if (typeof kw === 'string') {
+                        return `<span class="keyword-pill">${kw}</span>`;
+                    } else if (typeof kw === 'object') {
+                        return `<span class="keyword-pill">${kw.name || kw.keyword || kw.text || ''}</span>`;
+                    }
+                    return '';
+                }).filter(html => html.length > 0).join('');
+            } else if (typeof item.keywords === 'string' && item.keywords.trim().length > 0) {
+                keywordsHTML = item.keywords.split(',')
+                    .map(kw => kw.trim())
+                    .filter(kw => kw)
+                    .map(kw => `<span class="keyword-pill">${kw}</span>`)
+                    .join('');
+            }
+        } else if (item.tags && Array.isArray(item.tags) && item.tags.length > 0) {
+            // Try 'tags' as an alternative field name
+            keywordsHTML = item.tags.map(tag => `<span class="keyword-pill">${tag}</span>`).join('');
+        }
+        
+        // Get author information with various field name fallbacks
+        const authorName = item.author_name || item.author || item.creator || '';
+        
+        // Get publication date with formatting
+        let formattedDate = '';
+        if (item.publication_date) {
+            try {
+                // Format the date as a readable string (e.g., "January 15, 2023")
+                const date = new Date(item.publication_date);
+                if (!isNaN(date.getTime())) {
+                    formattedDate = date.toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    });
+                }
+            } catch (e) {
+                console.warn("Could not parse publication date:", item.publication_date);
+                formattedDate = item.publication_date; // Use as-is if parsing fails
+            }
+        }
+        
+        // Fallback to year if no full date is available
+        const displayDate = formattedDate || item.publication_year || item.year || '';
+        
         return `
             <div class="search-result-title">${titleHighlighted || 'No Title'}</div>
             <div class="search-result-meta-primary">
-                ${item.author ? `<span class="search-result-author">By: ${item.author}</span>` : ''}
-                ${item.year ? `<span class="search-result-year">${item.year}</span>` : ''}
+                ${authorName ? `<span class="search-result-author">By: ${authorName}</span>` : ''}
+                ${displayDate ? `<span class="search-result-date">${displayDate}</span>` : ''}
             </div>
             <div class="search-result-category-keywords">
-                ${item.category ? `<span class="search-result-category-tag">${item.category}</span>` : ''}
+                ${documentCategory ? `<span class="${categoryTagClass}">${documentCategory}</span>` : ''}
                 ${keywordsHTML ? `<div class="search-result-keywords-container">${keywordsHTML}</div>` : ''}
             </div>
-            <div class="search-result-desc">${descHighlighted || 'No description.'}</div>`;
+            <!-- Description removed as requested -->
+            `;
     }
     function createAuthorResultHTML(item, queryToHighlight) {
         const titleHighlighted = highlightText(item.title, queryToHighlight);
@@ -1657,6 +1891,66 @@
         }
         searchResultsOverlay.innerHTML = '';
         const fragment = document.createDocumentFragment();
+        
+        // Remove category filters summary - it's redundant with the toggled buttons
+        // const activeCategories = getActiveCategories();
+        // if (activeCategories.length > 1) {
+        //     // Create a filters summary header when multiple categories are selected
+        //     const filterSummary = document.createElement('div');
+        //     filterSummary.className = 'mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md';
+        //     
+        //     // Get documents to analyze category breakdown
+        //     const documents = apiResponse.results.documents?.hits || [];
+        //     
+        //     // Count documents by category
+        //     const categoryCounts = {};
+        //     activeCategories.forEach(cat => categoryCounts[cat] = 0);
+        //     
+        //     documents.forEach(doc => {
+        //         const docType = (doc.document_type || doc.category || '').toUpperCase();
+        //         if (categoryCounts[docType] !== undefined) {
+        //             categoryCounts[docType]++;
+        //         }
+        //     });
+        //     
+        //     // Create the category breakdown HTML
+        //     let categoryBreakdownHTML = '';
+        //     Object.entries(categoryCounts).forEach(([category, count]) => {
+        //         // Create appropriate styling for each category
+        //         let badgeClass = 'inline-flex items-center px-2 py-1 rounded-md text-xs font-medium';
+        //         if (category.toLowerCase() === 'thesis') {
+        //             badgeClass += ' bg-red-100 text-red-800';
+        //         } else if (category.toLowerCase() === 'dissertation') {
+        //             badgeClass += ' bg-green-100 text-green-800';
+        //         } else if (category.toLowerCase() === 'confluence') {
+        //             badgeClass += ' bg-yellow-100 text-yellow-800';
+        //         } else if (category.toLowerCase() === 'synergy') {
+        //             badgeClass += ' bg-blue-100 text-blue-800';
+        //         }
+        //         
+        //         categoryBreakdownHTML += `
+        //             <span class="${badgeClass} mr-2 mb-1">
+        //                 ${category}: ${count}
+        //             </span>
+        //         `;
+        //     });
+        //     
+        //     filterSummary.innerHTML = `
+        //         <div class="flex items-center text-sm text-green-800 font-medium">
+        //             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-2">
+        //                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
+        //             </svg>
+        //             <div>
+        //                 <div>Showing results from multiple categories:</div>
+        //                 <div class="flex flex-wrap mt-2">
+        //                     ${categoryBreakdownHTML}
+        //                 </div>
+        //             </div>
+        //         </div>
+        //     `;
+        //     fragment.appendChild(filterSummary);
+        // }
+        
         let totalResultsAcrossCategories = 0;
         const categoryDisplayConfig = {
             documents: { defaultLabel: 'Documents', icon: `<svg class="header-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>`, headerClass: 'documents-header', itemRenderer: createDocumentResultHTML, itemClass: '' },
@@ -1676,7 +1970,19 @@
                 sectionDiv.appendChild(header);
                 categoryData.hits.forEach(item => {
                     const resultElement = document.createElement('a');
+                    
+                    // Special handling for keyword results to redirect to searchResultsPage.html
+                    if (key === 'keywords') {
+                        const keywordText = item.name || item.keyword || item.title || '';
+                        const keywordSearchUrl = new URL('/pages/searchResultsPage.html', window.location.origin);
+                        const params = new URLSearchParams();
+                        if (keywordText) params.append('keyword', keywordText);
+                        keywordSearchUrl.search = params.toString();
+                        resultElement.href = keywordSearchUrl.toString();
+                    } else {
                     resultElement.href = item.url || '#';
+                    }
+                    
                     resultElement.classList.add('search-result-item');
                     if (catInfo.itemClass) resultElement.classList.add(catInfo.itemClass);
                     resultElement.target = "_self";
@@ -2010,24 +2316,42 @@
             if (filterElement) filterElement.addEventListener('change', performSearchOverlay); 
         });
         
-        if (showAllResultsBtn) { 
-            showAllResultsBtn.addEventListener('click', () => { 
-                // Navigate to full search results page with current params
-                const searchParams = new URLSearchParams();
-                const query = searchInputOverlay?.value || '';
-                if (query) searchParams.append('q', query);
-                
-                const selectedCategories = getActiveCategories();
-                if (selectedCategories.length > 0) {
-                    selectedCategories.forEach(cat => searchParams.append('category', cat));
-                }
-                
-                if (authorFilterOverlay?.value) searchParams.append('author', authorFilterOverlay.value);
-                if (keywordsFilterOverlay?.value) searchParams.append('keywords', keywordsFilterOverlay.value);
-                if (yearFilterOverlay?.value) searchParams.append('year', yearFilterOverlay.value);
-                
-                window.location.href = `/search?${searchParams.toString()}`;
-            }); 
+        // Add this function to properly navigate to search results page
+        function navigateToSearchResultsPage() {
+            const searchQuery = searchInputOverlay.value.trim();
+            const url = new URL('/pages/searchResultsPage.html', window.location.origin);
+            
+            // Add search query parameter
+            if (searchQuery) {
+                url.searchParams.append('q', searchQuery);
+            }
+            
+            // Add any selected categories
+            const activeCategories = getActiveCategories();
+            activeCategories.forEach(category => {
+                url.searchParams.append('category', category);
+            });
+            
+            // Add other filters if they exist
+            if (authorFilterOverlay && authorFilterOverlay.value) {
+                url.searchParams.append('author', authorFilterOverlay.value);
+            }
+            
+            if (keywordsFilterOverlay && keywordsFilterOverlay.value) {
+                url.searchParams.append('keyword', keywordsFilterOverlay.value);
+            }
+            
+            if (yearFilterOverlay && yearFilterOverlay.value) {
+                url.searchParams.append('year', yearFilterOverlay.value);
+            }
+            
+            // Navigate to the search results page
+            window.location.href = url.toString();
+        }
+
+        // Add the event listener for the button
+        if (showAllResultsBtn) {
+            showAllResultsBtn.addEventListener('click', navigateToSearchResultsPage);
         }
         
         // Register event listeners for search open/close
@@ -2301,6 +2625,17 @@
         }
     }
 })(); // IIFE End
+
+// Ensure Show All Results button works
+window.addEventListener('DOMContentLoaded', function() {
+    var showAllResultsBtn = document.getElementById('showAllResultsBtn');
+    if (showAllResultsBtn) {
+        showAllResultsBtn.addEventListener('click', function() {
+            var searchInputValue = document.getElementById('searchInputOverlay').value || '';
+            window.location.href = '/pages/searchResultsPage.html?q=' + encodeURIComponent(searchInputValue);
+        }, true); // Using capture phase to ensure this handler runs first
+    }
+});
 </script>
 </body>
 <script src="/Components/NavBar/dropdown-fix.js"></script>

@@ -928,6 +928,7 @@
                  filterAndRenderPublications(); // Initial render of publications
 
                  // Record the author profile visit
+                 console.log("Recording visit for author with ID:", currentAuthorData.id);
                  recordAuthorVisit(currentAuthorData.id);
 
                  console.log("Author Profile Initialized Successfully.");
@@ -949,62 +950,98 @@
      * @param {string} authorId - The ID of the author being viewed
      */
     async function recordAuthorVisit(authorId) {
-        if (!authorId) return;
+        if (!authorId) {
+            console.error("Cannot record visit: No author ID provided");
+            return;
+        }
+        
+        console.log("recordAuthorVisit called with authorId:", authorId);
         
         try {
-            // Check if user is logged in
-            let userInfo = null;
+            // More robust check if user is logged in
+            let isLoggedIn = false;
+            let userId = null;
+            
+            // Check multiple storage locations for user info
             try {
-                userInfo = JSON.parse(sessionStorage.getItem('userInfo'));
+                // Check sessionStorage first (primary storage for login status)
+                const sessionUserInfo = sessionStorage.getItem('userInfo');
+                if (sessionUserInfo) {
+                    const userInfo = JSON.parse(sessionUserInfo);
+                    if (userInfo && userInfo.isLoggedIn === true && userInfo.token) {
+                        isLoggedIn = true;
+                        userId = userInfo.id;
+                        console.log('Author Visit: User is logged in according to sessionStorage');
+                    }
+                }
+                
+                // If not found in sessionStorage, check localStorage
+                if (!isLoggedIn) {
+                    const localUserInfo = localStorage.getItem('userInfo');
+                    if (localUserInfo) {
+                        const userInfo = JSON.parse(localUserInfo);
+                        if (userInfo && userInfo.isLoggedIn === true && userInfo.token) {
+                            isLoggedIn = true;
+                            userId = userInfo.id;
+                            console.log('Author Visit: User is logged in according to localStorage');
+                        }
+                    }
+                }
+                
+                // Finally check cookies if still not found
+                if (!isLoggedIn) {
+                    const cookies = document.cookie.split(';');
+                    const sessionTokenCookie = cookies.find(c => c.trim().startsWith('session_token='));
+                    if (sessionTokenCookie) {
+                        isLoggedIn = true;
+                        console.log('Author Visit: User is logged in according to session_token cookie');
+                    }
+                }
             } catch (e) {
-                console.log('No user info found or invalid format');
+                console.log('Error checking login status:', e);
+                isLoggedIn = false; // Default to not logged in on error
             }
             
             // Determine visitor type (guest or user)
-            const visitorType = userInfo?.isLoggedIn ? 'user' : 'guest';
+            const visitorType = isLoggedIn ? 'user' : 'guest';
+            console.log(`Author Visit: Recording as ${visitorType}`);
             
             // Prepare visit data - ensure all expected parameters are provided
             const visitData = {
                 authorId: authorId,
-                visitorType: visitorType,  // This is critical for the counter table (author_id, date, visitor_type)
-                userId: userInfo?.isLoggedIn ? userInfo.id : undefined
+                visitorType: visitorType
             };
             
-            console.log('Recording author visit to counter table:', visitData);
+            // Only include userId if user is logged in and we have a userId
+            if (isLoggedIn && userId) {
+                visitData.userId = userId;
+            }
+            
+            console.log('Recording author visit with data:', visitData);
             
             // Send the visit data to the API
-            // Use the path that exactly matches what's registered in authorVisitsRoutes.ts
             const url = '/api/author-visits';
             console.log(`Sending POST request to: ${url}`);
             
             const response = await fetch(url, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    ...(userInfo?.token ? {'Authorization': `Bearer ${userInfo.token}`} : {})
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(visitData)
             });
             
             if (!response.ok) {
+                const errorText = await response.text();
                 console.warn(`Failed to record author visit: ${response.status} ${response.statusText}`);
-                // Log request details for debugging
-                console.log('Request details:', {
-                    url: url,
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': userInfo?.token ? 'Bearer [token-hidden]' : 'none'
-                    },
-                    body: visitData
-                });
+                console.warn('Server response:', errorText);
                 return;
             }
             
             const data = await response.json();
-            console.log('Author visit recorded successfully in counter table:', data);
+            console.log('Author visit recorded successfully:', data);
         } catch (error) {
-            console.error('Error recording author visit to counter table:', error);
+            console.error('Error recording author visit:', error);
             // Non-critical error, don't disrupt the user experience
         }
     }

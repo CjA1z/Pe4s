@@ -248,6 +248,15 @@
                         <option value="Spirituality">Spirituality</option>
                         </select>
                 </div>
+                
+                <div class="filter-author-options select-container basis-full sm:basis-1/2 md:basis-auto min-w-[160px] flex-shrink-0">
+                    <i class="fas fa-user select-icon"></i>
+                    <label for="filter-by-author" class="sr-only">Filter by Author:</label>
+                    <select id="filter-by-author" name="filter-by-author" class="form-input-professional w-full p-2 bg-white rounded-md text-gray-700 focus:outline-none focus:ring-2 focus:border-transparent transition-shadow">
+                        <option value="all">All Authors</option>
+                        <!-- Author options will be populated dynamically -->
+                    </select>
+                </div>
                  <div class="date-input-container basis-full sm:basis-1/2 md:basis-auto min-w-[200px]">
                     <label for="start-date">From:</label>
                     <input type="date" id="start-date" name="start-date" class="form-input-professional">
@@ -281,7 +290,8 @@
         };
         const SELECTORS = {
             SEARCH_BAR: '#search-bar', SORT_SELECT: '#sort-by', CATEGORY_FILTER: '#filter-by-category',
-            KEYWORD_FILTER: '#filter-by-keywords', START_DATE: '#start-date', END_DATE: '#end-date',
+            KEYWORD_FILTER: '#filter-by-keywords', AUTHOR_FILTER: '#filter-by-author', 
+            START_DATE: '#start-date', END_DATE: '#end-date',
             DOCUMENT_CONTAINER: '#document-container', NO_DOCUMENTS_MSG: '#no-documents-message',
             PAGINATION_CONTROLS: '#pagination-controls', KEYWORD_POPUP: '#keyword-popup-glass',
             TOGGLE_FILTERS_BTN: '#toggle-filters-btn', COLLAPSIBLE_FILTERS: '#collapsible-filters',
@@ -298,6 +308,7 @@
         const sortBySelect = document.querySelector(SELECTORS.SORT_SELECT);
         const filterByCategorySelect = document.querySelector(SELECTORS.CATEGORY_FILTER);
         const filterByKeywordsSelect = document.querySelector(SELECTORS.KEYWORD_FILTER);
+        const filterByAuthorSelect = document.querySelector(SELECTORS.AUTHOR_FILTER);
         const startDateInput = document.querySelector(SELECTORS.START_DATE);
         const endDateInput = document.querySelector(SELECTORS.END_DATE);
         const documentContainer = document.querySelector(SELECTORS.DOCUMENT_CONTAINER);
@@ -317,6 +328,7 @@
         let documentItemsData = [];
         let availableCategories = [];
         let availableKeywords = [];
+        let availableAuthors = [];
 
         function truncateText(text, maxLength) {
             if (!text) return "N/A";
@@ -538,7 +550,7 @@
                 
                 if (!token) {
                     console.warn('Cannot fetch history: No authentication token found');
-                    return { items: [], totalCount: 0 };
+                    throw new Error('AUTH_REQUIRED');
                 }
                 
                 // Build URL with query parameters
@@ -548,11 +560,14 @@
                 
                 // Add filters to query params
                 if (filters.searchTerm) url.searchParams.append('search', filters.searchTerm);
-                if (filters.category) url.searchParams.append('category', filters.category);
-                if (filters.keyword) url.searchParams.append('keyword', filters.keyword);
+                if (filters.category && filters.category !== 'all') url.searchParams.append('category', filters.category);
+                if (filters.keyword && filters.keyword !== 'all') url.searchParams.append('keyword', filters.keyword);
+                if (filters.author && filters.author !== 'all') url.searchParams.append('author', filters.author);
                 if (filters.startDate) url.searchParams.append('startDate', filters.startDate);
                 if (filters.endDate) url.searchParams.append('endDate', filters.endDate);
                 if (filters.sortBy) url.searchParams.append('sortBy', filters.sortBy);
+                
+                console.log(`Fetching history data from: ${url.toString()}`);
                 
                 // Fetch data from API
                 const response = await fetch(url, {
@@ -562,11 +577,27 @@
                     }
                 });
                 
+                if (response.status === 401 || response.status === 403) {
+                    console.error('Authentication error when fetching history data');
+                    throw new Error('AUTH_EXPIRED');
+                }
+                
                 if (!response.ok) {
-                    throw new Error(`Failed to fetch history: ${response.status} ${response.statusText}`);
+                    console.error(`API returned ${response.status} ${response.statusText}`);
+                    throw new Error(`API_ERROR:${response.status}`);
                 }
                 
                 const data = await response.json();
+                console.log('History data received:', data);
+                
+                if (!data || (!data.items && !Array.isArray(data))) {
+                    console.error('Invalid data format received from API');
+                    throw new Error('INVALID_DATA_FORMAT');
+                }
+                
+                // Support both { items: [] } format and direct array format
+                const items = data.items || (Array.isArray(data) ? data : []);
+                const totalCount = data.totalCount || items.length;
                 
                 // Update available filter options if provided
                 if (data.filters) {
@@ -581,31 +612,79 @@
                 }
                 
                 // Map API response to the format expected by the UI
-                const mappedItems = data.items.map(item => ({
-                    id: item.document_id,
-                    type: item.document_type || 'pdf',
+                const mappedItems = items.map(item => ({
+                    id: item.document_id || item.id,
+                    type: item.document_type || item.type || 'pdf',
                     category: item.category || 'Unknown',
                     keywords: item.keywords || [],
-                    title: item.title || `Document #${item.document_id}`,
-                    author: (item.author_names && item.author_names.length > 0) ? item.author_names.join(', ') : 'Unknown',
-                    date: formatDateYYYYMMDD(item.accessed_at),
+                    title: item.title || `Document #${item.document_id || item.id}`,
+                    author: (item.author_names && item.author_names.length > 0) 
+                        ? item.author_names.join(', ') 
+                        : (item.author || 'Unknown'),
+                    date: formatDateYYYYMMDD(item.accessed_at || item.date || new Date()),
                     action: item.action
                 }));
+                
+                console.log(`Processed ${mappedItems.length} history items`);
+                
+                // Collect authors from items and update filter dropdown
+                collectAvailableAuthors(mappedItems);
 
                 return { 
                     items: mappedItems, 
-                    totalCount: data.totalCount 
+                    totalCount: totalCount 
                 };
             } catch (error) {
                 console.error("Failed to fetch history data:", error);
                 
+                // Specific error handling
+                if (error.message === 'AUTH_REQUIRED' || error.message === 'AUTH_EXPIRED') {
+                    // Authentication issues - handle specially
+                    showAuthError();
+                    return { items: [], totalCount: 0, error: 'auth' };
+                }
+                
                 // In development mode, fall back to mock data
                 if (location.hostname === 'localhost' || location.hostname.includes('127.0.0.1')) {
+                    console.log('Using mock data for development');
                     return generateMockHistoryData(page, limit, filters);
                 }
                 
-                return { items: [], totalCount: 0 };
+                return { items: [], totalCount: 0, error: error.message };
             }
+        }
+        
+        // Function to display authentication error message
+        function showAuthError() {
+            const errorMsg = document.createElement('div');
+            errorMsg.className = 'auth-error bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6';
+            errorMsg.innerHTML = `
+                <div class="flex items-center">
+                    <div class="py-1"><svg class="fill-current h-6 w-6 text-red-500 mr-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M2.93 17.07A10 10 0 1 1 17.07 2.93 10 10 0 0 1 2.93 17.07zm12.73-1.41A8 8 0 1 0 4.34 4.34a8 8 0 0 0 11.32 11.32zM9 11V9h2v6H9v-4zm0-6h2v2H9V5z"/></svg></div>
+                    <div>
+                        <p class="font-bold">Authentication Required</p>
+                        <p class="text-sm">Your session has expired. Please <a href="/index.html" class="underline font-semibold">log in</a> again to view your history.</p>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <button id="login-redirect-btn" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+                        Go to Login
+                    </button>
+                </div>
+            `;
+            
+            // Remove any existing error messages first
+            const existingError = document.querySelector('.auth-error');
+            if (existingError) existingError.remove();
+            
+            // Insert at the top of the main content
+            const mainElement = document.querySelector('main');
+            mainElement.insertBefore(errorMsg, mainElement.firstChild);
+            
+            // Add event listener to the login button
+            document.getElementById('login-redirect-btn').addEventListener('click', function() {
+                window.location.href = '/index.html?redirect=history';
+            });
         }
 
         // Mock data function for development/fallback purposes
@@ -645,31 +724,144 @@
                 filterByKeywordsSelect.appendChild(option);
             });
         }
+        
+        // Update author filter dropdown with values from API or collected from documents
+        function updateAuthorFilterOptions() {
+            // Keep the "All Authors" option
+            filterByAuthorSelect.innerHTML = '<option value="all">All Authors</option>';
+            
+            // Add options from available authors
+            availableAuthors.forEach(author => {
+                const option = document.createElement('option');
+                option.value = author;
+                option.textContent = author;
+                filterByAuthorSelect.appendChild(option);
+            });
+        }
+        
+        // Collect unique authors from document items
+        function collectAvailableAuthors(documents) {
+            const authorSet = new Set();
+            documents.forEach(doc => {
+                if (doc.author && doc.author.trim() !== '') {
+                    authorSet.add(doc.author);
+                }
+            });
+            availableAuthors = Array.from(authorSet).sort();
+            updateAuthorFilterOptions();
+        }
 
         async function fetchAndDisplayDocuments() {
             const filters = {
                 searchTerm: searchBar.value.toLowerCase().trim(),
                 category: filterByCategorySelect.value,
                 keyword: filterByKeywordsSelect.value,
+                author: filterByAuthorSelect.value,
                 sortBy: sortBySelect.value,
                 startDate: startDateInput.value,
                 endDate: endDateInput.value,
             };
 
             try {
+                // Remove any existing error messages
+                const existingError = document.querySelector('.error-message');
+                if (existingError) existingError.remove();
+                
+                // Show loading state
                 documentContainer.style.opacity = '0.5';
+                documentContainer.innerHTML = `
+                    <div class="flex items-center justify-center py-12">
+                        <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-700"></div>
+                        <span class="ml-3 text-gray-600">Loading your history...</span>
+                    </div>
+                `;
+                
                 const response = await fetchHistoryData(currentPage, ITEMS_PER_PAGE, filters);
+                
+                // Handle specific error cases
+                if (response.error) {
+                    if (response.error === 'auth') {
+                        // Auth error already displayed by fetchHistoryData
+                        documentContainer.innerHTML = '';
+                        noDocumentsMessage.classList.add(CSS_CLASSES.HIDDEN);
+                        paginationControlsContainer.innerHTML = '';
+                        return;
+                    } else {
+                        // Show general error message
+                        showErrorMessage(`Error loading history: ${response.error}`);
+                        documentContainer.innerHTML = '';
+                        noDocumentsMessage.classList.add(CSS_CLASSES.HIDDEN);
+                        paginationControlsContainer.innerHTML = '';
+                        return;
+                    }
+                }
+                
                 currentTotalItems = response.totalCount;
                 renderDocuments(response.items);
                 renderPaginationControls(response.totalCount);
+                
+                // Track the view event
+                try {
+                    // Optional - track that user viewed history
+                    const userInfo = JSON.parse(sessionStorage.getItem('userInfo') || localStorage.getItem('userInfo') || '{}');
+                    if (userInfo?.token) {
+                        fetch('/api/analytics/track', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${userInfo.token}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                event: 'history_view',
+                                page: window.location.pathname,
+                                filters: filters
+                            })
+                        }).catch(e => console.log('Analytics error:', e));
+                    }
+                } catch (analyticsError) {
+                    console.log('Analytics error:', analyticsError);
+                }
             } catch (error) {
                 console.error("Failed to fetch history data:", error);
-                documentContainer.innerHTML = `<p class="text-center text-red-600 p-4">Error loading history.</p>`;
+                showErrorMessage("Error loading history. Please try again later.");
                 noDocumentsMessage.classList.add(CSS_CLASSES.HIDDEN);
                 paginationControlsContainer.innerHTML = '';
             } finally {
                  documentContainer.style.opacity = '1';
             }
+        }
+        
+        // Function to show error message
+        function showErrorMessage(message) {
+            const errorMsg = document.createElement('div');
+            errorMsg.className = 'error-message bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6';
+            errorMsg.innerHTML = `
+                <div class="flex items-center">
+                    <div class="py-1"><svg class="fill-current h-6 w-6 text-red-500 mr-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M2.93 17.07A10 10 0 1 1 17.07 2.93 10 10 0 0 1 2.93 17.07zm12.73-1.41A8 8 0 1 0 4.34 4.34a8 8 0 0 0 11.32 11.32zM9 11V9h2v6H9v-4zm0-6h2v2H9V5z"/></svg></div>
+                    <div>
+                        <p class="font-bold">Error</p>
+                        <p class="text-sm">${message}</p>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <button class="retry-btn bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+                        Try Again
+                    </button>
+                </div>
+            `;
+            
+            // Remove any existing error messages first
+            const existingError = document.querySelector('.error-message');
+            if (existingError) existingError.remove();
+            
+            // Insert at the top of the main content
+            const mainElement = document.querySelector('main');
+            mainElement.insertBefore(errorMsg, mainElement.firstChild);
+            
+            // Add event listener to retry button
+            errorMsg.querySelector('.retry-btn').addEventListener('click', function() {
+                fetchAndDisplayDocuments();
+            });
         }
 
         function handleFilterChange() {
@@ -729,7 +921,31 @@
             const keywordTrigger = target.closest('.keywords-meta-container');
 
             if (clickableAuthor) {
-                alert(`Filtering by author (not implemented): ${clickableAuthor.dataset.authorName}`);
+                const authorName = clickableAuthor.dataset.authorName;
+                // Check if this author is in our dropdown already
+                const authorOption = Array.from(filterByAuthorSelect.options).find(opt => opt.textContent === authorName);
+                
+                if (!authorOption && authorName) {
+                    // Add this author to the dropdown if not present
+                    const option = document.createElement('option');
+                    option.value = authorName;
+                    option.textContent = authorName;
+                    filterByAuthorSelect.appendChild(option);
+                    
+                    // Also add to our tracking array
+                    if (!availableAuthors.includes(authorName)) {
+                        availableAuthors.push(authorName);
+                    }
+                }
+                
+                // Set the filter value and trigger change
+                filterByAuthorSelect.value = authorName;
+                handleFilterChange();
+                
+                // Expand filters if they're collapsed
+                if (!filtersExpanded) {
+                    toggleFilterExpansion(null, true);
+                }
             } else if (clickableCategory) {
                 filterByCategorySelect.value = clickableCategory.dataset.categoryName;
                 handleFilterChange();
@@ -800,6 +1016,7 @@
             sortBySelect.addEventListener('change', handleFilterChange);
             filterByCategorySelect.addEventListener('change', handleFilterChange);
             filterByKeywordsSelect.addEventListener('change', handleFilterChange);
+            filterByAuthorSelect.addEventListener('change', handleFilterChange);
             startDateInput.addEventListener('change', handleFilterChange);
             endDateInput.addEventListener('change', handleFilterChange);
             documentContainer.addEventListener('click', handleContainerClick);

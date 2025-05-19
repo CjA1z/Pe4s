@@ -94,34 +94,100 @@ export async function handleFileUpload(ctx: Context): Promise<void> {
       originalPath = originalPath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
     }
     
-    // For replacements, use the directory from the original path
-    if (isReplacement && originalPath) {
+    // Special handling for foreword files
+    const isFileNameForeword = file && 
+                              typeof file === 'object' && 
+                              (file as any).filename && 
+                              ((file as any).filename.toLowerCase().includes('foreword'));
+    const isForewordUpload = isFileNameForeword || 
+                            (data.fields.document_type && data.fields.document_type.toString().toLowerCase().includes('foreword')) || 
+                            data.fields.is_foreword === 'true';
+    
+    console.log(`[UPLOAD_DEBUG] File appears to be foreword? ${isForewordUpload ? 'YES' : 'NO'}`);
+    
+    // Extract storage path from original path if available
+    if (originalPath && originalPath.includes('/')) {
       const lastSlashIndex = originalPath.lastIndexOf('/');
-      if (lastSlashIndex !== -1) {
         storagePath = originalPath.substring(0, lastSlashIndex);
         console.log("[UPLOAD_DEBUG] Using storage path from original:", storagePath);
-      }
     }
     
-    // Default to hello directory if no path specified
+    // Default storage path if one is not provided
     if (!storagePath) {
       storagePath = "storage/hello";
+       console.log("[UPLOAD_DEBUG] Using default storage path:", storagePath);
     }
     
-    // Normalize storage path
+    // Clean up the path for safety
     storagePath = storagePath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
     
-    // Get the workspace root directory (parent of Deno directory)
-    const workspaceRoot = Deno.cwd().replace(/[\\/]Deno$/, '');
+    // Handle foreword files specially - ensure they go to a forewords subfolder
+    if (isForewordUpload) {
+       console.log("[UPLOAD_DEBUG] Detected foreword file upload");
+       
+       // Extract document type from path or from form data
+       const pathParts = storagePath.split('/');
+       let docType = 'hello'; // Default
+       
+       // Try to get document type from path
+       if (pathParts.length > 1) {
+           docType = pathParts[1].toLowerCase();
+       }
+       
+       // Override with document_type from form data if available
+       if (data.fields.document_type) {
+           docType = data.fields.document_type.toString().toLowerCase();
+       }
+       
+       // Handle various document types - ensure they're valid
+       const validDocTypes = ['thesis', 'dissertation', 'confluence', 'synergy', 'hello'];
+       if (!validDocTypes.includes(docType)) {
+           docType = 'hello';
+       }
+       
+       // Ensure the path correctly includes the document type and forewords subfolder
+       if (storagePath.includes('forewords')) {
+           // Path already includes forewords subfolder, verify its structure
+           const forewordDirIndex = storagePath.indexOf('forewords');
+           const beforeForewordDir = storagePath.substring(0, forewordDirIndex);
+           
+           if (!beforeForewordDir.includes(docType)) {
+               // Needs correcting - rebuild the path
+               storagePath = `storage/${docType}/forewords`;
+           }
+       } else {
+           // Build the proper foreword path
+           storagePath = `storage/${docType}/forewords`;
+       }
+       
+       console.log("[UPLOAD_DEBUG] Final foreword directory path:", storagePath);
+    }
     
-    // Make sure the storage path is for the workspace level, not inside the Deno directory
+    // Ensure storage path is at workspace level
     if (storagePath.includes("Deno/storage")) {
       storagePath = storagePath.replace("Deno/storage", "storage");
       console.log("[UPLOAD_DEBUG] Fixed storage path to be at workspace level:", storagePath);
     }
     
     console.log("[UPLOAD_DEBUG] Final storage path:", storagePath);
+    
+    // Get the workspace root directory (parent of Deno directory)
+    const workspaceRoot = Deno.cwd().replace(/[\\/]Deno$/, '');
+    
     console.log("[UPLOAD_DEBUG] Workspace root:", workspaceRoot);
+    
+    // Ensure foreword directories exist if this is a foreword upload
+    if (isForewordUpload) {
+        // Ensure the directory exists
+        try {
+            const fullPath = join(workspaceRoot, storagePath);
+            await Deno.mkdir(fullPath, { recursive: true });
+            console.log("[UPLOAD_DEBUG] Created or verified foreword directory:", fullPath);
+        } catch (dirError) {
+            console.warn("[UPLOAD_DEBUG] Directory creation warning:", dirError instanceof Error ? dirError.message : String(dirError));
+            // Continue with upload attempt
+        }
+    }
     
     // Save file with replacement options if needed
     const saveOptions = isReplacement && originalName ? {

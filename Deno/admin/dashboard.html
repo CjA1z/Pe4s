@@ -26,7 +26,7 @@
   <link rel="stylesheet" href="/admin/Components/css/chart.css">
   <!-- Then load JavaScript -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="/Components/js/login.js"></script>
+  <script src="/Components/js/document-visit-tracker.js"></script>
   <script src="/admin/Components/js/dashboard.js"></script>
   <script src="/admin/Components/js/side_bar.js"></script>
   <script src="/admin/Components/js/most-visited-works.js"></script>
@@ -104,16 +104,7 @@
       
       <table class="most-visited-table">
         <h3 class="most-visited-heading">Most Visited Works</h3>
-        <div class="most-visited-filter">
-          <label for="most-visited-time-period" class="filter-label">Time period:</label>
-          <select id="most-visited-time-period" class="time-filter">
-            <option value="1">Daily</option>
-            <option value="3">Last 3 days</option>
-            <option value="7" selected>Last 7 days</option>
-            <option value="30">Last month</option>
-            <option value="0">All time</option>
-          </select>
-        </div>
+        <!-- Time filter removed, will always show all time data -->
         <thead>
           <tr>
             <th>Cover</th>

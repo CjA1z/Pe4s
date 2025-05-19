@@ -6,6 +6,7 @@
     <title>Archiving System Page - Optimized</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="/Components/js/document-visit-tracker.js"></script>
     <style>
         /* CSS Variables for Theming */
         :root {
@@ -789,6 +790,7 @@
                 <form id="accessForm">
                     <input type="hidden" id="requestedDocId" name="requested_doc_id">
                     <input type="hidden" id="requestedDocTitle" name="requested_doc_title">
+                    <!-- No isEntireCollection field needed for single document -->
                     <div style="margin-bottom: 1rem;">
                         <label for="full_name">Full Name:</label>
                         <input type="text" id="full_name" name="full_name" required placeholder="e.g., Juan Dela Cruz">
@@ -1457,9 +1459,13 @@
 
             if (floatingRequestButton) {
                 floatingRequestButton.addEventListener('click', () => {
-                    // Only open choice modal if not in pending state
+                    // Only open access request modal directly if not in pending state
                     if (!floatingRequestButton.classList.contains('status-pending')) {
-                        openRequestChoiceModal();
+                        if (mainDocumentData && mainDocumentData.doc_id) {
+                            openAccessRequestModal(mainDocumentData.doc_id, mainDocumentData.title || 'Document');
+                        } else {
+                            showGeneralMessage("Document details not available for request.", true);
+                        }
                     }
                 });
             }
@@ -1518,45 +1524,156 @@
                         if(reasonErrorElement) reasonErrorElement.style.display = 'block';
                         return;
                     }
+                    
+                    // Only check for "Other" details if "Other" is selected
                     if (selectedReasons.includes('Other') && reasonDescription && reasonDescription.value.trim() === '') {
                          showGeneralMessage("Please provide details for your 'Other' reason.", true);
-                         if(reasonDescription) reasonDescription.focus(); return;
+                         if(reasonDescription) reasonDescription.focus();
+                         return;
                     }
+                    
                     if (!consentCheckbox || !consentCheckbox.checked) {
-                        showGeneralMessage("Please agree to the Terms and Conditions.", true); return;
+                        showGeneralMessage("Please agree to the Terms and Conditions.", true);
+                        return;
                     }
 
+                    // Prepare form data in the format expected by the backend
                     const formData = {
-                        docId: requestedDocIdInput.value, // This is the ID of the item being requested
-                        docTitle: requestedDocTitleInput.value,
-                        fullName: document.getElementById('full_name').value,
+                        document_id: requestedDocIdInput.value, // This is the ID of the item being requested
+                        full_name: document.getElementById('full_name').value,
                         email: document.getElementById('email').value,
                         affiliation: document.getElementById('affiliation').value,
-                        reasons: selectedReasons,
-                        reasonDetails: reasonDescription ? reasonDescription.value : ''
-                     };
-                    console.log("Access Request For:", formData);
+                        reason: selectedReasons.join(', '),
+                        reason_details: ''
+                    };
+                    
+                    // Ensure reason_details is always populated (it's required by the backend)
+                    if (selectedReasons.includes('Other') && reasonDescription && reasonDescription.value.trim()) {
+                        // If "Other" is selected and details are provided, use those details
+                        formData.reason_details = reasonDescription.value.trim();
+                    } else if (reasonDescription && reasonDescription.value.trim()) {
+                        // If details were provided even without "Other" selected
+                        formData.reason_details = reasonDescription.value.trim();
+                    } else {
+                        // Default: Use the selected reasons as the details
+                        formData.reason_details = `Request for access based on: ${selectedReasons.join(', ')}`;
+                    }
+                    
+                    console.log("Submitting access request:", formData);
+                    
+                    // Show a loading indicator
+                    const submitButton = event.submitter;
+                    const originalButtonText = submitButton.innerHTML;
+                    submitButton.disabled = true;
+                    submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+                    
+                    // Add timeout and error handling for the fetch request
+                    let requestTimeout;
+                    
+                    // Create an AbortController to handle timeouts
+                    const controller = new AbortController();
+                    const timeoutDuration = 15000; // 15 seconds
+                    
+                    // Set up timeout to abort fetch if it takes too long
+                    requestTimeout = setTimeout(() => {
+                        controller.abort();
+                    }, timeoutDuration);
+                    
+                    // Submit the request to the backend
+                    fetch('/api/document-requests', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(formData),
+                        signal: controller.signal // Connect the abort controller
+                    })
+                    .then(response => {
+                        // Clear timeout as we got a response
+                        clearTimeout(requestTimeout);
+                        
+                        // Reset the button state
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = originalButtonText;
+                        
+                        if (response.ok) {
+                            return response.json();
+                        } else {
+                            // Handle error response
+                            return response.json().then(errorData => {
+                                throw new Error(errorData.error || 'Failed to submit request');
+                            }).catch(jsonError => {
+                                // If we can't parse the error as JSON, use status text
+                                throw new Error(`Server error: ${response.status} ${response.statusText}`);
+                            });
+                        }
+                    })
+                    .then(data => {
+                        console.log("Request submitted successfully:", data);
 
-                    // Store pending status for the main document if the request was for the main document
-                    // OR if the request was for any document originating from the floating button workflow.
-                    // For simplicity, we'll tie the floating button's pending state to the main document's ID.
-                    if (mainDocumentData.doc_id) { // Check if mainDocumentData and its doc_id exist
-                        if (formData.docId === mainDocumentData.doc_id) { // Only set pending for main document requests
+                        // Store pending status for the document
+                        if (mainDocumentData.doc_id) {
                              localStorage.setItem('requestStatus_' + mainDocumentData.doc_id, 'pending');
                              updateFloatingButtonDisplay(); // Update the FAB to "Request Pending"
                         }
+
+                        // Set receipt details
+                        if(receiptNumberElement) {
+                            // Use the ID from the response if available, otherwise generate a receipt number
+                            receiptNumberElement.textContent = data.id ? `REQ-${data.id}` : `REQ-${Date.now()}`;
                     }
+                        if(receiptDocTitleElement) receiptDocTitleElement.textContent = requestedDocTitleInput.value;
 
-
-                    if(receiptNumberElement) receiptNumberElement.textContent = 'REQ-' + Date.now();
-                    if(receiptDocTitleElement) receiptDocTitleElement.textContent = formData.docTitle;
+                        // Set up email service link
                     const emailInfo = getEmailServiceInfo(formData.email.toLowerCase());
                     if(emailServiceLink) {
                         emailServiceLink.href = emailInfo.url;
                         emailServiceLink.textContent = `Open ${emailInfo.name}`;
                     }
+                        
+                        // Show receipt section and a message about email
                     if(formSection) formSection.classList.add('modal-section-hidden');
-                    if(receiptSection) receiptSection.classList.remove('modal-section-hidden');
+                        if(receiptSection) {
+                            // Add note about possible email delay
+                            const emailNote = document.createElement('p');
+                            emailNote.classList.add('text-sm', 'text-gray-600', 'mt-2');
+                            emailNote.innerHTML = 'Note: Confirmation email may be delayed or might go to your spam folder.'
+                            
+                            // Find a better location within the receipt to place the note
+                            const receiptFooter = receiptSection.querySelector('.receipt-footer');
+                            if (receiptFooter) {
+                                receiptFooter.appendChild(emailNote);
+                            } else {
+                                // Fallback to the main receipt container if footer not found
+                                receiptSection.querySelector('.polished-receipt').appendChild(emailNote);
+                            }
+                            
+                            receiptSection.classList.remove('modal-section-hidden');
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Error submitting request:", error);
+                        
+                        // Reset the button state
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = originalButtonText;
+                        
+                        // Clear timeout if error happened before timeout
+                        clearTimeout(requestTimeout);
+                        
+                        // Check for network errors or timeouts
+                        let errorMessage = error.message || 'Failed to submit request. Please try again.';
+                        
+                        if (error.name === 'AbortError') {
+                            errorMessage = 'Request timed out. The server may be busy, please try again later.';
+                        } else if (error.message && error.message.includes('NetworkError')) {
+                            errorMessage = 'Network error. Please check your connection and try again.';
+                        } else if (error.message && error.message.includes('Failed to fetch')) {
+                            errorMessage = 'Connection error. The server might be down or restarting.';
+                        }
+                        
+                        showGeneralMessage(`Error: ${errorMessage}`, true);
+                    });
                 });
             }
 
@@ -1673,6 +1790,22 @@
         } else {
             console.error('NavbarModule not found! Make sure navbar-loader.js is loaded correctly.');
         }
+    </script>
+    
+    <!-- Initialize document visit tracking -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof initSingleDocumentTracking === 'function') {
+                // Get document ID from URL
+                const documentId = getDocumentIdFromUrl();
+                if (documentId) {
+                    console.log('Tracking guest visit for document:', documentId);
+                    initSingleDocumentTracking(documentId);
+                }
+            } else {
+                console.error('DocumentTracker not found! Make sure document-visit-tracker.js is loaded correctly.');
+            }
+        });
     </script>
 </body>
 </html>

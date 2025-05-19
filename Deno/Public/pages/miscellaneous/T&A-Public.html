@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terms & Conditions - PeAS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        :root {
+            --theme-gold: #FDB813;
+            --theme-gold-darker: #EAA10F;
+            --theme-gold-light-bg: rgba(253, 184, 19, 0.3); 
+            --theme-gold-lighter-bg: rgba(253, 184, 19, 0.08); 
+            --theme-green-dark: #006A4E; 
+            --theme-green-darker-text: #00523D;
+            --theme-page-bg: #F9F6EE;
+            --neutral-border-color: #e5e7eb;
+            --primary-text-color: #1f2937;
+            --secondary-text-color: #424b57; 
+            --text-on-dark-bg: #FFFFFF; /* This will be used for header text */
+            --text-on-selection: #000000; 
+            --pastel-gold: #FFF5CC;
+            --pastel-green: #D0EAD0;
+            --footer-glass-bg-color: rgba(255, 255, 255, 0.25);
+            --footer-glass-border-color: rgba(255, 255, 255, 0.4);
+            --footer-glass-blur-radius: 6px;
+            --hover-focus-color: var(--theme-green-darker-text); 
+        }
+
+        html {
+            height: 100%;
+            box-sizing: border-box;
+            scroll-behavior: smooth;
+        }
+        *, *:before, *:after {
+            box-sizing: inherit;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--theme-page-bg);
+            background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23D3CBBF' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            color: var(--primary-text-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            margin: 0;
+            line-height: 1.65; 
+        }
+
+        .page-wrapper {
+            flex-grow: 1;
+        }
+        
+        main.container { 
+            padding-top: 2.5rem;
+        }
+        @media (min-width: 768px) {
+            main.container {
+                padding-top: 3rem;
+            }
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Inter', sans-serif;
+            color: var(--primary-text-color);
+            font-weight: 600;
+            margin-top: 0;
+            line-height: 1.3;
+        }
+
+        .font-libre { font-family: 'Libre Baskerville', serif; }
+        .font-inter { font-family: 'Inter', sans-serif; }
+
+        .container { 
+            width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+        @media (min-width: 640px) { .container { max-width: 640px; padding-left: 1.5rem; padding-right: 1.5rem; } }
+        @media (min-width: 768px) { .container { max-width: 768px; } }
+        @media (min-width: 1024px) { .container { max-width: 900px; } }
+        
+
+        /* Header styles with animated gradient */
+        .page-header {
+            position: relative; /* For ::before pseudo-element */
+            overflow: hidden; /* To contain ::before */
+            background-color: var(--theme-green-dark); /* Base color */
+            color: var(--text-on-dark-bg);
+            padding: 3rem 1.5rem; 
+            margin-bottom: 2.5rem; 
+            text-align: center; 
+            user-select: none; 
+            -webkit-user-select: none; 
+            -moz-user-select: none; 
+            -ms-user-select: none; 
+        }
+
+        @keyframes headerGradientAnimation { /* From T&A-First.html */
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .page-header::before { /* From T&A-First.html */
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 0; /* Behind the content */
+            background-image: linear-gradient(135deg,
+                rgba(220, 38, 38, 0.18), rgba(253, 184, 19, 0.18), 
+                rgba(220, 38, 38, 0.22), rgba(253, 184, 19, 0.22)); /* Colors from T&A-First */
+            background-size: 400% 400%;
+            animation: headerGradientAnimation 25s ease infinite;
+            opacity: 0.7; /* Opacity from T&A-First */
+        }
+
+        .page-header .header-content {
+            position: relative; /* To ensure it's above the ::before */
+            z-index: 1;
+            max-width: 900px; 
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .page-header .header-content h1 {
+            font-family: 'Inter', sans-serif; 
+            color: var(--text-on-dark-bg);
+            font-weight: 700; 
+            font-size: 1.875rem; 
+            line-height: 1.2;
+            margin-bottom: 0.5rem; 
+        }
+        .page-header .header-content h1 .fas { 
+            margin-right: 0.75rem;
+            font-size: 0.9em; 
+            opacity: 0.9;
+            vertical-align: baseline; 
+        }
+
+        .page-header .header-content p.subtitle { 
+            font-family: 'Libre Baskerville', serif; 
+            color: rgba(255, 255, 255, 0.85); 
+            font-size: 1.1rem; 
+            line-height: 1.7;
+            margin: 0 auto; 
+            max-width: 700px; 
+        }
+        
+        @media (min-width: 640px) {
+            .page-header { padding: 4rem 2rem; }
+            .page-header .header-content h1 { font-size: 2.5rem; } 
+            .page-header .header-content p.subtitle { font-size: 1.2rem; }
+        }
+        @media (min-width: 1024px) {
+            .page-header .header-content h1 { font-size: 2.75rem; }
+        }
+        /* End of Header Styles */
+
+
+        .terms-document-card {
+            background-color: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px) saturate(120%);
+            -webkit-backdrop-filter: blur(12px) saturate(120%);
+            border: 1px solid rgba(229, 231, 235, 0.45);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem; 
+        }
+
+        .terms-document-card h2 {
+            font-size: 1.35rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--primary-text-color);
+            border-bottom: 1px solid var(--neutral-border-color);
+            padding-bottom: 0.75rem;
+        }
+        
+        .terms-content {
+            color: var(--secondary-text-color);
+            font-size: 1rem; 
+            line-height: 1.7; 
+            padding-top: 0.5rem;
+        }
+        .terms-content p, 
+        .terms-content li {
+            margin-bottom: 1rem;
+            transition: color 0.2s ease-in-out, background-color 0.2s ease-in-out; 
+            padding: 0.2rem 0.1rem; 
+            border-radius: 0.25rem; 
+        }
+        .terms-content ul {
+            padding-left: 1.5rem;
+             margin-bottom: 1rem; 
+        }
+        .terms-content li {
+            margin-bottom: 0.5rem;
+        }
+
+        .terms-content p:hover,
+        .terms-content li:hover {
+            color: var(--hover-focus-color);
+        }
+
+        .terms-content p::selection,
+        .terms-content li::selection,
+        .terms-content span::selection { 
+            background-color: var(--theme-gold-light-bg);
+            color: var(--text-on-selection); 
+        }
+        .terms-content p::-moz-selection,
+        .terms-content li::-moz-selection,
+        .terms-content span::-moz-selection { 
+            background-color: var(--theme-gold-light-bg);
+            color: var(--text-on-selection);
+        }
+
+
+        @keyframes subtleGradientAnimation {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .footer-wrapper {
+            margin-top: auto;
+            width: 100%;
+        }
+        .site-footer {
+            position: relative;
+            overflow: hidden;
+            background-color: var(--footer-glass-bg-color);
+            -webkit-backdrop-filter: blur(var(--footer-glass-blur-radius));
+            backdrop-filter: blur(var(--footer-glass-blur-radius));
+            border-top: 1px solid var(--footer-glass-border-color);
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+            color: #374151;
+        }
+        .site-footer::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: -1;
+            background: linear-gradient(45deg, var(--pastel-gold), var(--pastel-green), var(--pastel-gold));
+            background-size: 200% 200%;
+            animation: subtleGradientAnimation 18s ease infinite;
+            opacity: 0.7;
+        }
+        .footer-content-padding {
+            position: relative;
+            z-index: 1;
+            padding: 2rem 1.5rem;
+            max-width: 80rem;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        @media (min-width: 640px) { .footer-content-padding { padding-left: 2rem; padding-right: 2rem; } }
+        @media (min-width: 1024px) { .footer-content-padding { padding-left: 2.5rem; padding-right: 2.5rem; } }
+
+        .footer-layout {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2rem;
+            text-align: center;
+        }
+        @media (min-width: 1024px) {
+            .footer-layout {
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: flex-start;
+                text-align: left;
+            }
+        }
+
+        .footer-logo-section { flex-shrink: 0; }
+        .footer-logo-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            margin-bottom: 0.75rem;
+        }
+        @media (min-width: 640px) {
+            .footer-logo-container { align-items: flex-start; text-align: left; }
+        }
+        @media (min-width: 1024px) {
+             .footer-logo-container { align-items: flex-start; }
+        }
+        .footer-logo-container img {
+            height: 3rem;
+            width: auto;
+            margin-bottom: 0.5rem;
+        }
+        @media (min-width: 640px) { .footer-logo-container img { height: 3.5rem; margin-bottom: 0; } }
+
+        .footer-nav {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+        }
+        @media (min-width: 1024px) { .footer-nav { align-items: flex-start; } }
+
+        .footer-link {
+            color: var(--theme-green-dark);
+            transition: color 0.2s ease-in-out, opacity 0.2s ease-in-out;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .footer-link:hover {
+            color: var(--theme-gold);
+            opacity: 0.85;
+        }
+        .copyright-text {
+            color: #6b7280;
+            font-size: 0.75rem;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <header class="page-header" role="banner">
+            <div class="header-content container">
+                <h1><i class="fas fa-file-signature"></i> Terms & Conditions</h1>
+                <p class="subtitle">This document outlines the terms and conditions for using the PeAS (Paulinian electronic Archiving System). By using our services, you agree to these terms.</p>
+            </div>
+        </header>
+
+        <main class="container" role="main">
+            <article class="terms-document-card">
+                <h2>1. Introduction & Acceptance of Terms</h2>
+                <div class="terms-content">
+                    <p>Welcome to PeAS (Paulinian electronic Archiving System)! These Terms and Conditions ("Terms") govern your access to and use of our website, services, and applications (collectively, the "Service"). By accessing or using the Service, you signify your agreement to be bound by these Terms. If you do not agree to these Terms, you may not access or use the Service.</p>
+                </div>
+            </article>
+
+            <article class="terms-document-card">
+                <h2>2. Account Registration and Security</h2>
+                <div class="terms-content">
+                    <p>To access certain features of the Service, you may be required to register for an account. You agree to provide accurate, current, and complete information during the registration process and to update such information to keep it accurate, current, and complete. You are responsible for safeguarding your password and for all activities that occur under your account. You agree to notify PeAS immediately of any unauthorized use of your account.</p>
+                    <ul>
+                        <li>Ensure your account information is accurate and up-to-date.</li>
+                        <li>Maintain the confidentiality of your account password.</li>
+                        <li>Report any suspected unauthorized account activity promptly.</li>
+                    </ul>
+                </div>
+            </article>
+
+            <article class="terms-document-card">
+                <h2>3. User Content and Intellectual Property Rights</h2>
+                <div class="terms-content">
+                    <p>Our Service may allow you to post, link, store, share, and otherwise make available certain information, text, graphics, videos, or other material ("User Content"). You retain all rights in, and are solely responsible for, the User Content you post to the Service.</p>
+                    <p>By making any User Content available through the Service, you grant to PeAS a non-exclusive, transferable, sublicensable, worldwide, royalty-free license to use, copy, modify, create derivative works based upon, distribute, publicly display, and publicly perform your User Content in connection with operating and providing the Service.</p>
+                </div>
+            </article>
+
+            <article class="terms-document-card">
+                <h2>4. Prohibited Activities and User Conduct</h2>
+                <div class="terms-content">
+                    <p>You agree not to engage in any of the following prohibited activities:</p>
+                    <ul>
+                        <li>Using the Service for any illegal purpose or in violation of any local, state, national, or international law.</li>
+                        <li>Violating or encouraging others to violate the rights of third parties, including intellectual property rights.</li>
+                        <li>Posting, uploading, or distributing any User Content that is unlawful, defamatory, libelous, inaccurate, or that a reasonable person could deem to be objectionable, profane, indecent, pornographic, harassing, threatening, embarrassing, hateful, or otherwise inappropriate.</li>
+                        <li>Interfering with security-related features of the Service.</li>
+                        <li>Transmitting any viruses, adware, spyware, worms, or other malicious code.</li>
+                    </ul>
+                </div>
+            </article>
+            
+            <article class="terms-document-card">
+                <h2>5. Disclaimers and Limitation of Liability</h2>
+                <div class="terms-content">
+                    <p>The Service is provided "AS IS" and "AS AVAILABLE" without warranties of any kind, either express or implied, including, but not limited to, implied warranties of merchantability, fitness for a particular purpose, and non-infringement. PeAS makes no warranty that the Service will meet your requirements or be available on an uninterrupted, secure, or error-free basis.</p>
+                    <p>To the maximum extent permitted by applicable law, PeAS shall not be liable for any indirect, incidental, special, consequential, or punitive damages, or any loss of profits or revenues, whether incurred directly or indirectly, or any loss of data, use, goodwill, or other intangible losses, resulting from your access to or use of or inability to access or use the Service.</p>
+                </div>
+            </article>
+
+            </main>
+    </div>
+
+    <div class="footer-wrapper">
+        <footer id="site-footer-element" class="site-footer" role="contentinfo">
+            <div class="footer-content-padding">
+                <div class="footer-layout">
+                    <div class="footer-logo-section">
+                        <div class="footer-logo-container">
+                             <img
+                                src="https://placehold.co/180x70/006A4E/FFFFFF?text=PeAS+Legal"
+                                alt="PeAS Legal Logo"
+                                onerror="this.onerror=null; this.src='https://placehold.co/180x70/cccccc/ffffff?text=Logo+Error';">
+                        </div>
+                        <p class="copyright-text">&copy; <span id="footerCurrentYear"></span> PeAS. All Rights Reserved.</p>
+                    </div>
+                    <nav class="footer-nav" role="navigation" aria-label="Footer Navigation">
+                        <a href="#home" class="footer-link">Home</a> 
+                        <a href="#contact" class="footer-link">Contact</a> 
+                        <a href="#" class="footer-link">Terms & Conditions</a>
+                        <a href="#privacy" class="footer-link">Privacy Policy</a> 
+                    </nav>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const yearElement = document.getElementById('footerCurrentYear');
+            if (yearElement) {
+                yearElement.textContent = new Date().getFullYear();
+            }
+        });
+    </script>
+
+</body>
+</html>

@@ -708,6 +708,253 @@ export class DocumentModel {
       return null;
     }
   }
+
+  /**
+   * Get document with full metadata for emails
+   * @param id Document ID
+   * @returns Document with metadata or null if not found
+   */
+  static async getDocumentById(id: number | string): Promise<any | null> {
+    try {
+      // Convert string ID to number if necessary
+      const docId = typeof id === 'string' ? parseInt(id) : id;
+      console.log(`[DocumentModel.getDocumentById] Looking up document with ID: ${docId}`);
+      
+      // First get basic document info
+      const document = await this.getById(docId);
+      
+      if (!document) {
+        console.warn(`[DocumentModel.getDocumentById] Document with ID ${docId} not found`);
+        return null;
+      }
+      
+      console.log(`[DocumentModel.getDocumentById] Retrieved base document:`, document);
+      
+      // Get category info if available
+      let category = null;
+      if (document.category_id) {
+        console.log(`[DocumentModel.getDocumentById] Looking up category for ID: ${document.category_id}`);
+        
+        try {
+          const categoryResult = await client.queryObject(
+            "SELECT name FROM categories WHERE id = $1",
+            [document.category_id]
+          );
+          console.log(`[DocumentModel.getDocumentById] Category query result:`, categoryResult.rows);
+          
+          if (categoryResult.rows.length > 0) {
+            category = categoryResult.rows[0].name;
+            console.log(`[DocumentModel.getDocumentById] Found category: ${category}`);
+          } else {
+            console.log(`[DocumentModel.getDocumentById] No category found for ID: ${document.category_id}`);
+          }
+        } catch (categoryError) {
+          console.error(`[DocumentModel.getDocumentById] Error querying category: ${categoryError}`);
+          // Check if it's a table not found error
+          if (categoryError instanceof Error && categoryError.message.includes("relation") && categoryError.message.includes("does not exist")) {
+            console.error(`[DocumentModel.getDocumentById] Categories table may not exist in the database`);
+          }
+        }
+      } else {
+        console.log(`[DocumentModel.getDocumentById] Document has no category_id`);
+        
+        // Try to use category field if it exists directly on document
+        if (document.category) {
+          category = document.category;
+          console.log(`[DocumentModel.getDocumentById] Using direct category field: ${category}`);
+        }
+      }
+      
+      // Get author info
+      let author = null;
+      try {
+        console.log(`[DocumentModel.getDocumentById] Looking up authors for document ID: ${docId}`);
+        
+        const authorsResult = await client.queryObject(
+          `SELECT a.full_name 
+           FROM authors a
+           JOIN document_authors da ON a.id = da.author_id
+           WHERE da.document_id = $1
+           ORDER BY da.author_order`,
+          [docId]
+        );
+        
+        console.log(`[DocumentModel.getDocumentById] Authors query result:`, authorsResult.rows);
+        
+        if (authorsResult.rows.length > 0) {
+          author = authorsResult.rows.map(a => a.full_name).join(', ');
+          console.log(`[DocumentModel.getDocumentById] Found authors: ${author}`);
+        } else {
+          console.log(`[DocumentModel.getDocumentById] No authors found for document ID: ${docId}`);
+          
+          // Check if the document has an author field directly
+          if (document.author) {
+            author = document.author;
+            console.log(`[DocumentModel.getDocumentById] Using direct author field: ${author}`);
+          }
+        }
+      } catch (authorError) {
+        console.error(`[DocumentModel.getDocumentById] Error fetching authors: ${authorError}`);
+        // Check if it's a table not found error
+        if (authorError instanceof Error && authorError.message.includes("relation") && authorError.message.includes("does not exist")) {
+          console.error(`[DocumentModel.getDocumentById] Authors table may not exist in the database`);
+        }
+        
+        // Try to use author field if it exists directly on document
+        if (document.author) {
+          author = document.author;
+          console.log(`[DocumentModel.getDocumentById] Using direct author field as fallback: ${author}`);
+        }
+      }
+      
+      // Get keywords
+      let keywords = null;
+      try {
+        console.log(`[DocumentModel.getDocumentById] Looking up keywords for document ID: ${docId}`);
+        
+        const keywordsResult = await client.queryObject(
+          `SELECT k.name
+           FROM keywords k
+           JOIN document_keywords dk ON k.id = dk.keyword_id
+           WHERE dk.document_id = $1`,
+          [docId]
+        );
+        
+        console.log(`[DocumentModel.getDocumentById] Keywords query result:`, keywordsResult.rows);
+        
+        if (keywordsResult.rows.length > 0) {
+          keywords = keywordsResult.rows.map(k => k.name).join(', ');
+          console.log(`[DocumentModel.getDocumentById] Found keywords: ${keywords}`);
+        } else {
+          console.log(`[DocumentModel.getDocumentById] No keywords found for document ID: ${docId}`);
+          
+          // Check if the document has keywords field directly
+          if (document.keywords) {
+            keywords = Array.isArray(document.keywords) ? document.keywords.join(', ') : document.keywords;
+            console.log(`[DocumentModel.getDocumentById] Using direct keywords field: ${keywords}`);
+          }
+        }
+      } catch (keywordError) {
+        console.error(`[DocumentModel.getDocumentById] Error fetching keywords: ${keywordError}`);
+        // Check if it's a table not found error
+        if (keywordError instanceof Error && keywordError.message.includes("relation") && keywordError.message.includes("does not exist")) {
+          console.error(`[DocumentModel.getDocumentById] Keywords table may not exist in the database`);
+        }
+        
+        // Try to use keywords field if it exists directly on document
+        if (document.keywords) {
+          keywords = Array.isArray(document.keywords) ? document.keywords.join(', ') : document.keywords;
+          console.log(`[DocumentModel.getDocumentById] Using direct keywords field as fallback: ${keywords}`);
+        }
+      }
+      
+      // Create enriched document with metadata
+      const enrichedDocument = {
+        ...document,
+        author,
+        category,
+        keywords
+      };
+      
+      console.log(`[DocumentModel.getDocumentById] Returning enriched document:`, {
+        id: enrichedDocument.id,
+        title: enrichedDocument.title,
+        author: enrichedDocument.author,
+        category: enrichedDocument.category,
+        keywords: enrichedDocument.keywords
+      });
+      
+      return enrichedDocument;
+    } catch (error) {
+      console.error(`[DocumentModel.getDocumentById] Error fetching document with metadata: ${error}`);
+      return null;
+    }
+  }
+
+  /**
+   * Get all contained document paths for a compiled document
+   * @param compiledDocId Compiled document ID
+   * @returns Array of file paths for all child documents
+   */
+  static async getCompiledDocumentChildPaths(compiledDocId: number | string): Promise<string[]> {
+    try {
+      // Convert ID to number if it's a string
+      const docId = typeof compiledDocId === 'string' ? parseInt(compiledDocId) : compiledDocId;
+      
+      if (isNaN(docId)) {
+        console.error(`[DocumentModel] Invalid compiled document ID: ${compiledDocId}`);
+        return [];
+      }
+      
+      console.log(`[DocumentModel] Getting child document paths for compiled document ID: ${docId}`);
+      
+      // First check if this is actually a compiled document
+      const checkResult = await client.queryObject<{ id: number }>(
+        "SELECT id FROM compiled_documents WHERE id = $1",
+        [docId]
+      );
+      
+      if (checkResult.rows.length === 0) {
+        console.warn(`[DocumentModel] ID ${docId} is not a compiled document`);
+        // Check if it might be a document that is part of a compiled document
+        const parentResult = await client.queryObject<{ compiled_document_id: number }>(
+          "SELECT compiled_document_id FROM compiled_document_items WHERE document_id = $1 LIMIT 1",
+          [docId]
+        );
+        
+        if (parentResult.rows.length > 0 && parentResult.rows[0].compiled_document_id) {
+          const parentId = parentResult.rows[0].compiled_document_id;
+          console.log(`[DocumentModel] Document ${docId} is part of compiled document ${parentId}, using that instead`);
+          return this.getCompiledDocumentChildPaths(parentId);
+        }
+        
+        return [];
+      }
+      
+      // Query all child documents through the relationship table
+      const result = await client.queryObject<{ document_id: number, file_path: string }>(
+        `SELECT cdi.document_id, d.file_path 
+         FROM compiled_document_items cdi
+         JOIN documents d ON cdi.document_id = d.id
+         WHERE cdi.compiled_document_id = $1 
+         AND d.deleted_at IS NULL
+         ORDER BY cdi.order_position ASC`,
+        [docId]
+      );
+      
+      console.log(`[DocumentModel] Found ${result.rows.length} child documents for compiled document ${docId}`);
+      
+      // Get the file paths for all child documents
+      const filePaths: string[] = [];
+      
+      for (const row of result.rows) {
+        if (row.file_path) {
+          try {
+            const resolvedPath = await this.getDocumentPath(row.document_id);
+            if (resolvedPath) {
+              filePaths.push(resolvedPath);
+              console.log(`[DocumentModel] Added child document path: ${resolvedPath}`);
+            } else {
+              console.warn(`[DocumentModel] Could not resolve path for child document ID: ${row.document_id}`);
+              // Still add the raw file path as a fallback
+              filePaths.push(row.file_path);
+            }
+          } catch (error) {
+            console.error(`[DocumentModel] Error resolving path for document ${row.document_id}:`, error);
+            // Add raw path as fallback
+            filePaths.push(row.file_path);
+          }
+        } else {
+          console.warn(`[DocumentModel] Child document ${row.document_id} has no file path`);
+        }
+      }
+      
+      return filePaths;
+    } catch (error) {
+      console.error(`[DocumentModel] Error fetching child document paths:`, error);
+      return [];
+    }
+  }
 }
 
 /**

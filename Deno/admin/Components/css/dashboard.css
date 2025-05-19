@@ -294,6 +294,21 @@ body {
     color: #006a4e;
 }
 
+/* Percentage bar styling for document statistics */
+.percentage-bar {
+    height: 8px;
+    width: 100%;
+    background-color: #eee;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.percentage-bar-fill {
+    height: 100%;
+    background-color: var(--theme-green-dark, #006A4E);
+}
+
 /* Works Summary Section */
 .works-summary {
     display: flex;

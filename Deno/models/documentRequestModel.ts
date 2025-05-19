@@ -14,6 +14,10 @@ export interface DocumentRequest {
     reviewed_by?: string;
     reviewed_at?: Date;
     review_notes?: string;
+    child_documents?: number[]; // Array of child document IDs for entire collection requests
+    is_entire_collection?: boolean; // Flag for entire collection requests
+    email_sent?: boolean; // Whether the confirmation email was sent successfully
+    email_error?: string; // Error message if email sending failed
     // Joined document properties
     book_title?: string;
     author_name?: string;
@@ -168,6 +172,42 @@ export class DocumentRequestModel {
             `DELETE FROM document_requests WHERE id = $1`,
             [id]
         );
+        return (result.rowCount ?? 0) > 0;
+    }
+
+    // Update a document request with partial data
+    async update(id: number, data: Partial<DocumentRequest>): Promise<boolean> {
+        // Build the SET clause dynamically based on provided fields
+        const updates: string[] = [];
+        const values: any[] = [];
+        let paramIndex = 1;
+
+        // Always update updated_at timestamp
+        updates.push(`updated_at = $${paramIndex}`);
+        values.push(new Date());
+        paramIndex++;
+
+        // Add each provided field to the updates
+        for (const [key, value] of Object.entries(data)) {
+            if (key !== 'id' && key !== 'created_at') {
+                updates.push(`${key} = $${paramIndex}`);
+                values.push(value);
+                paramIndex++;
+            }
+        }
+
+        // Add the id as the last parameter
+        values.push(id);
+
+        // Execute the update query
+        const result = await client.queryObject(
+            `UPDATE document_requests 
+            SET ${updates.join(', ')}
+            WHERE id = $${paramIndex}
+            RETURNING id`,
+            values
+        );
+        
         return (result.rowCount ?? 0) > 0;
     }
 

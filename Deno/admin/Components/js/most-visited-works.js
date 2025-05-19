@@ -6,45 +6,92 @@
  */
 
 // Function to update the most visited works table
-async function updateMostVisitedWorks(days = 7) {
+async function updateMostVisitedWorks() {
+    // Always use 0 for days parameter to show all time data
+    const days = 0;
     const limit = 5; // Always use exactly 5 documents
     try {
-        console.log('Fetching most visited works data directly from documents and visits tables...');
+        console.log('Fetching most visited documents data (all time)...');
         
-        // Try the new endpoint that directly joins documents and document_visits tables
-        const response = await fetch(`/api/documents/most-visited?limit=${limit}&days=${days}`);
+        // Use DocumentTracker's function to get most visited documents if available
+        if (window.DocumentTracker && typeof window.DocumentTracker.getMostVisitedDocuments === 'function') {
+            console.log('Using DocumentTracker.getMostVisitedDocuments()');
+            const documents = await window.DocumentTracker.getMostVisitedDocuments(limit, days);
+            if (documents && documents.length > 0) {
+                updateWorksTable(documents);
+                return;
+            }
+            console.log('DocumentTracker returned no documents, falling back to API');
+        }
+        
+        // Fallback to direct API call - use the page-visits endpoint that we implemented
+        const response = await fetch(`/api/page-visits/most-visited-documents?limit=${limit}&days=${days}`);
         
         if (!response.ok) {
-            console.log(`Direct join API returned error! status: ${response.status}`);
-            console.log('Trying legacy endpoint as fallback...');
-            
-            // Fall back to the legacy endpoint
-            const legacyResponse = await fetch(`/api/page-visits/most-visited-documents?limit=${limit}&days=${days}`);
-            
-            if (!legacyResponse.ok) {
-                console.log(`Legacy endpoint also failed with status: ${legacyResponse.status}`);
-                await fetchDocumentsWithVisits(days, limit);
-                return;
+            console.log(`API request failed with status: ${response.status}`);
+            // Try compatibility endpoint as second fallback
+            try {
+                const compatResponse = await fetch(`/api/most-visited-documents?limit=${limit}&period=${days}`);
+                if (compatResponse.ok) {
+                    const compatData = await compatResponse.json();
+                    if (compatData.documents && compatData.documents.length > 0) {
+                        // Transform the compatibility format to our expected format
+                        const formattedDocs = await Promise.all(compatData.documents.map(async (doc) => {
+                            // Fetch document details to get title and type
+                            try {
+                                const detailsResponse = await fetch(`/api/documents/${doc.id}`);
+                                if (detailsResponse.ok) {
+                                    const details = await detailsResponse.json();
+                                    return {
+                                        document_id: doc.id,
+                                        title: details.title || 'Untitled Document',
+                                        document_type: details.document_type || 'single',
+                                        visit_count: doc.visits || 0,
+                                        guest_count: Math.round(doc.visits * 0.8) || 0, // Estimate
+                                        user_count: Math.round(doc.visits * 0.2) || 0,  // Estimate
+                                        is_compiled: details.is_compiled || false
+                                    };
+                                }
+                            } catch (err) {
+                                console.warn(`Could not fetch details for document ${doc.id}:`, err);
+                            }
+                            
+                            // Fallback with minimal data
+                            return {
+                                document_id: doc.id,
+                                title: 'Document ' + doc.id,
+                                visit_count: doc.visits || 0,
+                                guest_count: 0,
+                                user_count: 0
+                            };
+                        }));
+                        
+                        updateWorksTable(formattedDocs);
+            return;
+        }
+                }
+            } catch (compatError) {
+                console.warn('Compatibility endpoint also failed:', compatError);
             }
             
-            const legacyData = await legacyResponse.json();
-            console.log('Legacy endpoint data received:', legacyData);
-            
-            if (!legacyData.documents || legacyData.documents.length === 0) {
-                await fetchDocumentsWithVisits(days, limit);
-                return;
-            }
-            
-            updateWorksTable(legacyData.documents.slice(0, limit));
+            // Use default documents endpoint as last resort
+            await fetchRecentDocuments();
             return;
         }
         
         const data = await response.json();
-        console.log('Direct join API data received:', data);
+        console.log('API data received:', data);
         
-        if (!data.documents || data.documents.length === 0) {
-            console.log('No documents returned from direct join API');
-            await fetchDocumentsWithVisits(days, limit);
+        if (!data.documents) {
+            // Check if response is already an array of documents
+            if (Array.isArray(data) && data.length > 0) {
+                // Ensure only 5 documents are displayed
+                updateWorksTable(data.slice(0, limit));
+            return;
+        }
+        
+            console.log('No documents returned from API');
+            await fetchRecentDocuments();
             return;
         }
         
@@ -52,200 +99,95 @@ async function updateMostVisitedWorks(days = 7) {
         updateWorksTable(data.documents.slice(0, limit));
     } catch (error) {
         console.error('Error updating most visited works:', error);
-        await fetchDocumentsWithVisits(days, limit);
+        await fetchRecentDocuments();
     }
 }
 
-/**
- * New function to fetch documents first, then manually get visit counts
- * This is a more reliable approach when the API endpoints aren't working properly
- */
-async function fetchDocumentsWithVisits(days = 7, limit = 5) {
+// Function to fetch recent documents when visit data is not available
+async function fetchRecentDocuments() {
     try {
-        console.log('Fetching all documents first, then getting visit counts...');
+        console.log('Fetching most recent documents as fallback...');
         
-        // First get all documents
-        const docsResponse = await fetch('/api/documents?limit=50');
-        
-        if (!docsResponse.ok) {
-            console.error(`Failed to fetch documents: ${docsResponse.status}`);
-            await fetchRegularDocuments();
-            return;
-        }
-        
-        const docsData = await docsResponse.json();
-        
-        if (!docsData.documents || docsData.documents.length === 0) {
-            console.log('No documents found in documents API');
-            await fetchRegularDocuments();
-            return;
-        }
-        
-        console.log(`Got ${docsData.documents.length} documents, now fetching visit counts...`);
-        
-        // Try to get visit counts separately
-        let visitCounts = {};
-        
-        try {
-            // Try to fetch visit counts from document_visits table
-            const visitsResponse = await fetch(`/api/document-visits/counts?days=${days}`);
-            
-            if (visitsResponse.ok) {
-                const visitsData = await visitsResponse.json();
-                console.log('Visit counts received:', visitsData);
-                
-                if (visitsData.visits) {
-                    visitCounts = visitsData.visits;
-                }
-            } else {
-                console.log(`Could not fetch visit counts: ${visitsResponse.status}`);
-            }
-        } catch (visitsError) {
-            console.error('Error fetching visit counts:', visitsError);
-        }
-        
-        // Combine the documents with visit counts
-        console.log('Raw document data from API:', docsData.documents);
-
-        const documentsWithVisits = docsData.documents.map(doc => {
-            // Get visit count for this document
-            const visitCount = visitCounts[doc.id] || 0;
-            
-            // Extensive logging to debug title issues
-            console.log(`Processing document ${doc.id}:`);
-            console.log('- Raw title field:', doc.title);
-            console.log('- All document fields:', Object.keys(doc).join(', '));
-            
-            // Try multiple possible title field names
-            let documentTitle = 'Untitled Document';
-            
-            if (doc.title && typeof doc.title === 'string' && doc.title.trim() !== '') {
-                documentTitle = doc.title;
-                console.log(`- Using 'title' field: ${documentTitle}`);
-            } else if (doc.document_title && typeof doc.document_title === 'string' && doc.document_title.trim() !== '') {
-                documentTitle = doc.document_title;
-                console.log(`- Using 'document_title' field: ${documentTitle}`);
-            } else if (doc.name && typeof doc.name === 'string' && doc.name.trim() !== '') {
-                documentTitle = doc.name;
-                console.log(`- Using 'name' field: ${documentTitle}`);
-            } else if (doc.text && typeof doc.text === 'string' && doc.text.trim() !== '') {
-                // Use the first 50 characters of text as title
-                documentTitle = doc.text.substring(0, 50) + '...';
-                console.log(`- Using 'text' field: ${documentTitle}`);
-            } else {
-                console.log('- No valid title field found. Using default: "Untitled Document"');
-            }
-            
-            return {
-                document_id: doc.id,
-                document_type: doc.document_type || 'single',
-                title: documentTitle, // Use our determined title
-                original_title: doc.title, // Keep original for debugging
-                original_document: doc, // Keep full document for debugging
-                visit_count: visitCount,
-                last_visit_date: doc.updated_at || doc.publication_date || doc.created_at,
-                keywords: doc.keywords || [],
-                author: doc.author_name || doc.author || 'Unknown'
-            };
-        });
-        
-        // Sort by visit count (highest first)
-        documentsWithVisits.sort((a, b) => b.visit_count - a.visit_count);
-        
-        console.log('Combined documents with visits:', documentsWithVisits);
-        
-        // Take the top documents based on limit
-        updateWorksTable(documentsWithVisits.slice(0, limit));
-    } catch (error) {
-        console.error('Error in fetchDocumentsWithVisits:', error);
-        await fetchRegularDocuments();
-    }
-}
-
-// Function to fetch regular documents when no visit data is available
-async function fetchRegularDocuments() {
-    const limit = 5; // Always use exactly 5 documents
-    try {
-        console.log('Fetching regular documents as fallback...');
-        const response = await fetch(`/api/documents?size=${limit}&sort=latest`);
+        const response = await fetch(`/api/documents?limit=5&sort=latest`);
         
         if (!response.ok) {
-            console.log(`HTTP error fetching regular documents: ${response.status}`);
+            console.log(`API request failed with status: ${response.status}`);
             displayErrorMessage();
             return;
         }
         
         const data = await response.json();
-        console.log('Regular documents data received:', data);
+        console.log('Recent documents data received:', data);
         
         if (!data.documents || data.documents.length === 0) {
+            console.log('No documents returned from API');
             displayNoDataMessage();
             return;
         }
         
-        // Format the documents to match our expected structure
-        const formattedDocuments = data.documents.map(doc => {
-            // Process keywords to ensure they're in array format
-            let processedKeywords = [];
-            try {
-                if (doc.keywords) {
-                    if (Array.isArray(doc.keywords)) {
-                        processedKeywords = doc.keywords;
-                    } else if (typeof doc.keywords === 'string') {
-                        try {
-                            // Try to parse as JSON
-                            processedKeywords = JSON.parse(doc.keywords);
-                        } catch (e) {
-                            // If not valid JSON, treat as comma-separated
-                            processedKeywords = doc.keywords.split(',').map(k => k.trim()).filter(k => k);
-                        }
-                    } else if (typeof doc.keywords === 'object') {
-                        // If it's an object but not an array, get its values
-                        processedKeywords = Object.values(doc.keywords);
-                    }
-                }
-            } catch (e) {
-                console.error(`Error processing keywords for document ${doc.id}:`, e);
-                processedKeywords = [];
-            }
-            
-            return {
+        // Transform to include required fields with zero visit counts
+        const documentsWithVisits = data.documents.map(doc => ({
                 document_id: doc.id,
+            title: doc.title || 'Untitled Document',
                 document_type: doc.document_type || 'single',
-                title: doc.title,
-                visit_count: 0, // No visits yet
-                last_visit_date: doc.publication_date,
-                start_year: doc.start_year,
-                end_year: doc.end_year,
-                keywords: processedKeywords
-            };
-        });
+            visit_count: 0,
+            guest_count: 0,
+            user_count: 0,
+            is_compiled: doc.is_compiled || false,
+            children: doc.children || [],
+            keywords: doc.keywords || [],
+            last_visit_date: doc.updated_at || doc.publication_date || doc.created_at
+        }));
         
-        // Ensure only 5 documents are displayed
-        updateWorksTable(formattedDocuments.slice(0, limit));
+        // Update the table
+        updateWorksTable(documentsWithVisits);
     } catch (error) {
-        console.error('Error fetching regular documents:', error);
+        console.error('Error fetching recent documents:', error);
         displayErrorMessage();
     }
 }
 
 // Function to get icon path for document type
-function getDocumentTypeIcon(type) {
+function getDocumentTypeIcon(type, category) {
+    // First check for explicit category if provided
+    if (category) {
+        // Normalize the category to lowercase for consistent comparison
+        const normalizedCategory = category.toLowerCase();
+        
+        // Return appropriate icon based on category
+        if (normalizedCategory.includes('thesis')) {
+            return '/admin/Components/icons/Category-icons/thesis.png';
+        } else if (normalizedCategory.includes('dissertation')) {
+            return '/admin/Components/icons/Category-icons/dissertation.png';
+        } else if (normalizedCategory.includes('confluence')) {
+            return '/admin/Components/icons/Category-icons/confluence.png';
+        } else if (normalizedCategory.includes('synergy')) {
+            return '/admin/Components/icons/Category-icons/synergy.png';
+        }
+        // If category doesn't match any known type, fall through to type-based logic
+    }
+
     if (!type) return '/admin/Components/icons/Category-icons/default_category_icon.png';
     
-    type = type.toLowerCase();
+    // Normalize the type to lowercase for consistent comparison
+    const normalizedType = (type || '').toLowerCase();
     
-    switch (type) {
+    // Check for compiled documents first using multiple indicators
+    if (normalizedType === 'compiled' || 
+        normalizedType === 'compilation' || 
+        normalizedType.includes('compile') || 
+        normalizedType.includes('confluence')) {
+        return '/admin/Components/icons/Category-icons/confluence.png';
+    }
+    
+    // Then check for other specific types
+    switch (normalizedType) {
         case 'thesis':
             return '/admin/Components/icons/Category-icons/thesis.png';
         case 'dissertation':
             return '/admin/Components/icons/Category-icons/dissertation.png';
-        case 'confluence':
-            return '/admin/Components/icons/Category-icons/confluence.png';
         case 'synergy':
             return '/admin/Components/icons/Category-icons/synergy.png';
-        case 'compiled':
-            return '/admin/Components/icons/Category-icons/confluence.png'; // Use confluence icon for compiled
         case 'single':
         default:
             return '/admin/Components/icons/Category-icons/thesis.png'; // Use thesis icon as default
@@ -266,109 +208,168 @@ function updateWorksTable(documents) {
     // Clear existing content
     tableBody.innerHTML = '';
     
-    // Check if we need to query actual document titles from database
-    if (documents.some(doc => doc.title === 'Untitled Document' || !doc.title)) {
-        console.warn('Some documents are missing titles - attempting direct database query...');
+    // First, filter out child documents - we only want to show compiled documents and standalone singles
+    // We'll create a set to track documents that are children of compiled documents
+    let childDocumentIds = new Set();
         
-        // Mark documents that need title resolution
-        documents.forEach(doc => {
-            if (doc.title === 'Untitled Document' || !doc.title) {
-                doc.needsTitleResolution = true;
-            }
-        });
-        
-        // Get list of document IDs that need title resolution
-        const documentIdsToResolve = documents
-            .filter(d => d.needsTitleResolution)
-            .map(d => d.document_id || d.id)
-            .filter(id => id); // Remove any undefined IDs
+    // Find and mark all child documents
+    const compiledDocs = documents.filter(doc => 
+        doc.is_compiled === true || 
+        doc.document_type === 'compiled' || 
+        (doc.children && doc.children.length > 0)
+    );
+    
+    // Add all child document IDs to our set
+    compiledDocs.forEach(compiledDoc => {
+        if (compiledDoc.children && Array.isArray(compiledDoc.children)) {
+            compiledDoc.children.forEach(child => {
+                if (child.id) childDocumentIds.add(child.id);
+                if (child.document_id) childDocumentIds.add(child.document_id);
+            });
+        }
+    });
             
-        if (documentIdsToResolve.length > 0) {
-            console.log(`Attempting to resolve titles for ${documentIdsToResolve.length} documents:`, documentIdsToResolve);
-            
-            // Make a direct API call to resolve titles
-            fetch('/api/documents/by-ids', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ documentIds: documentIdsToResolve })
-            })
-            .then(response => {
-                if (!response.ok) {
-                    console.error(`Failed to resolve titles: ${response.status}`);
-                    throw new Error(`Failed to resolve titles: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log('Title resolution response:', data);
-                
-                // Check if we have resolved documents
-                if (data.documents && data.documents.length > 0) {
-                    // Update titles with resolved ones
-                    data.documents.forEach(resolvedDoc => {
-                        // Find matching document in our list
-                        const docToUpdate = documents.find(d => 
-                            (d.document_id && d.document_id.toString() === resolvedDoc.id.toString()) || 
-                            (d.id && d.id.toString() === resolvedDoc.id.toString())
-                        );
-                        
-                        if (docToUpdate) {
-                            // Try multiple fields for title
-                            if (resolvedDoc.title) {
-                                docToUpdate.title = resolvedDoc.title;
-                                console.log(`✅ Resolved title for doc ${resolvedDoc.id}: "${resolvedDoc.title}"`);
-                            } else if (resolvedDoc.name) {
-                                docToUpdate.title = resolvedDoc.name;
-                                console.log(`✅ Resolved title from name for doc ${resolvedDoc.id}: "${resolvedDoc.name}"`);
-                            } else {
-                                docToUpdate.title = `Document #${resolvedDoc.id}`;
-                                console.log(`⚠️ Could not find title for doc ${resolvedDoc.id}, using ID instead`);
-                            }
-                            
-                            // Mark as resolved
-                            docToUpdate.needsTitleResolution = false;
-                        }
+    // If some documents aren't showing child info yet, try to fetch it
+    let needsChildDataFetch = false;
+    for (const doc of compiledDocs) {
+        if (!doc.children || doc.children.length === 0) {
+            needsChildDataFetch = true;
+            break;
+        }
+    }
+    
+    // If we need to fetch child data, do that asynchronously
+    if (needsChildDataFetch) {
+        fetchChildDocuments(compiledDocs).then(updatedDocs => {
+            // After fetching, update our filter with the new child information
+            updatedDocs.forEach(compiledDoc => {
+                if (compiledDoc.children && Array.isArray(compiledDoc.children)) {
+                    compiledDoc.children.forEach(child => {
+                        if (child.id) childDocumentIds.add(child.id);
+                        if (child.document_id) childDocumentIds.add(child.document_id);
                     });
-                    
-                    // Refresh the table with updated titles
-                    console.log('Refreshing table with resolved titles');
-                    renderDocumentsToTable(documents, tableBody);
-                } else {
-                    console.warn('No documents found in title resolution response');
                 }
-            })
-            .catch(error => {
-                console.error('Error resolving titles:', error);
-                // Continue with rendering even if resolution failed
-                renderDocumentsToTable(documents, tableBody);
             });
             
-            // Initial render with unresolved titles
-            // This will be updated once titles are resolved
-            renderDocumentsToTable(documents, tableBody);
-        } else {
-            // If no titles need resolution, just render normally
-            renderDocumentsToTable(documents, tableBody);
-        }
-    } else {
-        // If no documents need title resolution, just render normally
-        renderDocumentsToTable(documents, tableBody);
+            // Filter documents to only show compiled documents and standalone singles
+            const filteredDocuments = documents.filter(doc => {
+                const docId = doc.id || doc.document_id;
+                // Include if it's a compiled document OR if it's a single document that isn't a child
+                const isCompiled = doc.is_compiled === true || 
+                                doc.document_type === 'compiled' || 
+                                (doc.children && doc.children.length > 0);
+                return isCompiled || !childDocumentIds.has(docId);
+            });
+            
+            // Render the filtered documents
+            renderDocumentsToTable(filteredDocuments, tableBody);
+        });
+                            } else {
+        // Filter documents to only show compiled documents and standalone singles
+        const filteredDocuments = documents.filter(doc => {
+            const docId = doc.id || doc.document_id;
+            // Include if it's a compiled document OR if it's a single document that isn't a child
+            const isCompiled = doc.is_compiled === true || 
+                            doc.document_type === 'compiled' || 
+                            (doc.children && doc.children.length > 0);
+            return isCompiled || !childDocumentIds.has(docId);
+        });
+        
+        // Render the filtered documents
+        renderDocumentsToTable(filteredDocuments, tableBody);
     }
+}
+
+// Helper function to fetch child document data for compiled documents
+async function fetchChildDocuments(compiledDocs) {
+    const updatedDocs = [...compiledDocs];
+    
+    for (let i = 0; i < updatedDocs.length; i++) {
+        const doc = updatedDocs[i];
+        if (!doc.children || doc.children.length === 0) {
+            const docId = doc.id || doc.document_id;
+            if (!docId) continue;
+            
+            try {
+                // Try the compiled document details endpoint
+                const response = await fetch(`/api/compiled-documents/${docId}/details`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.children && Array.isArray(data.children)) {
+                        updatedDocs[i] = {
+                            ...doc,
+                            children: data.children
+                        };
+                        continue;
+                    }
+                }
+                
+                // Fallback to child documents endpoint
+                const childResponse = await fetch(`/api/documents/${docId}/children`);
+                if (childResponse.ok) {
+                    const childData = await childResponse.json();
+                    if (Array.isArray(childData)) {
+                        updatedDocs[i] = {
+                            ...doc,
+                            children: childData
+                        };
+                    } else if (childData.documents && Array.isArray(childData.documents)) {
+                        updatedDocs[i] = {
+                            ...doc,
+                            children: childData.documents
+                        };
+                    }
+                }
+            } catch (error) {
+                console.warn(`Error fetching child documents for ${docId}:`, error);
+    }
+        }
+    }
+    
+    return updatedDocs;
 }
 
 // Separate function to render documents to the table
 function renderDocumentsToTable(documents, tableBody) {
-    // Add each document to the table
-    documents.forEach((doc) => {
-        // Add debug attribute to help identify untitled documents
-        const debugInfo = doc.needsTitleResolution ? ' data-needs-title="true"' : '';
+    // First, check for any documents that are explicitly marked as children
+    const filteredDocuments = documents.filter(doc => {
+        // Skip any documents that explicitly have a parent_id or compiled_document_id
+        if (doc.parent_id || doc.compiled_document_id || doc.parent_document_id) {
+            console.log(`Filtering out child document ${doc.id || doc.document_id} with parent ${doc.parent_id || doc.compiled_document_id || doc.parent_document_id}`);
+            return false;
+        }
         
-        // Create a row with the debug attribute
+        // Filter out if the document has a relationship property indicating it's a child
+        if (doc.is_child === true || doc.child_order !== undefined || doc.order_index !== undefined) {
+            console.log(`Filtering out child document ${doc.id || doc.document_id} based on child indicators`);
+            return false;
+        }
+        
+        return true;
+    });
+    
+    console.log(`After child filtering: ${filteredDocuments.length} of ${documents.length} documents remain`);
+    
+    // Add each document to the table
+    filteredDocuments.forEach((doc) => {
+        console.log('Rendering document:', doc);
+        
+        // Create a row
         const row = document.createElement('tr');
         row.className = 'most-visited-row';
-        if (doc.needsTitleResolution) {
-            row.setAttribute('data-needs-title', 'true');
-            row.style.backgroundColor = '#fff8e1'; // Light yellow background for debugging
+        
+        // Determine if this is a compiled document - check multiple indicators
+        const isCompiled = 
+            doc.is_compiled === true || 
+            (doc.document_type && doc.document_type.toLowerCase().includes('compil')) ||
+            (doc.document_type && doc.document_type.toLowerCase().includes('confluence')) ||
+            (doc.children && doc.children.length > 0) ||
+            (doc.name && doc.name.toLowerCase().includes('compilation')) ||
+            (doc.name && doc.name.toLowerCase().includes('compiled'));
+        
+        // Force document_type to 'compiled' if it is a compiled document
+        if (isCompiled) {
+            doc.document_type = 'compiled';
         }
         
         // Create cover cell
@@ -379,8 +380,19 @@ function renderDocumentsToTable(documents, tableBody) {
         
         // Add image instead of text
         const coverImg = document.createElement('img');
-        coverImg.src = getDocumentTypeIcon(doc.document_type);
-        coverImg.alt = formatDocumentType(doc.document_type);
+        // Extract category from the title for compiled documents
+        let category = null;
+        if (doc.document_type === 'compiled' && doc.title) {
+            // Try to extract category from the title format "Category: Title"
+            const titleParts = doc.title.split(':');
+            if (titleParts.length > 1) {
+                category = titleParts[0].trim();
+            }
+        }
+        
+        // Get icon based on document type and category
+        coverImg.src = getDocumentTypeIcon(doc.document_type, category);
+        coverImg.alt = category || formatDocumentType(doc.document_type);
         coverImg.className = 'cover-icon most-visited-cover-icon';
         
         // Add error handler in case image doesn't load
@@ -401,54 +413,33 @@ function renderDocumentsToTable(documents, tableBody) {
         const titleElement = document.createElement('h5');
         titleElement.className = 'most-visited-title';
         
-        // Even more enhanced fallback for title
-        let title = doc.title || 'Untitled Document';
-        
-        // If title is still "Untitled Document", create a more descriptive fallback
-        if (title === 'Untitled Document' || !title) {
-            // Try other fields in order of preference
-            if (doc.document_title) {
-                title = doc.document_title;
+        // Check various title fields in order of preference
+        let docTitle = 'Untitled Document';
+        if (doc.title) {
+            docTitle = doc.title;
             } else if (doc.name) {
-                title = doc.name;
-            } else if (doc.description && doc.description.length > 0) {
-                // Use first 50 chars of description
-                title = doc.description.substring(0, 50) + (doc.description.length > 50 ? '...' : '');
-            } else if (doc.document_type) {
-                // Create title from document type and ID
-                const docType = formatDocumentType(doc.document_type);
-                title = `${docType} #${doc.document_id || doc.id || 'Unknown'}`;
-            } else if (doc.document_id || doc.id) {
-                title = `Document #${doc.document_id || doc.id}`;
-            } else if (doc.path) {
-                // Extract filename from path
-                const pathParts = doc.path.split('/');
-                title = pathParts[pathParts.length - 1];
-            }
+            docTitle = doc.name;
+        } else if (doc.document_title) {
+            docTitle = doc.document_title;
         }
         
-        // Handle special case for legacy database entry format
-        if (doc.original_document && doc.original_document.title) {
-            title = doc.original_document.title;
+        // Use the title directly from the API response
+        titleElement.textContent = docTitle;
+        titleElement.title = docTitle; // For hover tooltip
+        
+        // If compiled document, add compiled badge
+        if (isCompiled) {
+            const compiledBadge = document.createElement('span');
+            compiledBadge.className = 'compiled-badge';
+            compiledBadge.textContent = 'Compiled';
+            compiledBadge.style.backgroundColor = 'var(--theme-gold-light-bg)';
+            compiledBadge.style.color = 'var(--text-on-gold)';
+            compiledBadge.style.padding = '0.1rem 0.3rem';
+            compiledBadge.style.fontSize = '0.7rem';
+            compiledBadge.style.borderRadius = '0.25rem';
+            compiledBadge.style.marginLeft = '0.5rem';
+            titleElement.appendChild(compiledBadge);
         }
-        
-        // Only show the title without document type or date
-        titleElement.textContent = title;
-        // Add title attribute to show full title on hover
-        titleElement.title = title;
-        
-        // Add data attribute for debugging
-        titleElement.setAttribute('data-doc-id', doc.document_id || doc.id || 'unknown');
-        
-        // Log document data for debugging
-        console.log(`Rendering document:`, {
-            id: doc.document_id || doc.id,
-            title: title,
-            original_title: doc.title,
-            doc_type: doc.document_type,
-            all_fields: Object.keys(doc),
-            final_title_used: title
-        });
         
         // Format the document type for display (used for tags only)
         const docType = formatDocumentType(doc.document_type);
@@ -460,7 +451,7 @@ function renderDocumentsToTable(documents, tableBody) {
         // Document type tag
         const docTypeSpan = document.createElement('span');
         docTypeSpan.className = 'doc-type most-visited-doc-type';
-        docTypeSpan.textContent = docType;
+        docTypeSpan.textContent = isCompiled ? 'Compiled' : docType;
         // Make the document type tag non-clickable
         docTypeSpan.style.pointerEvents = 'none';
         tagsDiv.appendChild(docTypeSpan);
@@ -493,13 +484,12 @@ function renderDocumentsToTable(documents, tableBody) {
                 tagsDiv.appendChild(keywordTag);
             });
         }
-        // No fallback to mock tags - if no keywords are available, don't show any keyword tags
         
         // Add elements to details cell
         detailsCell.appendChild(titleElement);
         detailsCell.appendChild(tagsDiv);
         
-        // Create visits cell
+        // Create visits cell with detailed breakdown on hover
         const visitsCell = document.createElement('td');
         visitsCell.className = 'visits most-visited-visits';
         
@@ -510,20 +500,485 @@ function renderDocumentsToTable(documents, tableBody) {
         visitsCell.appendChild(visitsStrong);
         visitsCell.appendChild(document.createTextNode(' Visits'));
         
-        // Remove clickable behavior
-        // row.style.cursor = 'pointer';
-        // row.addEventListener('click', () => {
-        //     window.location.href = `/document/${doc.document_id}`;
-        // });
+        // Add hover tooltip with detailed visit counts
+        const tooltip = document.createElement('div');
+        tooltip.className = 'visits-tooltip';
+        tooltip.style.position = 'absolute';
+        tooltip.style.display = 'none';
+        tooltip.style.backgroundColor = 'rgba(0, 0, 0, 0.85)';
+        tooltip.style.color = 'white';
+        tooltip.style.padding = '0.75rem';
+        tooltip.style.borderRadius = '0.375rem';
+        tooltip.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+        tooltip.style.fontSize = '0.875rem';
+        tooltip.style.zIndex = '1000';
+        tooltip.style.width = 'auto';
+        tooltip.style.minWidth = '200px';
+        
+        // Create tooltip content
+        const tooltipContent = document.createElement('div');
+        
+        // Add guest/user visit breakdown
+        const guestCount = doc.guest_count || 0;
+        const userCount = doc.user_count || 0;
+        
+        const breakdownHtml = `
+            <div style="margin-bottom: 0.5rem"><strong>Visit Breakdown:</strong></div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem">
+                <span>Guest Visits:</span>
+                <strong>${guestCount}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem">
+                <span>User Visits:</span>
+                <strong>${userCount}</strong>
+            </div>
+            <div style="border-top: 1px solid rgba(255, 255, 255, 0.2); padding-top: 0.5rem;">
+                <div style="display: flex; justify-content: space-between">
+                    <span>Total Visits:</span>
+                    <strong>${doc.visit_count || 0}</strong>
+                </div>
+            </div>
+        `;
+        
+        tooltipContent.innerHTML = breakdownHtml;
+        tooltip.appendChild(tooltipContent);
+        
+        // Add child documents section if this is a compiled document with children
+        if (isCompiled && doc.children && doc.children.length > 0) {
+            const childrenSection = document.createElement('div');
+            childrenSection.style.borderTop = '1px solid rgba(255, 255, 255, 0.2)';
+            childrenSection.style.marginTop = '0.75rem';
+            childrenSection.style.paddingTop = '0.5rem';
+            
+            const childrenTitle = document.createElement('div');
+            childrenTitle.style.marginBottom = '0.5rem';
+            childrenTitle.innerHTML = `<strong>Child Documents (${doc.children.length}):</strong>`;
+            childrenSection.appendChild(childrenTitle);
+            
+            // Show top 3 child documents
+            const childrenToShow = doc.children.slice(0, 3);
+            childrenToShow.forEach(child => {
+                const childRow = document.createElement('div');
+                childRow.style.display = 'flex';
+                childRow.style.justifyContent = 'space-between';
+                childRow.style.marginBottom = '0.25rem';
+                
+                const childTitle = document.createElement('span');
+                childTitle.style.overflow = 'hidden';
+                childTitle.style.textOverflow = 'ellipsis';
+                childTitle.style.whiteSpace = 'nowrap';
+                childTitle.style.maxWidth = '160px';
+                childTitle.textContent = child.title || `Document ${child.id || ''}`;
+                
+                const childVisits = document.createElement('strong');
+                childVisits.textContent = child.visit_count || 0;
+                
+                childRow.appendChild(childTitle);
+                childRow.appendChild(childVisits);
+                childrenSection.appendChild(childRow);
+            });
+            
+            // Add "more" indicator if there are more children
+            if (doc.children.length > 3) {
+                const moreRow = document.createElement('div');
+                moreRow.style.fontSize = '0.8rem';
+                moreRow.style.opacity = '0.8';
+                moreRow.style.textAlign = 'center';
+                moreRow.style.marginTop = '0.25rem';
+                moreRow.textContent = `+ ${doc.children.length - 3} more`;
+                childrenSection.appendChild(moreRow);
+            }
+            
+            tooltip.appendChild(childrenSection);
+        }
+        
+        // Add tooltip to the page
+        document.body.appendChild(tooltip);
+        
+        // Add mouseover/mouseout event listeners for tooltip
+        visitsCell.addEventListener('mouseover', function(e) {
+            const rect = this.getBoundingClientRect();
+            tooltip.style.top = `${rect.bottom + window.scrollY + 5}px`;
+            tooltip.style.left = `${rect.left + window.scrollX}px`;
+            tooltip.style.display = 'block';
+            // Allow the tooltip to be displayed before adding the visible class
+            setTimeout(() => {
+                tooltip.classList.add('visible');
+            }, 10);
+        });
+        
+        visitsCell.addEventListener('mouseout', function() {
+            tooltip.classList.remove('visible');
+            // Wait for the transition to complete before hiding
+            setTimeout(() => {
+                tooltip.style.display = 'none';
+            }, 200); // Match the transition duration
+        });
         
         // Add all cells to the row
         row.appendChild(coverCell);
         row.appendChild(detailsCell);
         row.appendChild(visitsCell);
         
+        // Add click handler only for compiled documents
+        if (isCompiled) {
+            row.style.cursor = 'pointer';
+            row.addEventListener('click', () => {
+                // Show popup with child document breakdown for compiled documents
+                showCompiledDocumentBreakdown(doc);
+            });
+        } else {
+            // For single documents, no click handler and different cursor
+            row.style.cursor = 'default';
+            
+            // Add visual styling to indicate non-clickable state
+            row.style.opacity = '0.85';
+            
+            // Add a "read-only" badge to make it clear
+            const readOnlyBadge = document.createElement('span');
+            readOnlyBadge.className = 'read-only-badge';
+            readOnlyBadge.textContent = 'Read Only';
+            readOnlyBadge.style.backgroundColor = '#f0f0f0';
+            readOnlyBadge.style.color = '#666';
+            readOnlyBadge.style.padding = '0.1rem 0.3rem';
+            readOnlyBadge.style.fontSize = '0.7rem';
+            readOnlyBadge.style.borderRadius = '0.25rem';
+            readOnlyBadge.style.marginLeft = '0.5rem';
+            titleElement.appendChild(readOnlyBadge);
+        }
+        
         // Add the row to the table
         tableBody.appendChild(row);
     });
+}
+
+/**
+ * Shows a modal popup with breakdown of visits for child documents
+ * @param {Object} compiledDoc - The compiled document with children
+ */
+async function showCompiledDocumentBreakdown(compiledDoc) {
+    const docId = compiledDoc.document_id || compiledDoc.id;
+    
+    if (!docId) {
+        console.error('No document ID available for compiled document');
+        return;
+    }
+    
+    // Create modal backdrop immediately to show loading state
+    const modalBackdrop = document.createElement('div');
+    modalBackdrop.style.position = 'fixed';
+    modalBackdrop.style.top = '0';
+    modalBackdrop.style.left = '0';
+    modalBackdrop.style.width = '100%';
+    modalBackdrop.style.height = '100%';
+    modalBackdrop.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+    modalBackdrop.style.display = 'flex';
+    modalBackdrop.style.justifyContent = 'center';
+    modalBackdrop.style.alignItems = 'center';
+    modalBackdrop.style.zIndex = '2000';
+    
+    // Create modal content
+    const modalContent = document.createElement('div');
+    modalContent.className = 'compiled-doc-modal';
+    modalContent.style.backgroundColor = '#fff';
+    modalContent.style.borderRadius = '8px';
+    modalContent.style.padding = '20px';
+    modalContent.style.width = '600px';
+    modalContent.style.maxWidth = '90%';
+    modalContent.style.maxHeight = '80vh';
+    modalContent.style.overflowY = 'auto';
+    modalContent.style.boxShadow = '0 4px 20px rgba(0,0,0,0.2)';
+    
+    // Show loading state initially
+    modalContent.innerHTML = `
+        <h3>${compiledDoc.title || 'Compiled Document Details'}</h3>
+        <div style="text-align: center; padding: 30px;">
+            <div style="display: inline-block; width: 40px; height: 40px; border: 3px solid #f3f3f3; 
+                 border-top: 3px solid var(--theme-green-dark, #006A4E); border-radius: 50%; 
+                 animation: spin 1s linear infinite;"></div>
+            <p style="margin-top: 15px;">Loading document details...</p>
+        </div>
+        <style>
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        </style>
+    `;
+    
+    // Add modal to page immediately to show loading
+    modalBackdrop.appendChild(modalContent);
+    document.body.appendChild(modalBackdrop);
+    
+    // Add keyboard shortcut to close modal with Escape key
+    const escapeKeyHandler = (e) => {
+        if (e.key === 'Escape') {
+            document.body.removeChild(modalBackdrop);
+            document.removeEventListener('keydown', escapeKeyHandler);
+        }
+    };
+    
+    // Store the handler globally so it can be accessed by the close button
+    document.activeModalEscapeHandler = escapeKeyHandler;
+    document.addEventListener('keydown', escapeKeyHandler);
+    
+    // Close when clicking outside the modal
+    modalBackdrop.addEventListener('click', (e) => {
+        if (e.target === modalBackdrop) {
+            document.body.removeChild(modalBackdrop);
+            document.removeEventListener('keydown', escapeKeyHandler);
+        }
+    });
+    
+    try {
+        // Fetch detailed compiled document information with children
+        const response = await fetch(`/api/compiled-documents/${docId}/details`);
+        
+        if (!response.ok) {
+            // Fallback to regular documents endpoint if compiled endpoint fails
+            console.warn(`Failed to fetch compiled document details: ${response.status}, trying fallback`);
+            
+            // Try fallback to regular document endpoint
+            const fallbackResponse = await fetch(`/api/documents/${docId}`);
+            if (!fallbackResponse.ok) {
+                throw new Error(`Both API endpoints failed: ${fallbackResponse.status}`);
+            }
+            
+            const docData = await fallbackResponse.json();
+            await updateModalContent(modalContent, compiledDoc, docData);
+            return;
+        }
+        
+        const detailedData = await response.json();
+        await updateModalContent(modalContent, compiledDoc, detailedData);
+        
+    } catch (error) {
+        console.error('Error fetching document details:', error);
+        modalContent.innerHTML = `
+            <h3>${compiledDoc.title || 'Compiled Document Details'}</h3>
+            <div style="padding: 20px; text-align: center; color: #e53935;">
+                <div style="font-size: 36px; margin-bottom: 10px;">⚠️</div>
+                <p>Error loading document details.</p>
+                <p style="font-size: 0.9rem; color: #666;">${error.message || 'Unknown error'}</p>
+            </div>
+            <div style="display: flex; justify-content: center; margin-top: 20px;">
+                <button class="close-btn" style="background-color: #f0f0f0; color: #333; border: none; 
+                    padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+                    Close
+                </button>
+            </div>
+        `;
+        
+        // Add click handler to close button
+        const closeBtn = modalContent.querySelector('.close-btn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                document.body.removeChild(modalBackdrop);
+                document.removeEventListener('keydown', escapeKeyHandler);
+            });
+        }
+    }
+}
+
+// Function to update the modal content with document details
+async function updateModalContent(modalContent, basicDocData, detailedData) {
+    // Combine data from both sources, preferring detailed data
+    const doc = {
+        ...basicDocData,
+        ...detailedData,
+        // Keep visit counts from basic data if detailed data doesn't have them
+        visit_count: detailedData.visit_count || basicDocData.visit_count || 0,
+        guest_count: detailedData.guest_count || basicDocData.guest_count || 0,
+        user_count: detailedData.user_count || basicDocData.user_count || 0
+    };
+    
+    // Get child documents
+    let childDocs = [];
+    
+    if (detailedData.children && Array.isArray(detailedData.children)) {
+        childDocs = detailedData.children;
+    } else if (detailedData.child_documents && Array.isArray(detailedData.child_documents)) {
+        childDocs = detailedData.child_documents;
+    } else if (basicDocData.children && Array.isArray(basicDocData.children)) {
+        childDocs = basicDocData.children;
+    }
+    
+    // If still no child documents, try to fetch them
+    if (childDocs.length === 0) {
+        try {
+            const childResponse = await fetch(`/api/documents/${doc.id || doc.document_id}/children`);
+            if (childResponse.ok) {
+                const childData = await childResponse.json();
+                if (Array.isArray(childData)) {
+                    childDocs = childData;
+                } else if (childData.documents && Array.isArray(childData.documents)) {
+                    childDocs = childData.documents;
+                }
+            }
+        } catch (err) {
+            console.warn('Error fetching child documents:', err);
+        }
+    }
+    
+    // Fetch visit counts for each child document if not already present
+    for (let i = 0; i < childDocs.length; i++) {
+        const child = childDocs[i];
+        if (!child.visit_count) {
+            try {
+                const childId = child.id || child.document_id;
+                if (childId && window.DocumentTracker?.getDocumentVisitStats) {
+                    // Use DocumentTracker if available
+                    const stats = await window.DocumentTracker.getDocumentVisitStats(childId);
+                    child.visit_count = stats.total || 0;
+                    child.guest_count = stats.guest || 0;
+                    child.user_count = stats.user || 0;
+                } else if (childId) {
+                    // Direct API call
+                    const visitResponse = await fetch(`/api/document-visits/counts?documentId=${childId}`);
+                    if (visitResponse.ok) {
+                        const visitData = await visitResponse.json();
+                        child.visit_count = visitData.total || 0;
+                        child.guest_count = visitData.guest || 0;
+                        child.user_count = visitData.user || 0;
+                    }
+                }
+            } catch (err) {
+                console.warn(`Error fetching visit data for child document ${child.id || child.document_id}:`, err);
+                // Set fallback values
+                child.visit_count = child.visit_count || 0;
+                child.guest_count = child.guest_count || 0;
+                child.user_count = child.user_count || 0;
+            }
+        }
+    }
+    
+    // Total values
+    const totalVisits = doc.visit_count || 0;
+    const guestVisits = doc.guest_count || 0;
+    const userVisits = doc.user_count || 0;
+    
+    // Update the modal content with the data
+    modalContent.innerHTML = `
+        <h3>${doc.title || 'Compiled Document Details'}</h3>
+        
+        <div style="margin-bottom: 15px; padding: 10px; background-color: #f9f9f9; border-radius: 4px;">
+            <div style="font-weight: bold; margin-bottom: 8px;">Total Visits: ${totalVisits}</div>
+            
+            <div style="margin-bottom: 8px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                    <span>Guest Visits:</span>
+                    <span>${guestVisits} (${Math.round((guestVisits / totalVisits || 0) * 100)}%)</span>
+                </div>
+                <div class="percentage-bar">
+                    <div class="percentage-bar-fill" style="width: ${Math.round((guestVisits / totalVisits || 0) * 100)}%; background-color: #FFB74D;"></div>
+                </div>
+            </div>
+            
+            <div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                    <span>User Visits:</span>
+                    <span>${userVisits} (${Math.round((userVisits / totalVisits || 0) * 100)}%)</span>
+                </div>
+                <div class="percentage-bar">
+                    <div class="percentage-bar-fill" style="width: ${Math.round((userVisits / totalVisits || 0) * 100)}%;"></div>
+                </div>
+            </div>
+        </div>
+        
+        <h4>Child Documents (${childDocs.length})</h4>
+        
+        ${childDocs.length === 0 ? '<p style="color: #666;">No child documents found.</p>' : ''}
+    `;
+    
+    // If we have child documents, add the table
+    if (childDocs.length > 0) {
+        // Create table for child documents
+        const table = document.createElement('table');
+        table.style.width = '100%';
+        table.style.borderCollapse = 'collapse';
+        
+        // Add table header
+        const thead = document.createElement('thead');
+        thead.innerHTML = `
+            <tr>
+                <th style="text-align: left; padding: 8px; border-bottom: 2px solid #ddd;">Document</th>
+                <th style="text-align: right; padding: 8px; border-bottom: 2px solid #ddd;">Visits</th>
+                <th style="text-align: right; padding: 8px; border-bottom: 2px solid #ddd;">%</th>
+            </tr>
+        `;
+        table.appendChild(thead);
+        
+        // Add table body
+        const tbody = document.createElement('tbody');
+        
+        // Sort children by visit count (descending)
+        childDocs.sort((a, b) => (b.visit_count || 0) - (a.visit_count || 0));
+        
+        // Add row for each child document
+        childDocs.forEach(child => {
+            const childVisits = child.visit_count || 0;
+            const childPercent = totalVisits ? ((childVisits / totalVisits) * 100).toFixed(1) : 0;
+            
+            const row = document.createElement('tr');
+            row.style.cursor = 'pointer';
+            row.style.transition = 'background-color 0.2s';
+            row.style.borderBottom = '1px solid #eee';
+            
+            // Click to navigate to child document
+            row.onclick = () => {
+                window.location.href = `/pages/user-single.html?id=${child.id || child.document_id}`;
+            };
+            
+            row.innerHTML = `
+                <td style="padding: 8px; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    ${child.title || 'Untitled Document'}
+                </td>
+                <td style="text-align: right; padding: 8px;">${childVisits}</td>
+                <td style="text-align: right; padding: 8px;">
+                    <div style="display: flex; align-items: center; justify-content: flex-end;">
+                        <span style="margin-right: 8px;">${childPercent}%</span>
+                        <div style="width: 40px; height: 8px; background-color: #eee; border-radius: 4px; overflow: hidden;">
+                            <div style="height: 100%; width: ${childPercent}%; background-color: var(--theme-gold, #FDB813);"></div>
+                        </div>
+                    </div>
+                </td>
+            `;
+            
+            tbody.appendChild(row);
+        });
+        
+        table.appendChild(tbody);
+        modalContent.appendChild(table);
+    }
+    
+    // Add close button only (removing the View button)
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.display = 'flex';
+    buttonContainer.style.justifyContent = 'flex-end'; // Align to the right
+    buttonContainer.style.marginTop = '20px';
+    
+    const closeButton = document.createElement('button');
+    closeButton.textContent = 'Close';
+    closeButton.className = 'close-btn';
+    closeButton.style.backgroundColor = '#f0f0f0';
+    closeButton.style.color = '#333';
+    closeButton.style.border = 'none';
+    closeButton.style.padding = '8px 16px';
+    closeButton.style.borderRadius = '4px';
+    closeButton.style.cursor = 'pointer';
+    
+    // Store reference to the modal backdrop to properly remove it
+    closeButton.onclick = () => {
+        const modalBackdrop = modalContent.parentNode;
+        if (modalBackdrop) {
+            document.body.removeChild(modalBackdrop);
+            // Remove the event listener for the Escape key
+            document.removeEventListener('keydown', document.activeModalEscapeHandler);
+        }
+    };
+    
+    buttonContainer.appendChild(closeButton);
+    modalContent.appendChild(buttonContainer);
 }
 
 // Function to display an error message when data fetch fails
@@ -614,30 +1069,59 @@ function formatDate(doc) {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM loaded, initializing most visited works component...');
     
-    // Get the select element for time period
-    const timeSelectElement = document.getElementById('most-visited-time-period');
+    // Add CSS for tooltip to the page
+    const style = document.createElement('style');
+    style.textContent = `
+        .most-visited-visits {
+            position: relative;
+        }
+        .visits-tooltip {
+            position: absolute;
+            display: none;
+            z-index: 1000;
+        }
+        
+        /* Compiled Document Modal Styles */
+        .compiled-doc-modal {
+            font-family: 'Inter', sans-serif;
+        }
+        .compiled-doc-modal h3 {
+            color: var(--theme-green-darker-text, #00523D);
+            font-size: 1.25rem;
+        }
+        .compiled-doc-modal h4 {
+            color: var(--theme-green-dark, #006A4E);
+            font-size: 1.1rem;
+        }
+        .compiled-doc-modal table {
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .compiled-doc-modal tbody tr:hover {
+            background-color: var(--theme-gold-lighter-bg, rgba(253, 184, 19, 0.1)) !important;
+        }
+        .compiled-doc-modal .view-btn {
+            transition: background-color 0.2s;
+        }
+        .compiled-doc-modal .view-btn:hover {
+            background-color: var(--theme-green-darker-text, #00523D);
+        }
+        .compiled-doc-modal .close-btn:hover {
+            background-color: #e0e0e0;
+        }
+        .percentage-bar {
+            height: 6px;
+            background-color: #eee;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 2px;
+        }
+        .percentage-bar-fill {
+            height: 100%;
+            background-color: var(--theme-gold, #FDB813);
+        }
+    `;
+    document.head.appendChild(style);
     
-    // Initial update with default of 7 days
-    updateMostVisitedWorks(7);
-    
-    // Add event listener for time period changes
-    if (timeSelectElement) {
-        timeSelectElement.addEventListener('change', () => {
-            const days = parseInt(timeSelectElement.value);
-            
-            // Log which time period was selected
-            if (days === 1) {
-                console.log('Showing daily most visited documents');
-            } else if (days === 7) {
-                console.log('Showing last 7 days most visited documents');
-            } else if (days === 30) {
-                console.log('Showing last month most visited documents');
-            } else if (days === 0) {
-                console.log('Showing all time most visited documents');
-            }
-            
-            // Always use limit=5 to ensure exactly 5 documents are displayed
-            updateMostVisitedWorks(days);
-        });
-    }
+    // Initialize with all time data
+    updateMostVisitedWorks();
 }); 

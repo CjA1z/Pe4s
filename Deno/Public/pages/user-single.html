@@ -1343,23 +1343,29 @@
             function trackDocumentVisit(docId) {
             // Initialize document visit tracking for single documents
             if (window.DocumentTracker) {
-                    // Check if using the new counter-based approach
                     if (typeof window.DocumentTracker.initSingleDocumentTracking === 'function') {
+                    console.log(`Tracking visit to single document: ${docId}`);
+                    // Use the enhanced tracking that handles parent-child relationship
                         window.DocumentTracker.initSingleDocumentTracking(docId);
-                    } else if (typeof window.DocumentTracker.recordVisit === 'function') {
-                        // Determine visitor type (guest or user)
-                        let userInfo = null;
+                } else {
+                    console.warn('Enhanced document tracking not available, using fallback');
+                    
+                    // Determine visitor type
+                    let visitorType = 'guest';
                         try {
-                            userInfo = JSON.parse(sessionStorage.getItem('userInfo'));
+                        const userInfo = JSON.parse(sessionStorage.getItem('userInfo') || localStorage.getItem('userInfo'));
+                        visitorType = userInfo?.isLoggedIn ? 'user' : 'guest';
                         } catch (e) {
                             console.log('No user info found or invalid format');
                         }
-                        const visitorType = userInfo?.isLoggedIn ? 'user' : 'guest';
-                        
-                        // Record visit with visitor type
-                        window.DocumentTracker.recordVisit(docId, visitorType);
-                    } else {
-                        console.error('No compatible document tracking method found');
+                    
+                    // Use basic recording function if available
+                    if (typeof window.DocumentTracker.recordDocumentVisit === 'function') {
+                        window.DocumentTracker.recordDocumentVisit(docId, visitorType, {
+                            documentType: 'single',
+                            url: window.location.pathname + window.location.search
+                        });
+                    }
                     }
                         } else {
                 console.error('DocumentTracker not found! Make sure document-visit-tracker.js is loaded correctly.');

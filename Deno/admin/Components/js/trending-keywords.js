@@ -13,12 +13,12 @@ async function fetchTrendingKeywords() {
         // Show loading state
         showLoadingState();
         
-        // Try getting keywords from most visited documents first
-        await fetchKeywordsFromMostVisitedDocuments();
+        // Skip the failing endpoint and go directly to the working documents list endpoint
+        await fetchKeywordsFromDocumentsList();
     } catch (error) {
         console.error('Error fetching trending keywords:', error);
-        // Fallback to keywords from documents list
-        await fetchKeywordsFromDocumentsList();
+        // Use hardcoded keywords as last resort
+        useHardcodedKeywords();
     }
 }
 

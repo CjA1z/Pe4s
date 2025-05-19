@@ -1,0 +1,2367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Results</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <style>
+        :root {
+            --theme-gold: #FDB813;
+            --theme-gold-darker: #EAA10F;
+            --theme-gold-lighter-bg: rgba(253, 184, 19, 0.08);
+            --theme-green-dark: #006A4E;
+            --theme-green-darker-text: #00523D;
+            --theme-page-bg: #F9F6EE;
+            --neutral-border-color: #e0e0e0;
+            --input-border-color: #cccccc;
+            --primary-text-color: #1f2937;
+            --secondary-text-color: #4b5563;
+            --container-bg: #FFFFFF;
+            --link-color: var(--theme-green-dark);
+            --link-hover-color: var(--theme-gold-darker);
+            --button-bg-color: var(--theme-green-dark);
+            --button-text-color: #FFFFFF;
+            --button-hover-bg-color: var(--theme-green-darker-text);
+            --filter-label-color: var(--secondary-text-color);
+            --filter-bg-color: #fdfcfa;
+            --card-hover-shadow: 0 8px 20px rgba(0,0,0,0.12);
+            --card-shadow: 0 3px 8px rgba(0,0,0,0.07);
+            --active-filter-border: var(--theme-gold-darker); 
+            --active-filter-bg: var(--theme-gold-lighter-bg);
+
+            --document-card-bg: #FFFFFF;
+            --document-card-bg-hover: #f7f7f7;
+            --metadata-pill-bg: #f0f0f0;
+            --metadata-pill-text-color: var(--secondary-text-color);
+
+
+            --category-tile-off-white-text: #f0f0f0;
+            --category-tile-dark-text: #1f2937;
+            --category-active-box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+            --category-active-transform: translateY(1px) scale(0.98);
+
+            --category-tile-red-bg: #FEE2E2; --category-tile-red-text: #991B1B; --category-tile-red-count-bg: rgba(220, 38, 38, 0.15); --category-tile-red-count-text: #991B1B; --category-tile-red-border: #FECACA;
+            --category-tile-red-active-bg: #DC2626; --category-tile-red-active-text: var(--category-tile-off-white-text); --category-tile-red-active-border: #B91C1C; --category-tile-red-active-count-bg: rgba(255, 255, 255, 0.25); --category-tile-red-active-count-text: var(--category-tile-off-white-text);
+            --category-tile-green-bg-specific: #D1FAE5; --category-tile-green-text-specific: #065F46; --category-tile-green-count-bg-specific: rgba(0, 106, 78, 0.15); --category-tile-green-count-text-specific: #065F46; --category-tile-green-border-specific: #A7F3D0;
+            --category-tile-green-active-bg-specific: var(--theme-green-dark); --category-tile-green-active-text-specific: var(--category-tile-off-white-text); --category-tile-green-active-border-specific: #064E3B; --category-tile-green-active-count-bg-specific: rgba(255, 255, 255, 0.25); --category-tile-green-active-count-text-specific: var(--category-tile-off-white-text);
+            --category-tile-yellow-bg: #FEF9C3; --category-tile-yellow-text: #713F12; --category-tile-yellow-count-bg: rgba(234, 179, 8, 0.15); --category-tile-yellow-count-text: #713F12; --category-tile-yellow-border: #FEF08A;
+            --category-tile-yellow-active-bg: #EAB308; --category-tile-yellow-active-text: var(--category-tile-dark-text); --category-tile-yellow-active-border: #CA8A04; --category-tile-yellow-active-count-bg: rgba(0,0,0,0.15); --category-tile-yellow-active-count-text: var(--category-tile-dark-text);
+            --category-tile-blue-bg: #DBEAFE; --category-tile-blue-text: #1E40AF; --category-tile-blue-count-bg: rgba(59, 130, 246, 0.15); --category-tile-blue-count-text: #1E40AF; --category-tile-blue-border: #BFDBFE;
+            --category-tile-blue-active-bg: #2563EB; --category-tile-blue-active-text: var(--category-tile-off-white-text); --category-tile-blue-active-border: #1D4ED8; --category-tile-blue-active-count-bg: rgba(255, 255, 255, 0.25); --category-tile-blue-active-count-text: var(--category-tile-off-white-text);
+
+            --sidebar-width: 280px;
+            --sidebar-peek-amount: 60px;
+            --sidebar-transition-duration: 0.4s;
+            --peek-arrow-size: 40px;
+            --elastic-bezier: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif; margin: 0;
+            background-color: var(--theme-page-bg); color: var(--primary-text-color);
+            line-height: 1.5; transition: background-color 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Structure layout elements */
+        .page-content-wrapper {
+            display: flex;
+            flex: 1;
+            width: 100%;
+            position: relative;
+            padding-top: 80px; /* Space for navbar */
+        }
+
+        #navbarContainer {
+            width: 100%;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 995;
+        }
+
+        #navbarContainer nav {
+            width: 100% !important;
+        }
+
+        #sidebar-peek-trigger {
+            position: fixed;
+            left: 0;
+            top: 0; /* Position at the very top */
+            width: 20px;
+            height: 100vh; /* Full viewport height */
+            z-index: 1010; /* Match sidebar z-index */
+            display: none;
+            margin-top: 0;
+        }
+
+        .filter-sidebar {
+            width: var(--sidebar-width);
+            background-color: var(--filter-bg-color);
+            border-right: 1px solid var(--neutral-border-color);
+            padding: 15px 10px;
+            box-sizing: border-box;
+            overflow: hidden;
+            transition: transform var(--sidebar-transition-duration) var(--elastic-bezier),
+                        width var(--sidebar-transition-duration) var(--elastic-bezier),
+                        padding var(--sidebar-transition-duration) ease-in-out;
+            flex-shrink: 0;
+            height: 100vh; /* Full viewport height */
+            position: fixed;
+            left: 0;
+            top: 0; /* Position at the very top */
+            z-index: 1010; /* Higher z-index than navbar (995) */
+            display: flex;
+            flex-direction: column;
+            transform: translateX(0);
+            margin-top: 0; 
+        }
+        .filter-sidebar.collapsed {
+            transform: translateX(calc(-1 * var(--sidebar-width)));
+            padding-left: 0;
+            padding-right: 0;
+        }
+        .filter-sidebar.peeking {
+            transform: translateX(calc(-1 * var(--sidebar-width) + var(--sidebar-peek-amount)));
+            width: var(--sidebar-width);
+            padding-left: 10px;
+            padding-right: 10px;
+            box-shadow: 3px 0 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .filter-sidebar:not(.collapsed):not(.peeking) .filters-container-sidebar {
+            overflow-y: auto;
+        }
+        .filter-sidebar.peeking .filters-container-sidebar,
+        .filter-sidebar.peeking .clear-filters-btn,
+        .filter-sidebar.peeking #sidebar-minimize-btn {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity 0.1s ease, visibility 0.1s ease;
+        }
+        .filter-sidebar:not(.peeking) .filters-container-sidebar,
+        .filter-sidebar:not(.peeking) .clear-filters-btn,
+        .filter-sidebar:not(.peeking) #sidebar-minimize-btn {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+            transition: opacity 0.3s ease 0.1s, visibility 0.3s ease 0.1s;
+        }
+
+
+        .sidebar-peek-arrow {
+            position: absolute;
+            top: 50%;
+            right: calc((var(--sidebar-peek-amount) - var(--peek-arrow-size)) / 2);
+            transform: translateY(-50%);
+            width: var(--peek-arrow-size);
+            height: var(--peek-arrow-size);
+            background-color: var(--theme-green-dark);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s ease-in-out, visibility 0.2s ease-in-out, background-color 0.2s ease, transform 0.2s ease;
+            z-index: 1011; /* Keep above sidebar */
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+        .filter-sidebar.peeking .sidebar-peek-arrow {
+            opacity: 1;
+            visibility: visible;
+        }
+         .sidebar-peek-arrow:hover {
+            background-color: var(--theme-gold-darker);
+            transform: translateY(-50%) scale(1.1);
+        }
+        .sidebar-peek-arrow svg {
+            width: 20px; height: 20px;
+        }
+
+
+        .main-content-area {
+            flex-grow: 1;
+            padding: 20px;
+            box-sizing: border-box;
+            transition: margin-left var(--sidebar-transition-duration) var(--elastic-bezier);
+            max-width: 100%;
+            overflow-x: hidden;
+            margin-left: var(--sidebar-width);
+            position: relative;
+            width: 100%; /* Ensure full width */
+        }
+        .main-content-area::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(0,0,0,0);
+            pointer-events: none;
+            transition: background-color 0.3s ease;
+            z-index: 980;
+        }
+        body.main-content-dimmed-for-peek .main-content-area::after {
+            background-color: rgba(0,0,0,0.4);
+            pointer-events: auto;
+        }
+
+        .filter-sidebar.collapsed ~ .main-content-area {
+            margin-left: 0;
+        }
+        .filter-sidebar.peeking ~ .main-content-area {
+            margin-left: var(--sidebar-peek-amount);
+        }
+
+        .search-results-container-wrapper {
+             max-width: 900px; 
+             margin: 0 auto;
+             width: 100%;
+        }
+
+        .results-for-header {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: var(--primary-text-color);
+            margin-bottom: 25px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--neutral-border-color);
+        }
+        .results-for-header strong {
+            color: var(--theme-green-dark);
+            font-weight: 700;
+        }
+
+
+        .filters-header-sidebar {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--neutral-border-color);
+            flex-shrink: 0;
+        }
+        .filters-title-sidebar { font-size: 1.2em; font-weight: 600; color: var(--primary-text-color); }
+
+        #sidebar-minimize-btn {
+            background: var(--container-bg);
+            border: 1px solid var(--input-border-color);
+            padding: 0;
+            cursor: pointer;
+            color: var(--link-color);
+            transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            position: relative;
+        }
+        #sidebar-minimize-btn:hover {
+            color: var(--theme-gold-darker);
+            border-color: var(--theme-gold-darker);
+            background-color: var(--theme-gold-lighter-bg);
+        }
+        #sidebar-minimize-btn svg { width: 20px; height: 20px; }
+
+
+        .clear-filters-btn {
+            background-color: var(--theme-green-dark); 
+            color: var(--button-text-color); 
+            border: 1px solid var(--theme-green-dark); 
+            padding: 8px 12px; 
+            border-radius: 6px; 
+            font-size: 0.9em; 
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease; 
+            width: 100%;
+            margin-top: auto; 
+            flex-shrink: 0;
+            display: none; 
+            align-items: center;
+            justify-content: center;
+            gap: 8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            opacity: 0; 
+            transform: translateY(10px) scale(0.95); 
+        }
+        .clear-filters-btn:hover {
+            background-color: var(--theme-gold-darker); 
+            color: var(--primary-text-color); 
+            border-color: var(--theme-gold-darker); 
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            transform: translateY(10px) scale(1.03); 
+        }
+        .clear-filters-btn.visible { 
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+
+        .clear-filters-btn svg {
+            width: 16px; 
+            height: 16px;
+            fill: currentColor; 
+        }
+
+
+        .filters-container-sidebar {
+            display: flex; flex-direction: column; gap: 18px;
+            flex-grow: 1;
+            padding-right: 0;
+            margin-right: 0;
+            scrollbar-width: thin;
+            scrollbar-color: var(--input-border-color) transparent;
+        }
+        .filters-container-sidebar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .filters-container-sidebar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .filters-container-sidebar::-webkit-scrollbar-thumb {
+            background: var(--input-border-color);
+            border-radius: 2px;
+        }
+        .filters-container-sidebar::-webkit-scrollbar-thumb:hover {
+            background: var(--secondary-text-color);
+        }
+
+
+        .filter-group { display: flex; flex-direction: column; gap: 8px; }
+        .filter-group-label-container {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .info-icon {
+            cursor: pointer;
+            color: var(--secondary-text-color);
+            position: relative;
+            z-index: 10;
+        }
+        .info-icon svg { width: 14px; height: 14px; }
+        .info-icon:hover { color: var(--theme-gold-darker); }
+
+        .tooltip {
+            visibility: hidden;
+            opacity: 0;
+            width: 220px;
+            max-width: calc(var(--sidebar-width) - 20px - 2*5px);
+            background-color: #333;
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 8px 12px;
+            position: absolute;
+            z-index: 20;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -110px;
+            transition: opacity 0.2s ease-in-out;
+            font-size: 0.8em;
+            line-height: 1.4;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            box-sizing: border-box;
+        }
+        .tooltip::after {
+            content: "";
+            position: absolute;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            top: 100%;
+            border-color: #333 transparent transparent transparent;
+        }
+        .tooltip.tooltip-below {
+            bottom: auto;
+            top: calc(100% + 8px);
+        }
+        .tooltip.tooltip-below::after {
+            top: auto;
+            bottom: 100%;
+            border-color: #333 transparent transparent transparent;
+        }
+
+        /* Common Toggle Container Style */
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 6px;
+            border-radius: 8px;
+        }
+        .toggle-container > label { 
+            font-weight: 600;
+            color: var(--primary-text-color);
+            font-size: 0.95em;
+            margin-right: 10px;
+        }
+
+        /* Toggle Switch Styles (reusable) */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .3s;
+            border-radius: 24px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        input:checked + .slider {
+            background-color: var(--theme-green-dark);
+        }
+        input:focus + .slider {
+            box-shadow: 0 0 0 2px var(--theme-page-bg), 0 0 0 4px var(--theme-green-dark);
+        }
+        input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+
+        /* "Show Only" Filter Specifics */
+        .all-types-toggle-container { 
+            margin-bottom: 12px;
+        }
+        .individual-type-filters {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .type-filter-item {
+            display: flex;
+            align-items: center;
+            padding: 4px 0;
+        }
+        .type-filter-item input[type="checkbox"] {
+            margin-right: 8px;
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            accent-color: var(--theme-green-dark);
+        }
+        .type-filter-item label {
+            font-size: 0.9em;
+            color: var(--secondary-text-color);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            flex-grow: 1;
+        }
+        .type-filter-item input[type="checkbox"]:checked + label {
+            color: var(--primary-text-color);
+            font-weight: 500;
+        }
+        .type-filter-item .filter-count {
+            font-size: 0.9em;
+            color: var(--secondary-text-color);
+            background-color: rgba(0,0,0,0.05);
+            padding: 1px 5px;
+            border-radius: 8px;
+            margin-left: auto;
+        }
+        .type-filter-item input[type="checkbox"]:checked + label .filter-count {
+            background-color: rgba(0, 106, 78, 0.1);
+            color: var(--theme-green-darker-text);
+        }
+
+        .filter-group-category-header { 
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px; 
+        }
+        .all-categories-toggle-container { 
+             margin-bottom: 8px; 
+        }
+
+
+        .filter-group label, .filter-group .filter-label { 
+            font-size: 0.9em; color: var(--filter-label-color); font-weight: 500;
+        }
+        .filter-group input[type="text"], .filter-group input[type="number"], .filter-group select { 
+            width: 100%; padding: 9px 12px; border: 1px solid var(--input-border-color);
+            border-radius: 5px; background-color: var(--container-bg); color: var(--primary-text-color);
+            font-size: 0.9em; transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+            box-sizing: border-box;
+        }
+        .filter-group input[type="text"]::placeholder, .filter-group input[type="number"]::placeholder { color: var(--secondary-text-color); opacity: 0.7; }
+        .filter-group input[type="number"] { -moz-appearance: textfield; 
+        }
+        .filter-group input[type="number"]::-webkit-outer-spin-button,
+        .filter-group input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .filter-group select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%234b5563'%3E%3Cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 0.6rem center; background-size: 1.1em;
+        }
+        .filter-group input:focus, .filter-group select:focus {
+            outline: none; border-color: var(--theme-green-dark);
+            box-shadow: 0 0 0 2px rgba(0, 106, 78, 0.15);
+        }
+        .filter-group select.filter-active:not(:focus) {
+            border-color: var(--active-filter-border); background-color: var(--active-filter-bg);
+        }
+        .filter-group input[type="text"].filter-active:not(:focus),
+        .filter-group input[type="number"].filter-active:not(:focus) { 
+            border-color: var(--active-filter-border); background-color: var(--active-filter-bg);
+        }
+
+        #specific-year-filter-group {
+            display: none; 
+        }
+        #year-range-filter-group {
+            display: none; 
+            gap: 10px; 
+        }
+        #year-range-filter-group .filter-group { 
+            flex: 1;
+        }
+
+
+        #category-tile-filter-container { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 5px; }
+        .category-filter-tile {
+            font-weight: 500; padding: 0.5rem 0.4rem 0.4rem; border-radius: 0.75rem;
+            cursor: pointer; transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease, background-image 0.2s ease;
+            border: 1px solid transparent; display: flex; flex-direction: column;
+            align-items: center; justify-content: space-between;
+            min-width: calc(50% - 4px); max-width: calc(50% - 4px);
+            min-height: 70px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            background-image: none; user-select: none;
+        }
+        .category-filter-tile:hover { transform: translateY(-2px); box-shadow: 0 3px 7px rgba(0,0,0,0.1); }
+        .category-filter-tile.active { transform: var(--category-active-transform); box-shadow: var(--category-active-box-shadow) !important; }
+        .category-tile-content { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.1rem; }
+        .category-tile-icon { font-size: 1.2em; font-weight: bold; margin-bottom: 0.15rem; width: 22px; height: 22px; display:flex; align-items:center; justify-content:center;}
+        .category-tile-icon svg { width: 100%; height: 100%; }
+        .category-tile-name { font-size: 0.7rem; line-height: 1.1; display: block; }
+        .category-tile-count { font-size: 0.6rem; padding: 0.05rem 0.3rem; border-radius: 0.4rem; margin-top: 0.15rem; font-weight: 500; line-height: 1; transition: background-color 0.2s ease, color 0.2s ease; }
+
+        .category-tile-thesis { background-color: var(--category-tile-red-bg); color: var(--category-tile-red-text); border: 1px solid var(--category-tile-red-border); }
+        .category-tile-thesis:hover { background-color: #FCA5A5; border-color: #F87171; }
+        .category-tile-thesis.active { background-color: var(--category-tile-red-active-bg) !important; color: var(--category-tile-red-active-text) !important; border: 2px solid var(--category-tile-red-active-border) !important; }
+        .category-tile-thesis .category-tile-count { background-color: var(--category-tile-red-count-bg); color: var(--category-tile-red-count-text); }
+        .category-tile-thesis.active .category-tile-count { background-color: var(--category-tile-red-active-count-bg) !important; color: var(--category-tile-red-active-count-text) !important; }
+
+        .category-tile-dissertation { background-color: var(--category-tile-green-bg-specific); color: var(--category-tile-green-text-specific); border: 1px solid var(--category-tile-green-border-specific); }
+        .category-tile-dissertation:hover { background-color: #6EE7B7; border-color: #34D399; }
+        .category-tile-dissertation.active { background-color: var(--category-tile-green-active-bg-specific) !important; color: var(--category-tile-green-active-text-specific) !important; border: 2px solid var(--category-tile-green-active-border-specific) !important; }
+        .category-tile-dissertation .category-tile-count { background-color: var(--category-tile-green-count-bg-specific); color: var(--category-tile-green-count-text-specific); }
+        .category-tile-dissertation.active .category-tile-count { background-color: var(--category-tile-green-active-count-bg-specific) !important; color: var(--category-tile-green-active-count-text-specific) !important; }
+
+        .category-tile-confluence { background-color: var(--category-tile-yellow-bg); color: var(--category-tile-yellow-text); border: 1px solid var(--category-tile-yellow-border); }
+        .category-tile-confluence:hover { background-color: #FDE047; border-color: #FACC15; }
+        .category-tile-confluence.active { background-color: var(--category-tile-yellow-active-bg) !important; color: var(--category-tile-yellow-active-text) !important; border: 2px solid var(--category-tile-yellow-active-border) !important; }
+        .category-tile-confluence .category-tile-count { background-color: var(--category-tile-yellow-count-bg); color: var(--category-tile-yellow-count-text); }
+        .category-tile-confluence.active .category-tile-count { background-color: var(--category-tile-yellow-active-count-bg) !important; color: var(--category-tile-yellow-active-count-text) !important; }
+
+        .category-tile-synergy { background-color: var(--category-tile-blue-bg); color: var(--category-tile-blue-text); border: 1px solid var(--category-tile-blue-border); }
+        .category-tile-synergy:hover { background-color: #93C5FD; border-color: #60A5FA; }
+        .category-tile-synergy.active { background-color: var(--category-tile-blue-active-bg) !important; color: var(--category-tile-blue-active-text) !important; border: 2px solid var(--category-tile-blue-active-border) !important; }
+        .category-tile-synergy .category-tile-count { background-color: var(--category-tile-blue-count-bg); color: var(--category-tile-blue-count-text); }
+        .category-tile-synergy.active .category-tile-count { background-color: var(--category-tile-blue-active-count-bg) !important; color: var(--category-tile-blue-active-count-text) !important; }
+
+
+        .search-result-item,
+        .author-profile-card,
+        .keyword-result-pill {
+            transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, background-color 0.2s ease-out;
+            opacity: 1;
+        }
+        .search-result-item {
+            margin-bottom: 15px;
+            padding: 18px;
+            border: 1px solid var(--neutral-border-color);
+            border-radius: 8px;
+            background-color: var(--document-card-bg);
+            box-shadow: var(--card-shadow);
+        }
+        .search-result-item:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--card-hover-shadow);
+            background-color: var(--document-card-bg-hover);
+        }
+        .search-result-item:last-child { margin-bottom: 0; }
+
+        .result-title a {
+            font-size: 1.25em;
+            color: var(--link-color);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.2s ease;
+        }
+        .result-title a:hover {
+            text-decoration: underline;
+            text-decoration-color: var(--link-hover-color);
+            color: var(--link-hover-color);
+        }
+        .result-metadata {
+            font-size: 0.85em;
+            color: var(--metadata-pill-text-color);
+            margin-top: 6px;
+            margin-bottom: 10px;
+            display: inline-flex;
+            flex-wrap: wrap;
+            gap: 8px 12px;
+            padding: 6px 12px;
+            background-color: var(--metadata-pill-bg);
+            border-radius: 20px;
+        }
+        .result-metadata span {
+            display: inline-flex;
+            align-items: center;
+        }
+        .result-metadata .meta-icon {
+            margin-right: 5px;
+            color: var(--metadata-pill-text-color);
+            width: 0.9em; height: 0.9em;
+            opacity: 0.8;
+        }
+        .result-snippet {
+            font-size: 0.95em;
+            color: var(--secondary-text-color);
+            line-height: 1.6;
+            margin-top: 10px;
+        }
+
+        .results-category-heading {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: var(--primary-text-color);
+            margin-top: 25px;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--theme-green-dark);
+        }
+        .results-category-heading:first-of-type {
+            margin-top: 0;
+        }
+
+        .author-card-grid-container,
+        .keyword-result-pill-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 10px;
+        }
+        .keyword-result-pill-container {
+             gap: 10px;
+        }
+
+        .author-profile-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 10px;
+            padding: 15px;
+            border: 1px solid var(--neutral-border-color);
+            border-radius: 8px;
+            background-color: #fff;
+            box-shadow: var(--card-shadow);
+            width: 150px;
+            height: 180px;
+            justify-content: center;
+        }
+        .author-profile-card:hover {
+            transform: translateY(-5px) scale(1.03);
+            box-shadow: var(--card-hover-shadow);
+            border-color: var(--theme-gold-darker);
+        }
+        .author-avatar-placeholder {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background-color: var(--theme-green-dark);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 1.5em;
+            flex-shrink: 0;
+            margin-bottom: 5px;
+        }
+        .author-info .author-name {
+            font-size: 1em;
+            font-weight: 600;
+            color: var(--primary-text-color);
+            margin-bottom: 2px;
+        }
+        .author-info .author-doc-count {
+            font-size: 0.8em;
+            color: var(--secondary-text-color);
+            margin-bottom: 4px;
+        }
+        .author-info .author-view-link {
+            font-size: 0.75em;
+            color: var(--link-color);
+            text-decoration: none;
+        }
+        .author-info .author-view-link:hover {
+            text-decoration: underline;
+            color: var(--link-hover-color);
+        }
+
+        .keyword-result-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 20px;
+            background-color: var(--theme-gold-lighter-bg);
+            border: 1px solid var(--theme-gold);
+            cursor: pointer;
+        }
+        .keyword-result-pill:hover {
+            background-color: var(--theme-gold);
+            border-color: var(--theme-gold-darker);
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .keyword-result-pill:hover .keyword-pill-name {
+            color: var(--theme-green-darker-text);
+        }
+        .keyword-result-pill:hover .keyword-pill-count {
+            background-color: var(--theme-gold-darker);
+            color: #fff;
+        }
+        .keyword-result-pill .keyword-pill-name {
+            font-weight: 500;
+            font-size: 0.9em;
+            color: var(--theme-green-darker-text);
+        }
+        .keyword-result-pill .keyword-pill-count {
+            font-size: 0.75em;
+            background-color: var(--theme-gold);
+            color: var(--primary-text-color);
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-weight: 500;
+        }
+
+        .pagination-container {
+            margin-top: 30px;
+            text-align: center;
+        }
+        .pagination {
+             display: inline-flex;
+             align-items: center;
+        }
+        .pagination a, .pagination span.page-number {
+            display: inline-block; padding: 8px 12px; margin: 0 3px;
+            border: 1px solid var(--input-border-color); color: var(--link-color);
+            text-decoration: none; border-radius: 6px; font-size: 0.9em; font-weight: 500;
+            transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+            min-width: 36px;
+            text-align: center;
+        }
+        .pagination a:hover {
+            background-color: var(--theme-gold-lighter-bg); border-color: var(--theme-gold-darker);
+            color: var(--theme-gold-darker); transform: translateY(-1px);
+        }
+        .pagination span.current {
+            background-color: var(--button-bg-color); color: var(--button-text-color);
+            border-color: var(--button-bg-color); font-weight: 600;
+        }
+        .pagination a.disabled {
+            color: #bbb; pointer-events: none;
+            border-color: var(--neutral-border-color); background-color: #f5f5f5;
+        }
+        .pagination span.ellipsis {
+            padding: 8px 6px;
+            color: var(--secondary-text-color);
+        }
+
+        .end-of-results-message, .no-results, .pagination-container {
+            opacity: 0;
+        }
+        .end-of-results-message {
+            text-align: center;
+            color: var(--secondary-text-color);
+            font-style: italic;
+            margin-top: 20px;
+            padding: 10px;
+            display: none;
+        }
+
+        .no-results {
+            text-align: center; padding: 25px 20px; color: var(--secondary-text-color);
+            font-style: italic; font-size: 1em; background-color: var(--filter-bg-color);
+            border-radius: 8px;
+        }
+        .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
+
+        /* Loading indicator styles */
+        .loading-results {
+            text-align: center;
+            padding: 25px 20px;
+            color: var(--secondary-text-color);
+            background-color: var(--filter-bg-color);
+            border-radius: 8px;
+            animation: pulse 1.5s infinite;
+        }
+
+        .loading-results:before {
+            content: "";
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            margin-right: 10px;
+            border: 2px solid var(--theme-green-dark);
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        /* Error message styling */
+        .error-message {
+            text-align: center;
+            padding: 25px 20px;
+            color: #991B1B;
+            background-color: #FEE2E2;
+            border-radius: 8px;
+            border: 1px solid #DC2626;
+        }
+
+        @media (max-width: 768px) {
+            .filter-sidebar {
+                position: fixed; z-index: 1000; height: 100%;
+                box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            }
+            .filter-sidebar.collapsed { transform: translateX(-100%); }
+            .main-content-area { margin-left: 0 !important; }
+            body.sidebar-open .main-content-area::before {
+                content: ''; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+                background-color: rgba(0,0,0,0.3); z-index: 999;
+            }
+            .filters-header-sidebar { flex-direction: row; align-items: center; }
+            .category-filter-tile { min-width: calc(33.33% - 7px); max-width: calc(33.33% - 7px); }
+            .author-card-grid-container { justify-content: center; }
+            .author-profile-card { width: calc(50% - 10px); height: auto; min-height: 160px; }
+            .keyword-result-pill-container { justify-content: center; }
+        }
+        @media (max-width: 600px) {
+            .search-bar-results-page input[type="search"] { padding: 10px 15px; font-size: 14px; }
+            .search-bar-results-page button { padding: 10px 15px; font-size: 14px; }
+            .result-title a { font-size: 1.1em; }
+            .result-snippet { font-size: 0.9em; }
+            .pagination a, .pagination span.page-number { padding: 7px 10px; font-size: 0.85em; min-width: 30px;}
+            .filters-container-sidebar { gap: 15px; }
+            .filter-group input[type="text"], .filter-group input[type="number"], .filter-group select { padding: 8px 10px; font-size: 0.85em; }
+            .category-filter-tile { min-width: calc(50% - 5px); max-width: calc(50% - 5px); min-height: 65px; padding: 0.4rem 0.3rem; }
+            .category-tile-icon { font-size: 1em; width: 20px; height: 20px; }
+            .category-tile-name { font-size: 0.65rem;}
+            .category-tile-count { font-size: 0.55rem; }
+            .filter-group label, .filter-group .filter-label { font-size: 0.8em; }
+            .author-profile-card { width: calc(100% - 10px); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar Placeholder -->
+    <div id="navbarContainer"></div>
+
+    <!-- Page Content Wrapper -->
+    <div class="page-content-wrapper">
+        <div id="sidebar-peek-trigger"></div>
+        <aside class="filter-sidebar" id="filter-sidebar">
+            <div class="filters-header-sidebar">
+                <span class="filters-title-sidebar">Filters</span>
+                <button type="button" id="sidebar-minimize-btn" title="Minimize Filters">
+                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" />
+                    </svg>
+                    <span class="tooltip">Minimize the filter panel. You can peek by hovering over the left edge or click the arrow to expand it again.</span>
+                </button>
+            </div>
+            <div class="filters-container-sidebar">
+                <div class="filter-group">
+                    <div class="filter-group-category-header toggle-container all-categories-toggle-container">
+                        <label for="toggle-all-categories">All Categories</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-all-categories">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div id="category-tile-filter-container" role="group" aria-labelledby="category-filter-label">
+                        </div>
+                </div>
+                <div class="filter-group show-only-filter-group">
+                    <label class="filter-label">Filter by Type</label>
+                    <div class="all-types-toggle-container toggle-container">
+                        <label for="toggle-all-result-types">All Types</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-all-result-types" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="individual-type-filters">
+                        <div class="type-filter-item">
+                            <input type="checkbox" name="result-type-specific" value="document" id="show-documents-cb" checked>
+                            <label for="show-documents-cb">Documents <span class="filter-count" id="count-documents"></span></label>
+                        </div>
+                        <div class="type-filter-item">
+                            <input type="checkbox" name="result-type-specific" value="author" id="show-authors-cb" checked>
+                            <label for="show-authors-cb">Authors <span class="filter-count" id="count-authors"></span></label>
+                        </div>
+                        <div class="type-filter-item">
+                            <input type="checkbox" name="result-type-specific" value="keyword" id="show-keywords-cb" checked> <label for="show-keywords-cb">Keywords <span class="filter-count" id="count-keywords-results"></span></label> </div>
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <label for="filter-sort">Sort By</label>
+                    <select id="filter-sort" name="sort" aria-label="Sort results by">
+                        <option value="relevance">Relevance</option>
+                        <option value="date-newest">Date: Newest First</option>
+                        <option value="date-oldest">Date: Oldest First</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="filter-author">Author</label>
+                    <select id="filter-author" name="author" aria-label="Filter by author">
+                        <option value="all">All Authors</option>
+                        </select>
+                </div>
+                <div class="filter-group">
+                     <div class="filter-group-label-container">
+                        <label for="filter-tags">Filter by Keywords</label> <span class="info-icon" tabindex="0"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clip-rule="evenodd" /></svg>
+                            <span class="tooltip">
+                                Enter keywords separated by commas (e.g., AI, research). This filters <strong>documents</strong> containing ALL entered keywords.
+                                <br><br>
+                                This is different from "Show Only: Keywords", which displays keyword entities themselves. </span>
+                        </span>
+                    </div>
+                    <input type="text" id="filter-tags" name="tags" placeholder="e.g., AI, research" aria-label="Filter by keywords"> </div>
+                <div class="filter-group">
+                    <label for="filter-year-published">Year Published</label>
+                    <select id="filter-year-published" name="year-published" aria-label="Filter by year published">
+                        <option value="all">Any Year</option>
+                        <option value="specific">Specific Year</option>
+                        <option value="range">Year Range</option>
+                    </select>
+                </div>
+                <div class="filter-group" id="specific-year-filter-group" style="display: none;">
+                    <label for="filter-year-specific" class="visually-hidden">Specific Year</label>
+                    <input type="number" id="filter-year-specific" name="year-specific" placeholder="YYYY" min="1000" max="2099" aria-label="Specific year">
+                </div>
+                <div class="filter-group" id="year-range-filter-group" style="display: none;">
+                     <div class="date-custom-inputs">
+                        <div class="filter-group">
+                            <label for="filter-year-from">Start Year</label>
+                            <input type="number" id="filter-year-from" name="year-from" placeholder="YYYY" min="1000" max="2099" aria-label="Start year">
+                        </div>
+                        <div class="filter-group">
+                            <label for="filter-year-to">End Year</label>
+                            <input type="number" id="filter-year-to" name="year-to" placeholder="YYYY" min="1000" max="2099" aria-label="End year">
+                        </div>
+                    </div>
+                </div>
+
+            </div> 
+            <button type="button" id="clear-filters-btn" class="clear-filters-btn">
+                <svg viewBox="-3 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" fill="currentColor" aria-hidden="true"> <g id="Page-1" stroke="none" stroke-width="1" fill-rule="evenodd"> <g id="Icon-Set-Filled" transform="translate(-261.000000, -205.000000)" fill="currentColor"> <path d="M268,220 C268,219.448 268.448,219 269,219 C269.552,219 270,219.448 270,220 L270,232 C270,232.553 269.552,233 269,233 C268.448,233 268,232.553 268,232 L268,220 L268,220 Z M273,220 C273,219.448 273.448,219 274,219 C274.552,219 275,219.448 275,220 L275,232 C275,232.553 274.552,233 274,233 C273.448,233 273,232.553 273,232 L273,220 L273,220 Z M278,220 C278,219.448 278.448,219 279,219 C279.552,219 280,219.448 280,220 L280,232 C280,232.553 279.552,233 279,233 C278.448,233 278,232.553 278,232 L278,220 L278,220 Z M263,233 C263,235.209 264.791,237 267,237 L281,237 C283.209,237 285,235.209 285,233 L285,217 L263,217 L263,233 L263,233 Z M277,209 L271,209 L271,208 C271,207.447 271.448,207 272,207 L276,207 C276.552,207 277,207.447 277,208 L277,209 L277,209 Z M285,209 L279,209 L279,207 C279,205.896 278.104,205 277,205 L271,205 C269.896,205 269,205.896 269,207 L269,209 L263,209 C261.896,209 261,209.896 261,211 L261,213 C261,214.104 261.895,214.999 262.999,215 L285.002,215 C286.105,214.999 287,214.104 287,213 L287,211 C287,209.896 286.104,209 285,209 L285,209 Z" id="trash"> </path> </g> </g> </svg>
+                Clear All Filters
+            </button>
+            <div class="sidebar-peek-arrow" id="sidebar-peek-arrow" title="Maximize Filters">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+                </svg>
+            </div>
+        </aside>
+
+        <main class="main-content-area" id="main-content-area">
+            <div class="search-results-container-wrapper">
+                 <h1 id="results-for-header" class="results-for-header">Results for '<span id="search-query-term-display">Your Search</span>'</h1>
+
+                <div id="searchResultsList">
+                    <p class="no-results">Apply filters or search to see results.</p>
+                </div>
+                <div id="end-of-results-message" class="end-of-results-message" style="display: none;">
+                    You've reached the end of the results.
+                </div>
+
+                <div class="pagination-container" id="pagination-container" style="display: none;">
+                    <nav class="pagination" id="pagination-nav" aria-label="Search results pagination">
+                        </nav>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Mock data representing search results
+        const mockResultsData = [
+            // MODIFIED: Removed "Article" category items
+            { id: 3, resultType: 'document', title: "Sustainable Urban Development: A Thesis", url: "https://www.example.net/blog/sustainable-cities", snippet: "Discussing new approaches to creating sustainable and resilient urban environments for the future.", date: "2024-05-01", category: "Thesis", author: "Jane Jacobs Jr.", tags: ["sustainability", "urban planning", "cities", "environment"], relevanceScore: 0.85 },
+            { id: 4, resultType: 'document', title: "Advanced Techniques in Machine Learning - A Dissertation", url: "https://www.example.edu/ml-techniques", snippet: "A deep dive into cutting-edge machine learning algorithms and their applications.", date: "2023-11-15", category: "Dissertation", author: "Dr. Alan Turing", tags: ["machine learning", "AI", "algorithms", "deep learning"], relevanceScore: 0.95 },
+            { id: 5, resultType: 'document', title: "Beginner's Guide to Quantum Computing - Confluence Proceedings", url: "https://www.example.com/guides/quantum", snippet: "An accessible introduction to the principles of quantum computing and its potential.", date: "2024-03-13", category: "Confluence", author: "Dr. Ada Lovelace", tags: ["quantum computing", "guide", "physics", "technology"], relevanceScore: 0.77 },
+            { id: 6, resultType: 'document', title: "The Synergy of Art and Science - Conference Paper", url: "https://www.example.com/synergy-art-sci", snippet: "Exploring interdisciplinary connections and collaborative potential between artistic and scientific domains.", date: "2024-02-28", category: "Synergy", author: "Leonardo da Vinci II", tags: ["interdisciplinary", "art", "science", "collaboration"], relevanceScore: 0.82 },
+            { id: 7, resultType: 'document', title: "Ethical Considerations in AI Development - A Thesis", url: "https://www.example.net/ai-ethics-thesis", snippet: "An in-depth analysis of the ethical challenges posed by advancing artificial intelligence technologies.", date: "2023-09-05", category: "Thesis", author: "Dr. Rachel Carson", tags: ["AI", "ethics", "philosophy", "technology"], relevanceScore: 0.90 },
+
+            // Authors
+            { id: 101, resultType: 'author', title: "Dr. Ada Lovelace", url: "#author-ada", documentCount: 2, relevanceScore: 0.9 }, // Note: Ada Lovelace now has 1 doc in this set
+            { id: 102, resultType: 'author', title: "Prof. Edward Tufte", url: "#author-tufte", documentCount: 0, relevanceScore: 0.85 }, // No docs for Tufte in this set
+            { id: 103, resultType: 'author', title: "Jane Jacobs Jr.", url: "#author-jacobs", documentCount: 1, relevanceScore: 0.8 },
+            { id: 104, resultType: 'author', title: "Dr. Alan Turing", url: "#author-turing", documentCount: 1, relevanceScore: 0.93 },
+            { id: 105, resultType: 'author', title: "Dr. Rachel Carson", url: "#author-carson", documentCount: 1, relevanceScore: 0.81 },
+            { id: 106, resultType: 'author', title: "Leonardo da Vinci II", url: "#author-leo", documentCount: 1, relevanceScore: 0.79 },
+
+
+            // Keywords (formerly Tags) - MODIFIED resultType
+            { id: 201, resultType: 'keyword', title: "AI", url: "#tag-ai", documentCount: 3, relevanceScore: 0.95 },
+            { id: 202, resultType: 'keyword', title: "Research", url: "#tag-research", documentCount: 2, relevanceScore: 0.90 },
+            { id: 203, resultType: 'keyword', title: "Sustainability", url: "#tag-sustainability", documentCount: 2, relevanceScore: 0.88 },
+            { id: 204, resultType: 'keyword', title: "Data Visualization", url: "#tag-dataviz", documentCount: 1, relevanceScore: 0.87 },
+            { id: 205, resultType: 'keyword', title: "Machine Learning", url: "#tag-ml", documentCount: 1, relevanceScore: 0.94 },
+            { id: 206, resultType: 'keyword', title: "Ethics", url: "#tag-ethics", documentCount: 1, relevanceScore: 0.89 }
+        ];
+
+        // API endpoints - align with navbar
+        const API = {
+            documents: '/api/documents',  // This endpoint works
+            categories: '/api/categories',
+            keywords: '/api/keywords',
+            trendingKeywords: '/api/trending-keywords',
+        };
+
+        // Flag to enable/disable features that depend on missing APIs
+        const FEATURES = {
+            hasAuthorsAPI: false,
+            hasCategoryCountsAPI: false,
+            hasCompiledDocumentsAPI: false,
+            hasRegularDocumentsAPI: false,
+        }
+        
+        let currentResultsData = [];
+        const RESULTS_PER_PAGE = 5;
+        let currentPage = 1;
+        let currentFilteredResultsMasterList = [];
+        const PREDEFINED_CATEGORIES = ["Thesis", "Dissertation", "Confluence", "Synergy"];
+
+        // Store actual category counts from API
+        let categoryCountsFromAPI = {};
+
+        /**
+         * Updates the category tiles with the provided counts
+         */
+        function updateCategoryTilesWithCounts(counts) {
+            PREDEFINED_CATEGORIES.forEach(categoryName => {
+                const count = counts[categoryName] || 0;
+                const countElements = document.querySelectorAll(`.category-count-${categoryName.toLowerCase().replace(/\s+/g, '-')}`);
+                
+                countElements.forEach(element => {
+                    element.textContent = count;
+                    
+                    // Also update dataset for consistency
+                    const tileElement = element.closest('.category-filter-tile');
+                    if (tileElement) {
+                        tileElement.dataset.count = count;
+                    }
+                });
+            });
+        }
+
+        /**
+         * Fetch data from an API endpoint
+         * @param {string} url - API endpoint URL
+         * @returns {Promise<any>} - Parsed JSON response
+         */
+        async function fetchData(url) {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status}`);
+                }
+                return await response.json();
+            } catch (error) {
+                console.error(`Error fetching from ${url}:`, error);
+                return null;
+            }
+        }
+
+        /**
+         * Performs a search using the backend API
+         * @param {string} query - Search query
+         * @param {Object} filters - Filter options
+         * @returns {Promise<Array>} - Combined search results
+         */
+        async function performSearch(query, filters = {}) {
+            try {
+                const searchResults = [];
+                
+                // Since only the main documents API works, just use that
+                const documents = await fetchDocuments(API.documents, query, filters).catch(err => {
+                    console.error("Error fetching documents:", err);
+                    return [];
+                });
+                
+                // Add documents to search results
+                if (documents && documents.length > 0) {
+                    searchResults.push(...documents);
+                }
+                
+                // Only try to get keywords if there's an actual search query
+                if (query && currentPage === 1) {
+                    try {
+                        // Extract keywords from documents since we don't have a keywords API
+                        const keywords = extractKeywordsFromDocuments(documents, query);
+                        if (keywords.length > 0) {
+                            searchResults.push(...keywords);
+                        }
+                        
+                        // Extract authors from documents since we don't have an authors API
+                        const authors = extractAuthorsFromDocuments(documents, query);
+                        if (authors.length > 0) {
+                            searchResults.push(...authors);
+                        }
+                    } catch (e) {
+                        console.error("Error extracting supplemental data:", e);
+                    }
+                }
+                
+                // Fallback to mock data if no results found
+                if (searchResults.length === 0) {
+                    console.log("No results found from APIs, using mock data as fallback");
+                    return mockResultsData;
+                }
+                
+                return searchResults;
+            } catch (error) {
+                console.error('Error performing search:', error);
+                return mockResultsData; // Fallback to mock data in case of error
+            }
+        }
+
+        /**
+         * Extract author information from document results
+         */
+        function extractAuthorsFromDocuments(documents, query) {
+            if (!Array.isArray(documents)) return [];
+            
+            const authorMap = new Map();
+            
+            documents.forEach(doc => {
+                let authorName = doc.author;
+                if (!authorName && doc.authors) {
+                    if (Array.isArray(doc.authors) && doc.authors.length > 0) {
+                        authorName = doc.authors[0].name || doc.authors[0];
+                    } else if (typeof doc.authors === 'string') {
+                        authorName = doc.authors;
+                    } else if (doc.authors.name) {
+                        authorName = doc.authors.name;
+                    }
+                }
+                
+                if (authorName && (!query || authorName.toLowerCase().includes(query.toLowerCase()))) {
+                    if (!authorMap.has(authorName)) {
+                        authorMap.set(authorName, {
+                            count: 1,
+                            name: authorName
+                        });
+                    } else {
+                        const author = authorMap.get(authorName);
+                        author.count++;
+                    }
+                }
+            });
+            
+            // Convert map to array of author result objects
+            return Array.from(authorMap.values()).map((author, idx) => ({
+                id: 2000 + idx,
+                resultType: 'author',
+                title: author.name,
+                url: `/authors/${encodeURIComponent(author.name)}`,
+                documentCount: author.count,
+                relevanceScore: 0.8
+            }));
+        }
+
+        /**
+         * Extract keyword information from document results
+         */
+        function extractKeywordsFromDocuments(documents, query) {
+            if (!Array.isArray(documents)) return [];
+            
+            const keywordMap = new Map();
+            
+            documents.forEach(doc => {
+                const tags = doc.keywords || doc.tags || [];
+                if (Array.isArray(tags)) {
+                    tags.forEach(tag => {
+                        if (tag && (!query || tag.toLowerCase().includes(query.toLowerCase()))) {
+                            if (!keywordMap.has(tag)) {
+                                keywordMap.set(tag, {
+                                    count: 1,
+                                    name: tag
+                                });
+                            } else {
+                                const keyword = keywordMap.get(tag);
+                                keyword.count++;
+                            }
+                        }
+                    });
+                }
+            });
+            
+            // Convert map to array of keyword result objects
+            return Array.from(keywordMap.values()).map((keyword, idx) => ({
+                id: 1000 + idx,
+                resultType: 'keyword',
+                title: keyword.name,
+                url: `/search?q=${encodeURIComponent(keyword.name)}`,
+                documentCount: keyword.count,
+                relevanceScore: 0.7
+            }));
+        }
+
+        /**
+         * Helper function to fetch documents with exactly the same API approach as the navbar
+         */
+        async function fetchDocuments(endpoint, query, filters) {
+            try {
+                // Build document search URL with filters
+                const documentUrl = new URL(endpoint, window.location.origin);
+                if (query) documentUrl.searchParams.append('search', query);
+                
+                // Store selected categories for client-side filtering - MATCHES NAVBAR EXACTLY
+                const selectedCategories = filters.category && filters.category.length > 0 
+                    ? filters.category.map(cat => cat.toUpperCase()) 
+                    : [];
+                
+                // For backward compatibility, just fetch all documents without category filter
+                // if multiple categories are selected - we'll filter on client side
+                if (selectedCategories.length === 1) {
+                    // Apply single category filter directly - this should work with existing API
+                    documentUrl.searchParams.append('category', selectedCategories[0]);
+                    // Also try document_type as an alternative parameter name
+                    documentUrl.searchParams.append('document_type', selectedCategories[0]);
+                } else if (selectedCategories.length > 1) {
+                    // For multiple categories, we'll fetch more documents and filter client-side
+                    // The limit needs to be higher to ensure we get enough results after filtering
+                    documentUrl.searchParams.set('limit', '50');
+                }
+                
+                // Add other filters
+                if (filters.author) documentUrl.searchParams.append('author', filters.author);
+                if (filters.tags) documentUrl.searchParams.append('keyword', filters.tags);
+                if (filters.yearSpecific) documentUrl.searchParams.append('year', filters.yearSpecific);
+                if (filters.yearFrom) documentUrl.searchParams.append('year_from', filters.yearFrom);
+                if (filters.yearTo) documentUrl.searchParams.append('year_to', filters.yearTo);
+                
+                // Handle pagination
+                documentUrl.searchParams.append('page', currentPage.toString());
+                documentUrl.searchParams.append('limit', RESULTS_PER_PAGE.toString());
+                
+                // Sort parameter
+                if (filters.sort) {
+                    let sortParam = 'relevance';
+                    if (filters.sort === 'date-newest') sortParam = 'latest';
+                    if (filters.sort === 'date-oldest') sortParam = 'earliest';
+                    documentUrl.searchParams.append('sort', sortParam);
+                }
+                
+                console.log(`Fetching documents from ${endpoint}:`, documentUrl.toString());
+                
+                // Fetch documents
+                const documentsResponse = await fetchData(documentUrl.toString());
+                if (documentsResponse && documentsResponse.documents) {
+                    let documents = documentsResponse.documents;
+                    
+                    // Apply client-side filtering for multiple categories if needed
+                    if (selectedCategories.length > 1 && documents.length > 0) {
+                        documents = documents.filter(doc => {
+                            // Get document's category/type and normalize for comparison
+                            const documentType = doc.document_type || doc.category || '';
+                            const normalizedType = documentType.toUpperCase();
+                            
+                            // Keep document if its type matches any of our selected categories
+                            return selectedCategories.includes(normalizedType);
+                        });
+                        
+                        console.log(`Filtered from ${documentsResponse.documents.length} to ${documents.length} matching selected categories`);
+                    }
+                    
+                    // Transform document data to match our expected format
+                    const processedDocuments = documents.map(doc => {
+                        // Determine document type
+                        let category = doc.document_type || doc.category || "";
+                        if (category) {
+                            // Ensure proper capitalization to match our categories
+                            category = category.charAt(0).toUpperCase() + category.slice(1).toLowerCase();
+                        } else if (doc.is_compiled !== undefined) {
+                            category = doc.is_compiled ? "Compiled" : "Draft";
+                        }
+                        
+                        // Extract author info properly
+                        let authorName = "Unknown";
+                        if (doc.authors) {
+                            if (Array.isArray(doc.authors)) {
+                                authorName = doc.authors.length > 0 ? doc.authors[0].name : "Unknown";
+                            } else if (typeof doc.authors === 'string') {
+                                authorName = doc.authors;
+                            } else if (doc.authors.name) {
+                                authorName = doc.authors.name;
+                            }
+                        } else if (doc.author) {
+                            authorName = typeof doc.author === 'string' ? doc.author : doc.author.name || "Unknown";
+                        }
+                        
+                        // Extract keywords/tags
+                        const tags = doc.keywords || doc.tags || [];
+                        
+                        // Build proper URL - match the navbar's approach
+                        const isCompiled = doc.is_compiled === true || 
+                                        doc.document_type?.toLowerCase() === 'compiled' || 
+                                        doc.child_count > 0;
+                        
+                        // Use the same URL format as the navbar
+                        const documentUrl = isCompiled 
+                            ? `/pages/user-compiled.html?id=${doc.id}` 
+                            : `/pages/user-single.html?id=${doc.id}`;
+                        
+                        return {
+                            id: doc.id,
+                            resultType: 'document',
+                            title: doc.title,
+                            url: documentUrl,
+                            snippet: doc.abstract || doc.description || "",
+                            date: doc.publication_date || doc.created_at,
+                            category: category,
+                            author: authorName,
+                            tags: tags,
+                            relevanceScore: 0.8,
+                            is_compiled: isCompiled
+                        };
+                    });
+                    
+                    // Count the documents by category
+                    const categoryCounts = {};
+                    processedDocuments.forEach(doc => {
+                        if (doc.category) {
+                            categoryCounts[doc.category] = (categoryCounts[doc.category] || 0) + 1;
+                        }
+                    });
+                    
+                    // Update our category counts with the latest data from this search
+                    updateCategoryTilesWithCounts(categoryCounts);
+                    
+                    // Log the types of documents found
+                    console.log(`From ${endpoint}: Found ${processedDocuments.length} documents:`, 
+                              `Compiled: ${processedDocuments.filter(d => d.is_compiled).length}`,
+                              `Non-compiled: ${processedDocuments.filter(d => !d.is_compiled).length}`);
+                    
+                    return processedDocuments;
+                } else {
+                    console.warn(`No documents found or invalid response format from ${endpoint}:`, documentsResponse);
+                    return [];
+                }
+            } catch (error) {
+                console.error(`Error fetching documents from ${endpoint}:`, error);
+                return [];
+            }
+        }
+
+        // Replace problematic SVG paths with corrected ones for safe rendering
+        function createSafeSVGIcon(iconType) {
+            let svgContent = '';
+            
+            switch(iconType) {
+                case 'document':
+                    svgContent = '<path d="M3.25 2.75a.75.75 0 00-.75.75v9.5a.75.75 0 001.5.75v-1.224c.238.001.474.012.69.026h10.618a2.75 2.75 0 01.69.026V3.5a.75.75 0 00-.75-.75H4.75a.75.75 0 00-.75.75H3.25zM14.75 14.5H4.69a1.25 1.25 0 00-.69.191V15.5a2.25 2.25 0 002.25 2.25h7.5a2.25 2.25 0 002.25-2.25v-.809a2.75 2.75 0 01-1.25-.191z" />';
+                    break;
+                case 'author':
+                    svgContent = '<path d="M10 8a3 3 0 100-6 3 3 0 000 6zM3.465 14.493a1.23 1.23 0 00.41 1.412A9.957 9.957 0 0010 18c2.31 0 4.438-.784 6.131-2.095a1.23 1.23 0 00.41-1.412c-.006-.042-.03-.08-.071-.125a4.45 4.45 0 00-.87-.693c-.613-.373-1.476-.701-2.6-.861-.633-.09-1.3-.138-2-.138s-1.367.048-2 .138c-1.124.16-1.987.488-2.6.861a4.45 4.45 0 00-.87.693c-.041.045-.065.083-.07.125z" />';
+                    break;
+                case 'date':
+                    svgContent = '<path fill-rule="evenodd" d="M5.75 2a.75.75 0 01.75.75V4h7V2.75a.75.75 0 011.5 0V4h.25A2.75 2.75 0 0118 6.75v8.5A2.75 2.75 0 0115.25 18H4.75A2.75 2.75 0 012 15.25v-8.5A2.75 2.75 0 014.75 4H5V2.75A.75.75 0 015.75 2zm-1 5.5c-.69 0-1.25.56-1.25 1.25v6.5c0 .69.56 1.25 1.25 1.25h10.5c.69 0 1.25-.56 1.25-1.25v-6.5c0-.69-.56-1.25-1.25-1.25H4.75z" clip-rule="evenodd" />';
+                    break;
+                default:
+                    svgContent = '<path d="M3 5a2 2 0 012-2h10a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V5z" />';
+            }
+            
+            // Return complete SVG element
+            return `<svg class="meta-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">${svgContent}</svg>`;
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            let initialFullQuery = urlParams.get('q') || "";
+            let displayedSearchTerm = "";
+
+            const resultsListContainer = document.getElementById('searchResultsList');
+            const searchQueryTermDisplay = document.getElementById('search-query-term-display');
+            const filterSort = document.getElementById('filter-sort');
+            const filterAuthorEl = document.getElementById('filter-author');
+            const categoryTileFilterContainer = document.getElementById('category-tile-filter-container');
+            const filterTagsInput = document.getElementById('filter-tags');
+            
+            const filterYearPublishedSelect = document.getElementById('filter-year-published');
+            const specificYearFilterGroup = document.getElementById('specific-year-filter-group');
+            const filterYearSpecificInput = document.getElementById('filter-year-specific');
+            const yearRangeFilterGroup = document.getElementById('year-range-filter-group');
+            const filterYearFromInput = document.getElementById('filter-year-from');
+            const filterYearToInput = document.getElementById('filter-year-to');
+
+            const clearFiltersBtn = document.getElementById('clear-filters-btn');
+            
+            const toggleAllResultTypes = document.getElementById('toggle-all-result-types');
+            const specificTypeCheckboxes = document.querySelectorAll('input[name="result-type-specific"]');
+
+            const sidebarMinimizeBtn = document.getElementById('sidebar-minimize-btn');
+            const filterSidebar = document.getElementById('filter-sidebar'); 
+            const filtersContainerSidebar = filterSidebar.querySelector('.filters-container-sidebar'); 
+            const sidebarPeekTrigger = document.getElementById('sidebar-peek-trigger');
+            const sidebarPeekArrow = document.getElementById('sidebar-peek-arrow');
+            
+            const toggleAllCategoriesSwitch = document.getElementById('toggle-all-categories');
+
+            const paginationContainer = document.getElementById('pagination-container');
+            const paginationNav = document.getElementById('pagination-nav');
+            const endOfResultsMessage = document.getElementById('end-of-results-message');
+            
+            const countDocumentsEl = document.getElementById('count-documents');
+            const countAuthorsEl = document.getElementById('count-authors');
+            const countKeywordsEl = document.getElementById('count-keywords-results'); // MODIFIED: ID for count
+
+            function populateAuthorFilter() {
+                // Show loading state
+                filterAuthorEl.innerHTML = '<option value="all">Loading authors...</option>';
+                
+                // Extract authors from documents
+                fetchData(`${API.documents}?limit=100`)
+                    .then(data => {
+                        if (data && data.documents && Array.isArray(data.documents)) {
+                            // Extract unique authors from documents
+                            const authorSet = new Set();
+                            data.documents.forEach(doc => {
+                                if (doc.author) authorSet.add(doc.author);
+                                if (doc.authors) {
+                                    if (Array.isArray(doc.authors)) {
+                                        doc.authors.forEach(author => {
+                                            if (author && author.name) authorSet.add(author.name);
+                                        });
+                                    } else if (typeof doc.authors === 'string') {
+                                        authorSet.add(doc.authors);
+                                    }
+                                }
+                            });
+                            return Array.from(authorSet);
+                        }
+                        throw new Error('No document data available');
+                    })
+                    .then(authors => {
+                        // Reset and populate authors dropdown
+                filterAuthorEl.innerHTML = '<option value="all">All Authors</option>';
+                        
+                        // Sort authors by name
+                        authors.sort((a, b) => a.localeCompare(b));
+                        
+                        // Add each author to the dropdown (deduplicated)
+                        authors.forEach(authorName => {
+                            const option = document.createElement('option');
+                            option.value = authorName;
+                            option.textContent = authorName;
+                            filterAuthorEl.appendChild(option);
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Error loading authors:', error);
+                        // Fallback to mock data authors
+                        filterAuthorEl.innerHTML = '<option value="all">All Authors</option>';
+                        
+                        const uniqueAuthors = [...new Set(
+                            mockResultsData
+                                .filter(item => item.resultType === 'document' && item.author)
+                                .map(item => item.author)
+                        )].sort();
+                        
+                        uniqueAuthors.forEach(author => {
+                    const option = document.createElement('option');
+                    option.value = author;
+                    option.textContent = author;
+                    filterAuthorEl.appendChild(option);
+                        });
+                });
+            }
+
+            // Update populateCategoryTiles function to use actual category counts
+            function populateCategoryTiles() {
+                categoryTileFilterContainer.innerHTML = '';
+                
+                // First try to get actual counts from API
+                if (Object.keys(categoryCountsFromAPI).length === 0) {
+                    // Use estimated counts initially
+                PREDEFINED_CATEGORIES.forEach(categoryName => {
+                    const count = mockResultsData.filter(item => item.resultType === 'document' && item.category === categoryName).length;
+                    const tile = createCategoryTile(categoryName, count, toggleAllCategoriesSwitch.checked); 
+                    categoryTileFilterContainer.appendChild(tile);
+                });
+                    
+                    // Then fetch real counts in the background
+                    fetchCategoryCounts();
+                } else {
+                    // Use real counts if available
+                    PREDEFINED_CATEGORIES.forEach(categoryName => {
+                        const count = categoryCountsFromAPI[categoryName] || 0;
+                        const tile = createCategoryTile(categoryName, count, toggleAllCategoriesSwitch.checked); 
+                        categoryTileFilterContainer.appendChild(tile);
+                    });
+                }
+                
+                updateToggleAllCategoriesSwitchState(); 
+            }
+
+            /**
+             * Fetches category counts data similar to the navbar implementation
+             */
+            async function fetchCategoryCounts() {
+                try {
+                    // Get all documents and count by category - exactly like the navbar does
+                    const documentResponse = await fetchData(`${API.documents}?limit=100`);
+                    
+                    // Process categories and count documents by type
+                    const categoryCounts = {};
+                    PREDEFINED_CATEGORIES.forEach(category => {
+                        categoryCounts[category] = 0; // Initialize with zeros
+                    });
+                    
+                    // Count documents by type
+                    let totalDocuments = 0;
+                    
+                    if (documentResponse && documentResponse.documents) {
+                        documentResponse.documents.forEach(doc => {
+                            // Count by document type
+                            if (doc.document_type) {
+                                // Capitalize first letter to match our category format (Thesis, Dissertation, etc)
+                                const docType = doc.document_type.charAt(0).toUpperCase() + doc.document_type.slice(1).toLowerCase();
+                                if (categoryCounts[docType] !== undefined) {
+                                    categoryCounts[docType]++;
+                                    totalDocuments++;
+                                }
+                            } else if (doc.category) {
+                                // Alternative field name
+                                const docType = doc.category.charAt(0).toUpperCase() + doc.category.slice(1).toLowerCase();
+                                if (categoryCounts[docType] !== undefined) {
+                                    categoryCounts[docType]++;
+                                    totalDocuments++;
+                                }
+                            }
+                        });
+                    }
+                    
+                    console.log('Category counts from documents:', categoryCounts, 'Total:', totalDocuments);
+                    
+                    // Update stored category counts
+                    categoryCountsFromAPI = categoryCounts;
+                    
+                    // Update category tiles with accurate counts
+                    updateCategoryTilesWithCounts(categoryCounts);
+                    
+                } catch (error) {
+                    console.error('Error fetching category counts:', error);
+                }
+            }
+
+            function createCategoryTile(categoryName, count, isActive) {
+                const tile = document.createElement('button');
+                tile.type = 'button';
+                tile.className = `category-filter-tile category-tile-${categoryName.toLowerCase().replace(/\s+/g, '-')}`;
+                tile.classList.toggle('active', isActive); 
+                tile.dataset.category = categoryName;
+                tile.dataset.count = count; // Store count in dataset for easy updates
+                tile.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+                let iconSVG = '';
+                if (categoryName === "Thesis" || categoryName === "Dissertation") {
+                    iconSVG = `<svg class="meta-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M3.25 2.75A.75.75 0 002.5 3.5v9.5A.75.75 0 004 13.75v-1.224A2.736 2.736 0 014.69 12.5h10.618a2.736 2.736 0 01.691.026V3.5A.75.75 0 0015.25 2H4.75A.75.75 0 004 2.75H3.25zM14.75 14.5H4.691A1.236 1.236 0 004 14.691V15.5A2.25 2.25 0 006.25 17.75h7.5A2.25 2.25 0 0016 15.5v-.809c0-.052-.002-.104-.005-.155A2.736 2.736 0 0114.75 14.5z" /></svg>`;
+                } else if (categoryName === "Confluence") {
+                    iconSVG = `<svg class="meta-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M7 8a3 3 0 100-6 3 3 0 000 6zM14.5 9a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM1.054 17.245A3.501 3.501 0 014.5 14h11a3.501 3.501 0 013.446 3.245A2.002 2.002 0 0116.5 19h-13a2.002 2.002 0 01-1.946-1.755z" /></svg>`;
+                } else if (categoryName === "Synergy") {
+                    iconSVG = `<svg class="meta-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.586 4.414a1.5 1.5 0 012.122 0l1.878 1.879a1.5 1.5 0 010 2.121l-1.878 1.879a1.5 1.5 0 01-2.122-2.122L13.5 7.25H6.5A1.5 1.5 0 015 5.75S5 4.25 6.5 4.25h7.086l-.914-.914a1.5 1.5 0 010-2.122zM7.414 15.586a1.5 1.5 0 01-2.122 0L3.414 13.707a1.5 1.5 0 010-2.121l1.878-1.879a1.5 1.5 0 112.122 2.122L6.5 12.75h7a1.5 1.5 0 011.5 1.5s0 1.5-1.5 1.5H6.5l.914.914a1.5 1.5 0 010 2.122z" clip-rule="evenodd" /></svg>`;
+                }
+                tile.innerHTML = `
+                    <span class="category-tile-content">
+                        <span class="category-tile-icon">${iconSVG}</span>
+                        <span class="category-tile-name">${categoryName}</span>
+                        <span class="category-tile-count category-count-${categoryName.toLowerCase().replace(/\s+/g, '-')}">${count}</span>
+                    </span>`;
+                tile.addEventListener('click', handleCategoryTileClick);
+                return tile;
+            }
+            
+            function updateToggleAllCategoriesSwitchState() {
+                const allTiles = categoryTileFilterContainer.querySelectorAll('.category-filter-tile');
+                const activeTiles = categoryTileFilterContainer.querySelectorAll('.category-filter-tile.active');
+                toggleAllCategoriesSwitch.checked = (allTiles.length > 0 && activeTiles.length === allTiles.length);
+            }
+
+            toggleAllCategoriesSwitch.addEventListener('change', function() {
+                const allTiles = categoryTileFilterContainer.querySelectorAll('.category-filter-tile');
+                const isChecked = this.checked;
+                allTiles.forEach(tile => {
+                    tile.classList.toggle('active', isChecked);
+                    tile.setAttribute('aria-pressed', isChecked ? 'true' : 'false');
+                });
+                currentPage = 1;
+                applyFiltersAndSearch();
+            });
+
+
+            function handleCategoryTileClick(event) {
+                const clickedTile = event.currentTarget;
+                const isActive = clickedTile.classList.toggle('active');
+                clickedTile.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+                updateToggleAllCategoriesSwitchState(); 
+                currentPage = 1;
+                applyFiltersAndSearch();
+            }
+
+            function displayResults() {
+                const oldItems = Array.from(resultsListContainer.children)
+                                     .filter(child => !child.classList.contains('no-results')); 
+
+                if (oldItems.length > 0) {
+                    anime({
+                        targets: oldItems,
+                        opacity: 0,
+                        translateY: 20,
+                        scale: 0.95,
+                        duration: 250, 
+                        easing: 'cubicBezier(.68,-.55,.265,1.55)', 
+                        complete: () => renderNewResults() 
+                    });
+                } else {
+                    renderNewResults(); 
+                }
+            }
+
+            function renderNewResults() {
+                resultsListContainer.innerHTML = ''; 
+
+                const showAllTypes = toggleAllResultTypes.checked;
+                const selectedSpecificTypes = [];
+                if (!showAllTypes) {
+                    specificTypeCheckboxes.forEach(cb => {
+                        if (cb.checked) {
+                            selectedSpecificTypes.push(cb.value);
+                        }
+                    });
+                }
+
+                let resultsToDisplay = currentFilteredResultsMasterList;
+
+                if (!showAllTypes) {
+                    if (selectedSpecificTypes.length > 0) {
+                        resultsToDisplay = currentFilteredResultsMasterList.filter(r => selectedSpecificTypes.includes(r.resultType));
+                    } else {
+                        resultsToDisplay = []; 
+                    }
+                }
+
+                let paginatedItems = resultsToDisplay;
+                let itemsForPaginationCount = resultsToDisplay.length;
+                
+                const documentsAreSelectedOrImplied = showAllTypes || selectedSpecificTypes.includes('document');
+                if (documentsAreSelectedOrImplied) {
+                     const documentsInView = resultsToDisplay.filter(r => r.resultType === 'document');
+                     itemsForPaginationCount = documentsInView.length; 
+                     
+                     const startIndex = (currentPage - 1) * RESULTS_PER_PAGE;
+                     const endIndex = startIndex + RESULTS_PER_PAGE;
+
+                     if(showAllTypes){
+                        const paginatedDocs = documentsInView.slice(startIndex, endIndex);
+                        const otherTypes = resultsToDisplay.filter(r => r.resultType !== 'document');
+                        paginatedItems = [...paginatedDocs, ...otherTypes];
+                     } else { 
+                        paginatedItems = resultsToDisplay.filter(r => r.resultType === 'document').slice(startIndex, endIndex);
+                        const otherSelectedTypes = resultsToDisplay.filter(r => r.resultType !== 'document' && selectedSpecificTypes.includes(r.resultType));
+                        paginatedItems = [...paginatedItems, ...otherSelectedTypes];
+                     }
+
+                } else if (selectedSpecificTypes.length > 0) { 
+                    itemsForPaginationCount = resultsToDisplay.length; 
+                    const startIndex = (currentPage - 1) * RESULTS_PER_PAGE;
+                    const endIndex = startIndex + RESULTS_PER_PAGE;
+                    paginatedItems = resultsToDisplay.slice(startIndex, endIndex);
+                }
+
+
+                if (resultsToDisplay.length === 0) {
+                    const noResultsEl = document.createElement('p');
+                    noResultsEl.className = 'no-results';
+                    noResultsEl.textContent = 'No results match your criteria.';
+                    noResultsEl.style.opacity = 0; 
+                    resultsListContainer.appendChild(noResultsEl);
+                    anime({ targets: noResultsEl, opacity: 1, translateY: [20, 0], duration: 500, easing: 'easeOutQuad' });
+                } else {
+                    const grouped = { document: [], author: [], keyword: [] }; // MODIFIED: tag to keyword
+                    paginatedItems.forEach(item => { if (grouped[item.resultType]) grouped[item.resultType].push(item); });
+
+                    const elementsToAnimateIn = [];
+
+                    if (grouped.document.length > 0) {
+                        const heading = document.createElement('h2');
+                        heading.className = 'results-category-heading'; heading.textContent = 'Documents';
+                        resultsListContainer.appendChild(heading); elementsToAnimateIn.push(heading);
+                        grouped.document.forEach(result => { const el = createResultItemElement(result); resultsListContainer.appendChild(el); elementsToAnimateIn.push(el); });
+                    }
+                    if (grouped.author.length > 0) {
+                        const heading = document.createElement('h2');
+                        heading.className = 'results-category-heading'; heading.textContent = 'Authors';
+                        resultsListContainer.appendChild(heading); elementsToAnimateIn.push(heading);
+                        const authorCardContainer = document.createElement('div');
+                        authorCardContainer.className = 'author-card-grid-container';
+                        grouped.author.forEach(result => authorCardContainer.appendChild(createResultItemElement(result)));
+                        resultsListContainer.appendChild(authorCardContainer); elementsToAnimateIn.push(authorCardContainer);
+                    }
+                    if (grouped.keyword && grouped.keyword.length > 0) { // MODIFIED: tag to keyword
+                        const heading = document.createElement('h2');
+                        heading.className = 'results-category-heading'; heading.textContent = 'Keywords'; // MODIFIED: Text
+                        resultsListContainer.appendChild(heading); elementsToAnimateIn.push(heading);
+                        const keywordPillContainer = document.createElement('div'); // MODIFIED: Variable name
+                        keywordPillContainer.className = 'keyword-result-pill-container';
+                        grouped.keyword.forEach(result => keywordPillContainer.appendChild(createResultItemElement(result))); // MODIFIED: tag to keyword
+                        resultsListContainer.appendChild(keywordPillContainer); elementsToAnimateIn.push(keywordPillContainer);
+                    }
+                    
+                    if (elementsToAnimateIn.length === 0 && resultsToDisplay.length > 0) { 
+                    } else if (resultsListContainer.innerHTML === '') { 
+                         const noResultsEl = document.createElement('p');
+                         noResultsEl.className = 'no-results'; noResultsEl.textContent = 'No results for this selection or page.';
+                         noResultsEl.style.opacity = 0; resultsListContainer.appendChild(noResultsEl);
+                         elementsToAnimateIn.push(noResultsEl);
+                    }
+                    
+                    elementsToAnimateIn.forEach(el => {
+                        el.style.opacity = 0;
+                        if (el.classList.contains('author-card-grid-container') || el.classList.contains('keyword-result-pill-container')) {
+                            Array.from(el.children).forEach(child => child.style.opacity = 0);
+                        }
+                    });
+
+                    anime({
+                        targets: elementsToAnimateIn.filter(el => !el.classList.contains('author-card-grid-container') && !el.classList.contains('keyword-result-pill-container')),
+                        opacity: [0, 1],
+                        translateY: [40, 0],
+                        scale: [0.85, 1],
+                        duration: 600,
+                        delay: anime.stagger(100, { start: 50 }), 
+                        easing: 'spring(1, 70, 15, 0)', 
+                    });
+                    const gridContainers = resultsListContainer.querySelectorAll('.author-card-grid-container, .keyword-result-pill-container');
+                    gridContainers.forEach(container => {
+                        anime({
+                            targets: container, 
+                            opacity: [0,1],
+                            translateY: [40,0],
+                            scale: [0.85,1],
+                            duration: 600,
+                            delay: anime.stagger(100, {start:50}), 
+                            easing: 'spring(1,70,15,0)',
+                            complete: () => { 
+                                anime({
+                                    targets: container.children,
+                                    opacity: [0, 1],
+                                    translateY: [20, 0],
+                                    scale: [0.9, 1],
+                                    duration: 500,
+                                    delay: anime.stagger(70),
+                                    easing: 'spring(1, 70, 15, 0)',
+                                });
+                            }
+                        });
+                    });
+                }
+                renderPagination(itemsForPaginationCount); 
+            }
+
+
+            function createResultItemElement(result) {
+                // MODIFIED: Changed 'tag' to 'keyword' for resultType check
+                const itemEl = (result.resultType === 'keyword') ? document.createElement('a') : document.createElement('article');
+                let itemHTML = '';
+                if (result.resultType === 'document') {
+                    itemEl.className = 'search-result-item';
+                    itemEl.setAttribute('aria-labelledby', `result-title-${result.id}`);
+                    const publicationYear = result.date ? new Date(result.date).getFullYear() : 'N/A';
+                    const categoryIconSVG = createSafeSVGIcon('document');
+                    const authorIconSVG = createSafeSVGIcon('author');
+                    const dateIconSVG = createSafeSVGIcon('date');
+                    // Remove target="_blank" for document links to prevent opening in new tab
+                    const isInternalPage = result.url && (
+                        result.url.includes('guest-single.html') || 
+                        result.url.includes('guest-compiled.html') || 
+                        result.url.includes('user-single.html') || 
+                        result.url.includes('user-compiled.html')
+                    );
+                    const targetAttr = isInternalPage ? '' : 'target="_blank"';
+                    itemHTML = `<h3 class="result-title"><a href="${result.url || '#'}" id="result-title-${result.id}" ${targetAttr} rel="noopener noreferrer">${result.title}</a></h3><div class="result-metadata">${result.category ? `<span>${categoryIconSVG}${result.category}</span>` : ''}${result.author ? `<span>${authorIconSVG}By ${result.author}</span>` : ''}${result.date ? `<span>${dateIconSVG}${publicationYear}</span>` : ''}</div><p class="result-snippet">${result.snippet}</p>`;
+                } else if (result.resultType === 'author') {
+                    itemEl.className = 'author-profile-card';
+                    const initials = result.title.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
+                    itemHTML = `<div class="author-avatar-placeholder">${initials}</div><div class="author-info"><h3 class="author-name"><a href="${result.url || '#'}" target="_blank" rel="noopener noreferrer">${result.title}</a></h3><p class="author-doc-count">${result.documentCount} document${result.documentCount !== 1 ? 's' : ''}</p><a href="${result.url || '#'}" class="author-view-link" target="_blank" rel="noopener noreferrer">View works &rarr;</a></div>`;
+                } else if (result.resultType === 'keyword') { // MODIFIED: 'tag' to 'keyword'
+                    itemEl.href = result.url || '#'; 
+                    itemEl.className = 'keyword-result-pill'; 
+                    itemEl.setAttribute('target', '_blank'); 
+                    itemEl.setAttribute('rel', 'noopener noreferrer');
+                    itemHTML = `<span class="keyword-pill-name">${result.title}</span><span class="keyword-pill-count">${result.documentCount}</span>`;
+                }
+                itemEl.innerHTML = itemHTML;
+                return itemEl;
+            }
+
+            function renderPagination(totalItems) {
+                paginationNav.innerHTML = '';
+                const paginationContainerEl = document.getElementById('pagination-container'); 
+                const endOfResultsEl = document.getElementById('end-of-results-message'); 
+
+                paginationContainerEl.style.opacity = 0;
+                endOfResultsEl.style.opacity = 0;
+                endOfResultsEl.style.display = 'none';
+
+
+                const totalPages = Math.ceil(totalItems / RESULTS_PER_PAGE);
+                if (totalPages <= 1 && totalItems > 0) { 
+                     paginationContainerEl.style.display = 'none';
+                     endOfResultsEl.style.display = 'block';
+                     anime({ targets: endOfResultsEl, opacity: 1, duration: 500, easing: 'easeOutQuad' });
+                     return;
+                } else if (totalPages <= 1) { 
+                    paginationContainerEl.style.display = 'none';
+                    return;
+                }
+
+                paginationContainerEl.style.display = 'block';
+                anime({ targets: paginationContainerEl, opacity: 1, duration: 500, easing: 'easeOutQuad' });
+
+
+                const prevLink = document.createElement('a'); prevLink.href = '#'; prevLink.innerHTML = '&laquo; Previous'; prevLink.setAttribute('aria-label', 'Previous page');
+                if (currentPage === 1) { prevLink.classList.add('disabled'); prevLink.setAttribute('aria-disabled', 'true'); }
+                else { prevLink.addEventListener('click', (e) => { e.preventDefault(); currentPage--; applyFiltersAndSearch(); }); }
+                paginationNav.appendChild(prevLink);
+
+                let startPage = Math.max(1, currentPage - 2); let endPage = Math.min(totalPages, currentPage + 2);
+                if (currentPage <= 3) endPage = Math.min(totalPages, 5); if (currentPage > totalPages - 3) startPage = Math.max(1, totalPages - 4);
+                if (startPage > 1) { paginationNav.appendChild(createPageLink(1)); if (startPage > 2) { const ellipsis = document.createElement('span'); ellipsis.className = 'ellipsis'; ellipsis.textContent = '...'; paginationNav.appendChild(ellipsis); } }
+                for (let i = startPage; i <= endPage; i++) { paginationNav.appendChild(createPageLink(i)); }
+                if (endPage < totalPages) { if (endPage < totalPages - 1) { const ellipsis = document.createElement('span'); ellipsis.className = 'ellipsis'; ellipsis.textContent = '...'; paginationNav.appendChild(ellipsis); } paginationNav.appendChild(createPageLink(totalPages)); }
+
+                const nextLink = document.createElement('a'); nextLink.href = '#'; nextLink.innerHTML = 'Next &raquo;'; nextLink.setAttribute('aria-label', 'Next page');
+                if (currentPage === totalPages) { nextLink.classList.add('disabled'); nextLink.setAttribute('aria-disabled', 'true');
+                     endOfResultsEl.style.display = 'block';
+                     anime({ targets: endOfResultsEl, opacity: 1, duration: 500, easing: 'easeOutQuad' });
+                } else { nextLink.addEventListener('click', (e) => { e.preventDefault(); currentPage++; applyFiltersAndSearch(); }); }
+                paginationNav.appendChild(nextLink);
+            }
+
+            function createPageLink(pageNumber) {
+                const pageLink = document.createElement(pageNumber === currentPage ? 'span' : 'a');
+                pageLink.href = '#'; pageLink.textContent = pageNumber; pageLink.classList.add('page-number');
+                if (pageNumber === currentPage) { pageLink.classList.add('current'); pageLink.setAttribute('aria-current', 'page'); }
+                else { pageLink.setAttribute('aria-label', `Go to page ${pageNumber}`); pageLink.addEventListener('click', (e) => { e.preventDefault(); currentPage = pageNumber; applyFiltersAndSearch(); }); }
+                return pageLink;
+            }
+
+            function updateFilterControlActiveState() {
+                [filterSort, filterAuthorEl, filterYearPublishedSelect].forEach(selectEl => selectEl.classList.toggle('filter-active', selectEl.value !== selectEl.options[0].value));
+                [filterTagsInput, filterYearSpecificInput, filterYearFromInput, filterYearToInput].forEach(inputEl => inputEl.classList.toggle('filter-active', inputEl.value.trim() !== '' && !inputEl.closest('.filter-group').style.display.includes('none') ));
+            }
+
+            function checkIfAnyFilterApplied() {
+                if (filterSort.value !== 'relevance') return true;
+                if (filterAuthorEl.value !== 'all') return true;
+                if (filterTagsInput.value.trim() !== '') return true;
+                
+                const yearPublishedValue = filterYearPublishedSelect.value;
+                if (yearPublishedValue === 'specific' && filterYearSpecificInput.value.trim() !== '') return true;
+                if (yearPublishedValue === 'range' && (filterYearFromInput.value.trim() !== '' || filterYearToInput.value.trim() !== '')) return true;
+
+                if (!toggleAllResultTypes.checked) return true; 
+                if (!toggleAllCategoriesSwitch.checked) return true; 
+                
+                return false;
+            }
+
+            function updateClearFiltersButtonVisibility() {
+                if (checkIfAnyFilterApplied()) {
+                    clearFiltersBtn.style.display = 'flex';
+                     anime({
+                        targets: clearFiltersBtn,
+                        opacity: 1,
+                        translateY: 0,
+                        scale: 1,
+                        duration: 300,
+                        easing: 'easeOutQuad'
+                    });
+                } else {
+                    anime({
+                        targets: clearFiltersBtn,
+                        opacity: 0,
+                        translateY: 10,
+                        scale: 0.95,
+                        duration: 200,
+                        easing: 'easeInQuad',
+                        complete: function() {
+                            clearFiltersBtn.style.display = 'none';
+                        }
+                    });
+                }
+            }
+
+
+            function parseAndUpdateFiltersFromQuery(fullQuery) {
+                let remainingQuery = fullQuery;
+                let typeFilterAppliedFromUrl = false;
+                let categoryFilterAppliedFromUrl = false;
+                let yearFilterAppliedFromUrl = false;
+
+                const authorRegex = /author:"([^"]+)"/gi; let match = authorRegex.exec(remainingQuery);
+                if (match && match[1]) { const authorName = match[1]; const authorOption = Array.from(filterAuthorEl.options).find(opt => opt.value.toLowerCase() === authorName.toLowerCase()); if (authorOption) filterAuthorEl.value = authorOption.value; remainingQuery = remainingQuery.replace(match[0], '').trim(); }
+                
+                const categoryRegex = /category:([\w,]+)/gi; 
+                match = categoryRegex.exec(remainingQuery);
+                if (match && match[1]) {
+                    categoryFilterAppliedFromUrl = true;
+                    const categoriesFromQuery = match[1].toLowerCase().split(',');
+                    let allTilesSelected = true;
+                    let countSelected = 0;
+                    categoryTileFilterContainer.querySelectorAll('.category-filter-tile').forEach(tile => { 
+                        const isActive = categoriesFromQuery.includes(tile.dataset.category.toLowerCase());
+                        tile.classList.toggle('active', isActive); 
+                        tile.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+                        if (!isActive) allTilesSelected = false;
+                        if (isActive) countSelected++;
+                    }); 
+                    toggleAllCategoriesSwitch.checked = allTilesSelected && countSelected === PREDEFINED_CATEGORIES.length;
+                    remainingQuery = remainingQuery.replace(match[0], '').trim();
+                }
+                
+                const showOnlyRegex = /show:([\w,]+)/gi; 
+                match = showOnlyRegex.exec(remainingQuery);
+                if (match && match[1]) {
+                    typeFilterAppliedFromUrl = true;
+                    const showTypes = match[1].toLowerCase().split(',');
+                    specificTypeCheckboxes.forEach(cb => {
+                        cb.checked = showTypes.includes(cb.value);
+                    });
+                    updateAllTypesToggleState(); 
+                    remainingQuery = remainingQuery.replace(match[0], '').trim();
+                }
+                
+                const yearSpecificRegex = /year:(\d{4})(?!\S)/gi;
+                match = yearSpecificRegex.exec(remainingQuery);
+                if (match && match[1]) {
+                    yearFilterAppliedFromUrl = true;
+                    filterYearPublishedSelect.value = 'specific';
+                    filterYearSpecificInput.value = match[1];
+                    specificYearFilterGroup.style.display = 'block';
+                    yearRangeFilterGroup.style.display = 'none';
+                    remainingQuery = remainingQuery.replace(match[0], '').trim();
+                } else {
+                    const startYearRegex = /start_year:(\d{4})(?!\S)/gi;
+                    const endYearRegex = /end_year:(\d{4})(?!\S)/gi;
+                    let startYearMatch = startYearRegex.exec(remainingQuery);
+                    let endYearMatch = endYearRegex.exec(remainingQuery); 
+
+                    if (startYearMatch && startYearMatch[1]) {
+                        yearFilterAppliedFromUrl = true;
+                        filterYearPublishedSelect.value = 'range';
+                        filterYearFromInput.value = startYearMatch[1];
+                        remainingQuery = remainingQuery.replace(startYearMatch[0], '').trim();
+                        endYearMatch = endYearRegex.exec(remainingQuery);
+                    }
+                    if (endYearMatch && endYearMatch[1]) {
+                        yearFilterAppliedFromUrl = true; 
+                        filterYearPublishedSelect.value = 'range'; 
+                        filterYearToInput.value = endYearMatch[1];
+                        remainingQuery = remainingQuery.replace(endYearMatch[0], '').trim();
+                    }
+                    if (yearFilterAppliedFromUrl && filterYearPublishedSelect.value === 'range') {
+                         specificYearFilterGroup.style.display = 'none';
+                         yearRangeFilterGroup.style.display = 'flex'; 
+                    }
+                }
+
+
+                if (!typeFilterAppliedFromUrl) {
+                     toggleAllResultTypes.checked = true; 
+                     updateAllTypesToggleState(); 
+                }
+                if (!categoryFilterAppliedFromUrl) {
+                    toggleAllCategoriesSwitch.checked = true; 
+                    categoryTileFilterContainer.querySelectorAll('.category-filter-tile').forEach(tile => {
+                        tile.classList.add('active');
+                        tile.setAttribute('aria-pressed', 'true');
+                    });
+                }
+                 if (!yearFilterAppliedFromUrl) {
+                    filterYearPublishedSelect.value = 'all';
+                    specificYearFilterGroup.style.display = 'none';
+                    yearRangeFilterGroup.style.display = 'none';
+                }
+
+
+                const tagsRegex = /tags:([^ ]+(?:,[^ ]+)*)/gi; match = tagsRegex.exec(remainingQuery);
+                if (match && match[1]) { filterTagsInput.value = match[1].replace(/,/g, ', '); remainingQuery = remainingQuery.replace(match[0], '').trim(); }
+                
+                displayedSearchTerm = remainingQuery.trim(); searchQueryTermDisplay.textContent = displayedSearchTerm ? displayedSearchTerm : "All Content"; document.title = displayedSearchTerm ? `Results for "${displayedSearchTerm}"` : `Search Results`;
+                updateClearFiltersButtonVisibility(); 
+            }
+            
+
+            function applyFiltersAndSearch() {
+                const generalQuery = displayedSearchTerm.toLowerCase();
+
+                // Collect all filter values
+                const selectedAuthor = filterAuthorEl.value !== 'all' ? filterAuthorEl.value : null;
+                
+                // Get category filters
+                    const activeCategoryTiles = Array.from(categoryTileFilterContainer.querySelectorAll('.category-filter-tile.active'));
+                    const selectedCategories = activeCategoryTiles.map(tile => tile.dataset.category);
+                
+                // Year filters
+                const yearPublishedMode = filterYearPublishedSelect.value;
+                let yearSpecific = null, yearFrom = null, yearTo = null;
+                
+                if (yearPublishedMode === 'specific') {
+                    yearSpecific = filterYearSpecificInput.value.trim();
+                } else if (yearPublishedMode === 'range') {
+                    yearFrom = filterYearFromInput.value.trim();
+                    yearTo = filterYearToInput.value.trim();
+                }
+                
+                // Tags/keywords filter
+                const tagsQuery = filterTagsInput.value.trim();
+                
+                // Sort parameter
+                const sortBy = filterSort.value;
+                
+                // Collect all filters
+                const filters = {
+                    author: selectedAuthor,
+                    category: selectedCategories.length > 0 && !toggleAllCategoriesSwitch.checked ? selectedCategories : null,
+                    tags: tagsQuery || null,
+                    yearSpecific: yearSpecific || null,
+                    yearFrom: yearFrom || null,
+                    yearTo: yearTo || null,
+                    sort: sortBy
+                };
+                
+                // Update loading state
+                resultsListContainer.innerHTML = '<p class="loading-results">Loading search results...</p>';
+                
+                // Perform the search with filters
+                performSearch(generalQuery, filters)
+                    .then(results => {
+                currentFilteredResultsMasterList = results;
+                        
+                        // Update counts
+                        countDocumentsEl.textContent = `${results.filter(r => r.resultType === 'document').length}`;
+                        countAuthorsEl.textContent = `${results.filter(r => r.resultType === 'author').length}`;
+                        countKeywordsEl.textContent = `${results.filter(r => r.resultType === 'keyword').length}`;
+                        
+                        // Update category counts based on actual results
+                        updateCategoryCountsFromResults(results);
+                        
+                        // Update filters active state
+                updateFilterControlActiveState(); 
+                updateClearFiltersButtonVisibility();
+                        
+                        
+                        // Display results
+                displayResults();
+                    })
+                    .catch(error => {
+                        console.error('Error applying filters and searching:', error);
+                        resultsListContainer.innerHTML = '<p class="error-message">An error occurred while searching. Please try again later.</p>';
+                    });
+            }
+            
+            function updateAllTypesToggleState() {
+                let allSpecificChecked = true;
+                specificTypeCheckboxes.forEach(cb => {
+                    if (!cb.checked) {
+                        allSpecificChecked = false;
+                    }
+                });
+                toggleAllResultTypes.checked = allSpecificChecked;
+                specificTypeCheckboxes.forEach(cb => {
+                    cb.disabled = toggleAllResultTypes.checked;
+                });
+            }
+
+
+            toggleAllResultTypes.addEventListener('change', function() {
+                const isChecked = this.checked;
+                specificTypeCheckboxes.forEach(cb => {
+                    cb.checked = isChecked;
+                    cb.disabled = isChecked; 
+                });
+                currentPage = 1;
+                applyFiltersAndSearch();
+            });
+
+            specificTypeCheckboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', function(event) {
+                    if (this.checked) {
+                        specificTypeCheckboxes.forEach(otherCb => {
+                            if (otherCb !== this) {
+                                otherCb.checked = false;
+                            }
+                        });
+                    }
+                    toggleAllResultTypes.checked = false;
+                    specificTypeCheckboxes.forEach(cb_inner => { 
+                        cb_inner.disabled = false;
+                    });
+                    
+                    currentPage = 1;
+                    applyFiltersAndSearch();
+                });
+            });
+            
+            filterYearPublishedSelect.addEventListener('change', function() {
+                const selectedValue = this.value;
+                specificYearFilterGroup.style.display = 'none';
+                yearRangeFilterGroup.style.display = 'none';
+                let focusTarget = null;
+
+                if (selectedValue === 'specific') {
+                    specificYearFilterGroup.style.display = 'block';
+                    focusTarget = filterYearSpecificInput;
+                } else if (selectedValue === 'range') {
+                    yearRangeFilterGroup.style.display = 'flex';
+                    focusTarget = filterYearFromInput; 
+                }
+                
+                filterYearSpecificInput.value = ''; 
+                filterYearFromInput.value = '';
+                filterYearToInput.value = '';
+                
+                if(focusTarget){
+                    requestAnimationFrame(() => {
+                        focusTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                        setTimeout(() => focusTarget.focus(), 100); 
+                    });
+                }
+                
+                currentPage = 1;
+                applyFiltersAndSearch();
+            });
+
+            [filterYearSpecificInput, filterYearFromInput, filterYearToInput].forEach(input => {
+                input.addEventListener('input', debounce(() => {
+                    currentPage = 1;
+                    applyFiltersAndSearch();
+                }, 400));
+            });
+
+
+            function resetAllFilters() {
+                filterSort.value = 'relevance'; filterAuthorEl.value = 'all'; 
+                filterTagsInput.value = ''; 
+                
+                filterYearPublishedSelect.value = 'all';
+                specificYearFilterGroup.style.display = 'none';
+                filterYearSpecificInput.value = '';
+                yearRangeFilterGroup.style.display = 'none';
+                filterYearFromInput.value = '';
+                filterYearToInput.value = '';
+
+                toggleAllCategoriesSwitch.checked = true; 
+                categoryTileFilterContainer.querySelectorAll('.category-filter-tile').forEach(tile => { 
+                    tile.classList.add('active'); 
+                    tile.setAttribute('aria-pressed', 'true');
+                });
+                
+                toggleAllResultTypes.checked = true; 
+                updateAllTypesToggleState(); 
+
+                currentPage = 1; applyFiltersAndSearch();
+            }
+            filterSort.addEventListener('change', () => { currentPage = 1; applyFiltersAndSearch(); });
+            filterAuthorEl.addEventListener('change', () => { currentPage = 1; applyFiltersAndSearch(); });
+            filterTagsInput.addEventListener('input', debounce(() => { currentPage = 1; applyFiltersAndSearch(); }, 400));
+            
+            clearFiltersBtn.addEventListener('click', resetAllFilters);
+
+            const infoIcons = document.querySelectorAll('.info-icon');
+            infoIcons.forEach(icon => {
+                const tooltip = icon.querySelector('.tooltip');
+                if (!tooltip) return;
+                const originalMarginLeft = getComputedStyle(tooltip).marginLeft; 
+                const showTooltip = () => {
+                    tooltip.classList.remove('tooltip-below');
+                    tooltip.style.marginLeft = originalMarginLeft; 
+                    tooltip.style.transition = 'none'; 
+                    tooltip.style.visibility = 'visible'; 
+                    tooltip.style.opacity = '0'; 
+                    void tooltip.offsetWidth; 
+                    let tooltipRect = tooltip.getBoundingClientRect();
+                    const containerRect = filtersContainerSidebar.getBoundingClientRect();
+                    const sidebarOverallRect = filterSidebar.getBoundingClientRect(); 
+                    if (tooltipRect.top < containerRect.top) {
+                        tooltip.classList.add('tooltip-below');
+                        void tooltip.offsetWidth; 
+                        tooltipRect = tooltip.getBoundingClientRect(); 
+                    }
+                    const HORIZONTAL_BUFFER = 10; 
+                    let currentLeftMargin = parseFloat(originalMarginLeft);
+                    if (tooltipRect.left < sidebarOverallRect.left + HORIZONTAL_BUFFER) {
+                        const shiftAmount = (sidebarOverallRect.left + HORIZONTAL_BUFFER) - tooltipRect.left;
+                        tooltip.style.marginLeft = (currentLeftMargin + shiftAmount) + 'px';
+                    } else if (tooltipRect.right > sidebarOverallRect.right - HORIZONTAL_BUFFER) {
+                        const shiftAmount = tooltipRect.right - (sidebarOverallRect.right - HORIZONTAL_BUFFER);
+                        tooltip.style.marginLeft = (currentLeftMargin - shiftAmount) + 'px';
+                    }
+                    tooltip.style.transition = 'opacity 0.2s ease-in-out'; 
+                    tooltip.style.opacity = '1';
+                };
+                const hideTooltip = () => { tooltip.style.opacity = '0'; };
+                icon.addEventListener('mouseenter', showTooltip);
+                icon.addEventListener('focusin', showTooltip);
+                icon.addEventListener('mouseleave', hideTooltip);
+                icon.addEventListener('focusout', hideTooltip);
+            });
+
+            let isPeeking = false; let peekTimeout;
+            function setSidebarCollapsedState(collapse) {
+                filterSidebar.classList.toggle('collapsed', collapse); document.body.classList.toggle('sidebar-open', !collapse); document.body.classList.remove('main-content-dimmed-for-peek');
+                if (collapse) { sidebarPeekTrigger.style.display = 'block'; } else { sidebarPeekTrigger.style.display = 'none'; filterSidebar.classList.remove('peeking'); }
+            }
+            sidebarMinimizeBtn.addEventListener('click', () => { setSidebarCollapsedState(true); });
+            sidebarPeekTrigger.addEventListener('mouseenter', () => { if (filterSidebar.classList.contains('collapsed')) { isPeeking = true; filterSidebar.classList.add('peeking'); document.body.classList.add('main-content-dimmed-for-peek'); clearTimeout(peekTimeout); } });
+            filterSidebar.addEventListener('mouseleave', () => { if (isPeeking && filterSidebar.classList.contains('peeking')) { peekTimeout = setTimeout(() => { if(isPeeking && filterSidebar.classList.contains('peeking')) { filterSidebar.classList.remove('peeking'); document.body.classList.remove('main-content-dimmed-for-peek'); isPeeking = false; } }, 300); } });
+            filterSidebar.addEventListener('mouseenter', () => { if (isPeeking && filterSidebar.classList.contains('peeking')) { clearTimeout(peekTimeout); } });
+            sidebarPeekArrow.addEventListener('click', () => { isPeeking = false; filterSidebar.classList.remove('peeking'); document.body.classList.remove('main-content-dimmed-for-peek'); setSidebarCollapsedState(false); });
+
+            function debounce(func, delay) { let timeout; return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => func.apply(this, args), delay); }; }
+            function initializeLayout() { const isMobile = window.innerWidth <= 768; setSidebarCollapsedState(isMobile); }
+            
+            // Initial setup calls
+            populateAuthorFilter(); 
+            populateCategoryTiles(); 
+            parseAndUpdateFiltersFromQuery(decodeURIComponent(initialFullQuery.replace(/\+/g, ' '))); 
+            
+            updateToggleAllCategoriesSwitchState(); 
+            updateAllTypesToggleState(); 
+
+
+            initializeLayout(); 
+            window.addEventListener('resize', debounce(initializeLayout, 200)); 
+            applyFiltersAndSearch(); 
+        });
+
+        // Add function to update category counts based on search results
+        function updateCategoryCountsFromResults(results) {
+            if (!Array.isArray(results)) return;
+            
+            // Count documents by category
+            const categoryCounts = {};
+            results.filter(item => item.resultType === 'document')
+                .forEach(doc => {
+                    const category = doc.category || 'Unknown';
+                    categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+                });
+            
+            console.log("Updated category counts from search results:", categoryCounts);
+            
+            // Update category count in DOM
+            PREDEFINED_CATEGORIES.forEach(categoryName => {
+                const countElements = document.querySelectorAll(`.category-count-${categoryName.toLowerCase().replace(/\s+/g, '-')}`);
+                const count = categoryCounts[categoryName] || 0;
+                
+                countElements.forEach(element => {
+                    element.textContent = count;
+                    
+                    // Also update dataset for consistency
+                    const tileElement = element.closest('.category-filter-tile');
+                    if (tileElement) {
+                        tileElement.dataset.count = count;
+                    }
+                });
+            });
+            
+            // Update stored counts
+            categoryCountsFromAPI = {...categoryCountsFromAPI, ...categoryCounts};
+        }
+    </script>
+
+    <!-- Load NavbarModule to handle navbar functionality -->
+    <script src="/Components/js/navbar-loader.js"></script>
+    <script>
+        // Initialize the navbar once the DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize navbar if NavbarModule exists
+            if (window.NavbarModule) {
+                window.NavbarModule.init('#navbarContainer');
+            } else {
+                console.error('NavbarModule not found. Please check the path to navbar-loader.js');
+                // Fallback: Try to directly load the default navbar
+                fetch('/Components/NavBar/default-NavBar.html')
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Failed to load navbar: ${response.status}`);
+                        }
+                        return response.text();
+                    })
+                    .then(html => {
+                        document.getElementById('navbarContainer').innerHTML = html;
+                    })
+                    .catch(error => {
+                        console.error('Error loading navbar:', error);
+                    });
+            }
+        });
+    </script>
+</body>
+</html>

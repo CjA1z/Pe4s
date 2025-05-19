@@ -229,7 +229,7 @@
         <header class="compiled-header">
             <div class="container">
                 <h1>Compiled Document Title</h1>
-                <p>A collection of related documents compiled into a single volume</p>
+                
             </div>
         </header>
 
@@ -261,9 +261,6 @@
             <div class="action-buttons">
                 <a href="#" class="btn btn-primary" id="readBtn">
                     <i class="fas fa-book-open"></i> Read Full Document
-                </a>
-                <a href="#" class="btn btn-secondary" id="saveBtn">
-                    <i class="fas fa-bookmark"></i> Save for Later
                 </a>
             </div>
         </main>
@@ -360,9 +357,40 @@
                 `;
             }
 
+            // Add debug endpoint for examining the compiled document data directly
+            async function debugFetchCompiledDoc(docId) {
+                try {
+                    const response = await fetch(`/api/compiled-documents/${docId}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log('DEBUG - Compiled document data from API:', data);
+                        
+                        // Log any attachment-like fields
+                        const attachmentFields = [];
+                        for (const [key, value] of Object.entries(data)) {
+                            if (key.toLowerCase().includes('file') || 
+                                key.toLowerCase().includes('attachment') || 
+                                key.toLowerCase().includes('path') || 
+                                key.toLowerCase().includes('document')) {
+                                attachmentFields.push({key, value});
+                            }
+                        }
+                        console.log('DEBUG - Fields that might contain attachment info:', attachmentFields);
+                        
+                        return data;
+                    }
+                } catch (e) {
+                    console.error('Debug fetch error:', e);
+                }
+                return null;
+            }
+
             // Function to fetch compiled document data
             async function fetchCompiledDocumentData(docId) {
                 try {
+                    // First run the debug function to help us see the structure
+                    await debugFetchCompiledDoc(docId);
+                    
                     // Show loading state
                     showLoading(true);
                     
@@ -410,6 +438,47 @@
                     
                     if (!mainDocData) {
                         throw new Error('Document not found in either compiled-documents or regular documents');
+                    }
+                    
+                    // Check for foreword file path in the compiled document data
+                    console.log('Checking for foreword in compiled document data:', mainDocData);
+                    
+                    // Look for foreword_file_path in various possible field names
+                    if (mainDocData.foreword_file_path) {
+                        console.log('Found foreword_file_path:', mainDocData.foreword_file_path);
+                    } else if (mainDocData.foreword_path) {
+                        mainDocData.foreword_file_path = mainDocData.foreword_path;
+                        console.log('Found foreword_path:', mainDocData.foreword_path);
+                    } else if (mainDocData.foreword_attachment) {
+                        mainDocData.foreword_file_path = mainDocData.foreword_attachment;
+                        console.log('Found foreword_attachment:', mainDocData.foreword_attachment);
+                    } else if (mainDocData.attachment && typeof mainDocData.attachment === 'string' && 
+                              (mainDocData.attachment.toLowerCase().includes('foreword') || 
+                               mainDocData.attachment.toLowerCase().includes('preface'))) {
+                        mainDocData.foreword_file_path = mainDocData.attachment;
+                        console.log('Using attachment as foreword:', mainDocData.attachment);
+                    }
+                    
+                    // If we still don't have a foreword file path, check related fields
+                    if (!mainDocData.foreword_file_path) {
+                        // Check if there's a field that might contain the foreword file info
+                        const possibleFields = ['attachments', 'files', 'documents', 'related_files'];
+                        for (const field of possibleFields) {
+                            if (mainDocData[field] && Array.isArray(mainDocData[field])) {
+                                // Look for a foreword item in the array
+                                const forewordItem = mainDocData[field].find(item => 
+                                    (item.type && item.type.toLowerCase().includes('foreword')) || 
+                                    (item.name && item.name.toLowerCase().includes('foreword')) ||
+                                    (item.title && item.title.toLowerCase().includes('foreword'))
+                                );
+                                
+                                if (forewordItem) {
+                                    mainDocData.foreword_file_path = forewordItem.file_path || forewordItem.path || forewordItem.url;
+                                    console.log('Found foreword in related files:', mainDocData.foreword_file_path);
+                                    break;
+                                }
+                            }
+                        }
                     }
                     
                     // Update page header with document title and info
@@ -607,6 +676,9 @@
                 const contentElement = document.getElementById('compiledContent');
                 if (!contentElement) return;
                 
+                // Check if the document has a foreword file
+                const hasForeword = mainDoc.foreword_file_path || mainDoc.foreword_path;
+                
                 // First, display the main compiled document info
                 let html = `
                     <article class="document-item-base">
@@ -614,6 +686,7 @@
                             <h1 class="document-title">${extractTitle(mainDoc.title) || ''}</h1>
                             <div class="document-meta">
                                 ${mainDoc.publication_year ? `<span class="year">${mainDoc.publication_year}</span>` : ''}
+                                ${hasForeword ? `<span class="foreword-badge" style="background-color: var(--theme-gold); color: black; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 10px;">Foreword Available</span>` : ''}
                             </div>
                         </header>
                         
@@ -621,6 +694,16 @@
                             <h2>Abstract</h2>
                             <p>${mainDoc.abstract_foreword || mainDoc.abstract || mainDoc.description || 'No abstract available for this compiled document.'}</p>
                         </section>
+                        
+                        ${hasForeword ? `
+                        <section class="foreword-section" style="margin-top: 1.5rem; padding: 1rem; background-color: var(--theme-gold-lighter-bg); border-radius: 0.5rem;">
+                            <h3 style="color: var(--theme-green-darker-text); margin-top: 0;">Foreword Document Available</h3>
+                            <p>This compiled document has a foreword attachment. Click the "Read Foreword" button below to view it.</p>
+                            <button class="btn btn-primary" id="viewForewordBtn" style="margin-top: 0.5rem;">
+                                <i class="fas fa-file-alt"></i> View Foreword
+                            </button>
+                        </section>
+                        ` : ''}
                         
                         ${mainDoc.keywords ? `
                         <section class="keywords-section">
@@ -807,18 +890,21 @@
                 
                 // Update the existing action buttons instead of adding new ones
                 const readBtn = document.getElementById('readBtn');
-                if (readBtn && mainDoc.file_path) {
+                if (readBtn) {
+                    // Check for foreword attachment first, then fall back to main file path
+                    if (mainDoc.foreword_file_path) {
+                        readBtn.href = mainDoc.foreword_file_path;
+                        readBtn.title = "View Foreword Document";
+                        readBtn.querySelector('i').className = "fas fa-file-alt"; // Change icon to indicate foreword
+                        readBtn.innerHTML = `<i class="fas fa-file-alt"></i> Read Foreword`;
+                    } else if (mainDoc.file_path) {
                     readBtn.href = mainDoc.file_path;
+                        readBtn.title = "View Full Document";
+                    } else {
+                        readBtn.href = "#";
+                        readBtn.title = "Document file not available";
+                    }
                     readBtn.target = "_blank"; // Open in new tab
-                }
-                
-                const saveBtn = document.getElementById('saveBtn');
-                if (saveBtn) {
-                    const documentId = mainDoc.id;
-                    saveBtn.onclick = function(e) {
-                        e.preventDefault();
-                        saveForLater(e, documentId);
-                    };
                 }
             }
 
@@ -886,36 +972,35 @@
                 
                 tocList.innerHTML = tocHtml;
             }
-
-            // Save document for later reading
-            function saveForLater(event, documentId) {
-                event.preventDefault();
-                
-                // Implementation for saving the document for later reading
-                // This could use localStorage or send a request to server
-                
-                const savedItems = JSON.parse(localStorage.getItem('savedForLater') || '[]');
-                if (!savedItems.includes(documentId)) {
-                    savedItems.push(documentId);
-                    localStorage.setItem('savedForLater', JSON.stringify(savedItems));
-                    alert('Document saved for later reading!');
-                } else {
-                    alert('This document is already in your reading list.');
-                }
-            }
             
             // Track document visit
             function trackDocumentVisit(docId) {
-                // Initialize document visit tracking for compiled documents
-                if (window.DocumentTracker) {
-                    // Use initCompiledDocumentTracking instead of trackVisit
-                    if (typeof window.DocumentTracker.initCompiledDocumentTracking === 'function') {
-                        window.DocumentTracker.initCompiledDocumentTracking(docId);
-                    } else {
-                        console.error('DocumentTracker.initCompiledDocumentTracking method not found!');
-                    }
-                } else {
-                    console.error('DocumentTracker not found! Make sure document-visit-tracker.js is loaded correctly.');
+                try {
+                    // Get user type (guest or user)
+                    const userInfo = getUserInfo();
+                    const visitorType = userInfo && isUserLoggedIn(userInfo) ? 'user' : 'guest';
+                    
+                    // Make direct API call to track the visit
+                    fetch('/api/document-visits', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            documentId: docId,
+                            visitorType: visitorType
+                        })
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            console.warn('Failed to track document visit:', response.status);
+                        }
+                    })
+                    .catch(error => {
+                        console.warn('Error tracking document visit:', error);
+                    });
+                } catch (err) {
+                    console.error('Error in document visit tracking:', err);
                 }
             }
             
@@ -940,24 +1025,484 @@
                         return;
                     }
                     
-                    // User is logged in, but no document URL is available
-                    alert('Document file is not available');
+                    // Show loading indicator
+                    this.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Loading document...`;
+                    this.disabled = true;
+                    
+                    // Try multiple methods to find the document file paths
+                    console.log("Searching for document file paths via multiple methods");
+                    
+                    // First check if the document has any file paths - use the main GET endpoint
+                    fetch(`/api/compiled-documents/${documentId}`)
+                        .then(response => response.ok ? response.json() : Promise.reject('Cannot fetch document data'))
+                        .then(data => {
+                            console.log('Complete compiled document data:', data);
+                            let filePaths = [];
+                            
+                            // Try a more comprehensive set of potential field names
+                            const possibleFields = [
+                                'file_path', 'foreword_path', 'foreword_file_path', 'foreword_file', 
+                                'attachment', 'foreword_attachment', 'path', 'url', 'download_url',
+                                'file_url', 'document_path', 'document_file_path'
+                            ];
+                            
+                            // Prioritize foreword fields for better detection
+                            const forewordFields = [
+                                'foreword_file_path', 'foreword_path', 'foreword_file', 'foreword_attachment'
+                            ];
+                            
+                            // First explicitly check for foreword fields
+                            console.log('Explicitly checking for foreword fields first');
+                            forewordFields.forEach(field => {
+                                if (data[field] && typeof data[field] === 'string' && data[field].trim() !== '') {
+                                    console.log(`Found foreword file in field ${field}:`, data[field]);
+                                    filePaths.push({
+                                        path: data[field],
+                                        source: `foreword_${field}`,
+                                        isForeword: true
+                                    });
+                                }
+                            });
+                            
+                            // Look for any field that might contain a file path
+                            possibleFields.forEach(field => {
+                                if (data[field] && typeof data[field] === 'string' && data[field].trim() !== '') {
+                                    filePaths.push({
+                                        path: data[field],
+                                        source: field
+                                    });
                 }
             });
             
-            document.getElementById('saveBtn').addEventListener('click', function(e) {
-                e.preventDefault();
-                if (!documentId) {
-                    alert('No document ID provided');
+                            // Also check for arrays that might contain file information
+                            const arrayFields = ['files', 'attachments', 'documents', 'related_files'];
+                            arrayFields.forEach(arrayField => {
+                                if (data[arrayField] && Array.isArray(data[arrayField])) {
+                                    data[arrayField].forEach((item, index) => {
+                                        if (typeof item === 'string' && item.trim() !== '') {
+                                            filePaths.push({
+                                                path: item,
+                                                source: `${arrayField}[${index}]`
+                                            });
+                                        } else if (typeof item === 'object') {
+                                            // Check for file path properties within each item
+                                            possibleFields.forEach(field => {
+                                                if (item[field] && typeof item[field] === 'string' && item[field].trim() !== '') {
+                                                    filePaths.push({
+                                                        path: item[field],
+                                                        source: `${arrayField}[${index}].${field}`
+                                                    });
+                                                }
+                                            });
+                                        }
+                                    });
+                                }
+                            });
+                            
+                            // Also check if there are child documents with file paths
+                            if (data.children && Array.isArray(data.children) && data.children.length > 0) {
+                                data.children.forEach((child, index) => {
+                                    possibleFields.forEach(field => {
+                                        if (child[field] && typeof child[field] === 'string' && child[field].trim() !== '') {
+                                            filePaths.push({
+                                                path: child[field],
+                                                source: `children[${index}].${field}`,
+                                                title: child.title || `Child document ${index + 1}`
+                                            });
+                                        }
+                                    });
+                                });
+                            } else if (data.child_documents && Array.isArray(data.child_documents) && data.child_documents.length > 0) {
+                                data.child_documents.forEach((child, index) => {
+                                    possibleFields.forEach(field => {
+                                        if (child[field] && typeof child[field] === 'string' && child[field].trim() !== '') {
+                                            filePaths.push({
+                                                path: child[field],
+                                                source: `child_documents[${index}].${field}`,
+                                                title: child.title || `Child document ${index + 1}`
+                                            });
+                                        }
+                                    });
+                                });
+                            }
+                            
+                            // If no file paths found yet, try to get them from database directly with a custom endpoint
+                            if (filePaths.length === 0) {
+                                console.log('No file paths found in the document data. Trying alternative approaches...');
+                                
+                                // Try to get the file paths from the child document(s) first
+                                const childDocPromises = [];
+                                
+                                // Check specifically for foreword in API endpoints
+                                childDocPromises.push(
+                                    fetch(`/api/compiled-documents/${documentId}/foreword`)
+                                    .then(response => {
+                                        if (response.ok) {
+                                            console.log('Found foreword via specific endpoint');
+                                            // This could be either JSON with path info or direct file
+                                            const contentType = response.headers.get('content-type');
+                                            if (contentType && (contentType.includes('pdf') || contentType.includes('application/'))) {
+                                                // For PDF content type, open directly in new window
+                                                const url = `/api/compiled-documents/${documentId}/foreword`;
+                                                console.log('Opening foreword PDF directly:', url);
+                                                window.open(url, '_blank');
+                                                filePaths.push({
+                                                    path: url,
+                                                    source: 'foreword_direct_endpoint',
+                                                    isForeword: true,
+                                                    isDirectUrl: true
+                                                });
+                                                return filePaths;
+                                            } else {
+                                                return response.json().then(data => {
+                                                    if (data.file_path || data.path || data.url || data.foreword_path) {
+                                                        filePaths.push({
+                                                            path: data.foreword_path || data.file_path || data.path || data.url,
+                                                            source: 'foreword_endpoint_json',
+                                                            isForeword: true
+                                                        });
+                                                    }
+                                                    return filePaths;
+                                                });
+                                            }
+                                        }
+                                        return filePaths;
+                                    })
+                                    .catch(err => {
+                                        console.log('Could not find foreword via specific endpoint:', err);
+                                        return filePaths;
+                                    })
+                                );
+                                
+                                // First check if there's an id link to the main document in documents table
+                                childDocPromises.push(
+                                    fetch(`/api/documents/${documentId}`)
+                                    .then(response => response.ok ? response.json() : Promise.reject('Main document not found'))
+                                    .then(documentData => {
+                                        console.log('Fetched main document data:', documentData);
+                                        // Look for file path in the main document
+                                        possibleFields.forEach(field => {
+                                            if (documentData[field] && typeof documentData[field] === 'string' && documentData[field].trim() !== '') {
+                                                filePaths.push({
+                                                    path: documentData[field],
+                                                    source: `main_document.${field}`
+                                                });
+                                            }
+                                        });
+                                        return filePaths;
+                                    })
+                                    .catch(err => {
+                                        console.log('Could not find file in main document:', err);
+                                        return filePaths;
+                                    })
+                                );
+                                
+                                // If we have child documents, try looking in those too
+                                const childIds = [];
+                                
+                                // Collect child document IDs from various possible structures
+                                if (data.children && Array.isArray(data.children)) {
+                                    data.children.forEach(child => {
+                                        if (child.id) childIds.push(child.id);
+                                    });
+                                }
+                                
+                                if (data.child_documents && Array.isArray(data.child_documents)) {
+                                    data.child_documents.forEach(child => {
+                                        if (child.id) childIds.push(child.id);
+                                    });
+                                }
+                                
+                                // Try to get file paths from all child documents
+                                if (childIds.length > 0) {
+                                    console.log(`Checking ${childIds.length} child documents for file paths`);
+                                    childIds.forEach(childId => {
+                                        childDocPromises.push(
+                                            fetch(`/api/documents/${childId}`)
+                                            .then(response => response.ok ? response.json() : Promise.reject(`Child document ${childId} not found`))
+                                            .then(childData => {
+                                                console.log(`Found child document ${childId}:`, childData);
+                                                // Look for file paths
+                                                possibleFields.forEach(field => {
+                                                    if (childData[field] && typeof childData[field] === 'string' && childData[field].trim() !== '') {
+                                                        filePaths.push({
+                                                            path: childData[field],
+                                                            source: `child_${childId}.${field}`,
+                                                            title: childData.title || `Document ${childId}`
+                                                        });
+                                                    }
+                                                });
+                                                return filePaths;
+                                            })
+                                            .catch(err => {
+                                                console.log(`Error fetching child document ${childId}:`, err);
+                                                return filePaths;
+                                            })
+                                        );
+                                    });
+                                }
+                                
+                                // Wait for all promises to resolve
+                                return Promise.all(childDocPromises)
+                                    .then(() => {
+                                        // Return the accumulated file paths
+                                        return filePaths;
+                                    });
+                            }
+                            
+                            return filePaths;
+                        })
+                        .then(filePaths => {
+                            // Reset button state
+                            this.innerHTML = `<i class="fas fa-book-open"></i> Read Full Document`;
+                            this.disabled = false;
+                            
+                            // If we found file paths, let user choose or use the first one
+                            if (filePaths && filePaths.length > 0) {
+                                console.log(`Found ${filePaths.length} potential files:`, filePaths);
+                                
+                                // If we have foreword files, prioritize them
+                                const forewordFiles = filePaths.filter(file => file.isForeword);
+                                if (forewordFiles.length > 0) {
+                                    console.log(`Found ${forewordFiles.length} foreword files, prioritizing those`);
+                                    // Use the first foreword file if only one exists
+                                    if (forewordFiles.length === 1) {
+                                        const file = forewordFiles[0];
+                                        console.log(`Opening foreword file from '${file.source}': ${file.path}`);
+                                        // Handle direct URLs (like API endpoints) differently
+                                        if (file.isDirectUrl) {
+                                            window.open(file.path, '_blank');
+                                        } else if (file.isBlob) {
+                                            window.open(file.path, '_blank');
+                                        } else {
+                                            // For server paths, add a timestamp to prevent caching issues
+                                            const url = `${file.path}?t=${Date.now()}`;
+                                            // Open in new window to ensure browser handles as PDF
+                                            window.open(url, '_blank');
+                                        }
                     return;
+                                    } else {
+                                        // If multiple foreword files, ask user which to open
+                                        let message = "Multiple foreword files found. Please choose one to open:\n\n";
+                                        forewordFiles.forEach((file, index) => {
+                                            message += `${index + 1}: Foreword (${file.source})\n`;
+                                        });
+                                        
+                                        const choice = prompt(message, "1");
+                                        if (choice && !isNaN(choice)) {
+                                            const index = parseInt(choice) - 1;
+                                            if (forewordFiles[index]) {
+                                                console.log(`Opening chosen foreword file: ${forewordFiles[index].path}`);
+                                                const file = forewordFiles[index];
+                                                if (file.isDirectUrl) {
+                                                    window.open(file.path, '_blank');
+                                                } else if (file.isBlob) {
+                                                    window.open(file.path, '_blank');
+                                                } else {
+                                                    const url = `${file.path}?t=${Date.now()}`;
+                                                    window.open(url, '_blank');
+                                                }
+                                                return;
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                if (filePaths.length === 1) {
+                                    // Just one file, open it directly
+                                    const file = filePaths[0];
+                                    console.log(`Opening file from '${file.source}': ${file.path}`);
+                                    if (file.isDirectUrl) {
+                                        window.open(file.path, '_blank');
+                                    } else if (file.isBlob) {
+                                        window.open(file.path, '_blank');
+                                    } else {
+                                        const url = `${file.path}?t=${Date.now()}`;
+                                        window.open(url, '_blank');
+                                    }
+                                } else {
+                                    // Multiple files, ask user which one to open
+                                    let message = "Multiple document files found. Please choose one to open:\n\n";
+                                    filePaths.forEach((file, index) => {
+                                        const label = file.isForeword 
+                                            ? `Foreword (${file.source})`
+                                            : (file.title || `File ${index + 1} (${file.source})`);
+                                        message += `${index + 1}: ${label}\n`;
+                                    });
+                                    
+                                    const choice = prompt(message, "1");
+                                    if (choice && !isNaN(choice)) {
+                                        const index = parseInt(choice) - 1;
+                                        if (filePaths[index]) {
+                                            console.log(`Opening chosen file: ${filePaths[index].path}`);
+                                            const file = filePaths[index];
+                                            if (file.isDirectUrl) {
+                                                window.open(file.path, '_blank');
+                                            } else if (file.isBlob) {
+                                                window.open(file.path, '_blank');
+                                            } else {
+                                                const url = `${file.path}?t=${Date.now()}`;
+                                                window.open(url, '_blank');
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                console.error('No file paths found after exhaustive search');
+                                
+                                // Check if the UI indicates a foreword is available
+                                const forewordBadge = document.querySelector('.foreword-badge');
+                                if (forewordBadge) {
+                                    // UI says foreword is available but we couldn't find it
+                                    const retryForForeword = confirm(
+                                        "A foreword document is listed as available but couldn't be found automatically. " +
+                                        "Would you like to try using direct foreword URL patterns?"
+                                    );
+                                    
+                                    if (retryForForeword) {
+                                        // Try some common URL patterns for forewords
+                                        const baseUrl = window.location.origin;
+                                        const possibleUrls = [
+                                            `${baseUrl}/files/forewords/${documentId}.pdf`,
+                                            `${baseUrl}/uploads/forewords/${documentId}.pdf`,
+                                            `${baseUrl}/storage/compiled/forewords/${documentId}.pdf`,
+                                            `${baseUrl}/storage/compiled/forewords/foreword_${documentId}.pdf`,
+                                            `${baseUrl}/storage/confluence/forewords/${documentId}.pdf`,
+                                            `${baseUrl}/storage/confluence/forewords/foreword_${documentId}.pdf`,
+                                            `${baseUrl}/storage/thesis/forewords/${documentId}.pdf`,
+                                            `${baseUrl}/storage/thesis/forewords/foreword_${documentId}.pdf`,
+                                            `${baseUrl}/storage/dissertation/forewords/${documentId}.pdf`,
+                                            `${baseUrl}/storage/dissertation/forewords/foreword_${documentId}.pdf`,
+                                            `${baseUrl}/storage/synergy/forewords/${documentId}.pdf`,
+                                            `${baseUrl}/storage/synergy/forewords/foreword_${documentId}.pdf`,
+                                            `${baseUrl}/documents/foreword_${documentId}.pdf`,
+                                            `${baseUrl}/api/forewords/${documentId}`,
+                                            `${baseUrl}/api/compiled-documents/${documentId}/foreword-file`
+                                        ];
+                                        
+                                        // Present these options to the user
+                                        let urlPromptMessage = "Select a foreword URL pattern to try:\n\n";
+                                        possibleUrls.forEach((url, i) => {
+                                            urlPromptMessage += `${i+1}: ${url}\n`;
+                                        });
+                                        
+                                        const urlChoice = prompt(urlPromptMessage, "1");
+                                        if (urlChoice && !isNaN(urlChoice)) {
+                                            const urlIndex = parseInt(urlChoice) - 1;
+                                            if (possibleUrls[urlIndex]) {
+                                                console.log(`Trying direct foreword URL: ${possibleUrls[urlIndex]}`);
+                                                window.open(possibleUrls[urlIndex], '_blank');
+                                                return;
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                // Check if we have child documents that the user might want to view instead
+                                const childDocuments = document.querySelectorAll('.child-document-item');
+                                if (childDocuments && childDocuments.length > 0) {
+                                    const viewChildrenInstead = confirm(
+                                        "The compiled document doesn't have a main file available to view. " +
+                                        "Would you like to see the list of individual documents in this compilation instead?"
+                                    );
+                                    
+                                    if (viewChildrenInstead) {
+                                        // Scroll to the child documents section
+                                        const childDocSection = document.querySelector('.child-documents');
+                                        if (childDocSection) {
+                                            childDocSection.scrollIntoView({ behavior: 'smooth' });
+                                        }
+                                    }
+                                } else {
+                                    alert('Could not find any document files to view. The document may not have been properly uploaded or linked in the system.');
+                                }
+                            }
+                        })
+                        .catch(err => {
+                            console.error('Error retrieving document:', err);
+                            // Reset button state
+                            this.innerHTML = `<i class="fas fa-book-open"></i> Read Full Document`;
+                            this.disabled = false;
+                            alert('Could not retrieve document files. Please try again later or contact support if the problem persists.');
+                        });
+                } else if (this.getAttribute('href').includes('foreword')) {
+                    // Track foreword view
+                    try {
+                        fetch(`/api/analytics/track-view`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                documentId: documentId,
+                                viewType: 'foreword'
+                            })
+                        }).catch(e => console.log('Analytics error:', e));
+                    } catch (e) {
+                        console.log('Could not track foreword view');
+                    }
                 }
-                saveForLater(e, documentId);
             });
+
+            // Add event listener to the foreword button if it exists
+            const viewForewordBtn = document.getElementById('viewForewordBtn');
+            if (viewForewordBtn) {
+                viewForewordBtn.addEventListener('click', function() {
+                    // Show loading state
+                    this.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Loading...`;
+                    this.disabled = true;
+                    
+                    // Direct URL to foreword endpoint
+                    const forewordUrl = `/api/compiled-documents/${documentId}/foreword`;
+                    
+                    // First check if direct access works
+                    fetch(forewordUrl, { method: 'HEAD' })
+                        .then(response => {
+                            if (response.ok) {
+                                // Direct foreword access works, open in new tab
+                                window.open(forewordUrl, '_blank');
+                                
+                                // Reset button
+                                this.innerHTML = `<i class="fas fa-file-alt"></i> View Foreword`;
+                                this.disabled = false;
+                            } else {
+                                throw new Error('Direct foreword access failed');
+                            }
+                        })
+                        .catch(err => {
+                            console.log('Error accessing foreword directly:', err);
+                            
+                            // Try with format=json parameter as fallback
+                            fetch(`${forewordUrl}?format=json`)
+                                .then(response => response.ok ? response.json() : Promise.reject('Cannot fetch foreword data'))
+                                .then(data => {
+                                    if (data.foreword_path) {
+                                        // If we have a path, try to open it
+                                        window.open(data.foreword_path, '_blank');
+                                    } else {
+                                        // Show error message
+                                        alert('Could not load foreword document. The file may be missing or inaccessible.');
+                                    }
+                                    
+                                    // Reset button
+                                    this.innerHTML = `<i class="fas fa-file-alt"></i> View Foreword`;
+                                    this.disabled = false;
+                                })
+                                .catch(err => {
+                                    console.error('Error fetching foreword json:', err);
+                                    alert('Could not access foreword document. Please try again later.');
+                                    
+                                    // Reset button
+                                    this.innerHTML = `<i class="fas fa-file-alt"></i> View Foreword`;
+                                    this.disabled = false;
+                                });
+                        });
+                });
+            }
         });
     </script>
 
     <!-- Document Visit Tracking -->
-    <script src="/Components/js/document-visit-tracker.js"></script>
     <script>
         // Initialize document visit tracking when the page is fully loaded
         document.addEventListener('DOMContentLoaded', function() {

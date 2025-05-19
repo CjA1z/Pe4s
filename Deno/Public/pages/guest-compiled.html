@@ -6,6 +6,7 @@
     <title>Archiving System Page - Optimized</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="/Components/js/document-visit-tracker.js"></script>
     <style>
         /* CSS Variables for Theming */
         :root {
@@ -772,6 +773,7 @@
                 <form id="accessForm">
                     <input type="hidden" id="requestedDocId" name="requested_doc_id">
                     <input type="hidden" id="requestedDocTitle" name="requested_doc_title">
+                    <input type="hidden" id="isEntireCollection" name="is_entire_collection" value="false">
                     <div style="margin-bottom: 1rem;">
                         <label for="full_name">Full Name:</label>
                         <input type="text" id="full_name" name="full_name" required placeholder="e.g., Juan Dela Cruz">
@@ -1573,12 +1575,18 @@
             function openModal(modalElement) { if (modalElement) modalElement.classList.add('visible'); }
             function closeModal(modalElement) { if (modalElement) modalElement.classList.remove('visible'); }
 
-            function openAccessRequestModal(docId, docTitle) {
+            function openAccessRequestModal(docId, docTitle, isEntireCollection = false) {
                 if (!accessModal || !requestedDocIdInput || !requestedDocTitleInput || !modalDocTitleElement || !receiptDocTitleElement || !formSection || !receiptSection) return;
                 requestedDocIdInput.value = docId;
                 requestedDocTitleInput.value = docTitle;
                 modalDocTitleElement.textContent = docTitle;
                 receiptDocTitleElement.textContent = docTitle;
+                
+                // Set the flag for entire collection requests
+                const isEntireCollectionInput = document.getElementById('isEntireCollection');
+                if (isEntireCollectionInput) {
+                    isEntireCollectionInput.value = isEntireCollection ? "true" : "false";
+                }
 
                 formSection.classList.remove('modal-section-hidden');
                 receiptSection.classList.add('modal-section-hidden');
@@ -1650,7 +1658,7 @@
                     if (mainDocumentData && (mainDocumentData.doc_id || mainDocumentData.id)) {
                         // Get the document ID, ensuring it's a string
                         const docId = String(mainDocumentData.doc_id || mainDocumentData.id);
-                        openAccessRequestModal(docId, mainDocumentData.title || 'Main Collection');
+                        openAccessRequestModal(docId, mainDocumentData.title || 'Main Collection', true);
                         closeModal(requestChoiceModal);
                     } else {
                         showGeneralMessage("Collection details not available for request.", true);
@@ -1720,8 +1728,22 @@
                         email: document.getElementById('email').value,
                         affiliation: document.getElementById('affiliation').value,
                         reason: selectedReasons.join(', '),
-                        reason_details: ''
+                        reason_details: '',
+                        is_entire_collection: document.getElementById('isEntireCollection').value === 'true'
                     };
+                    
+                    // If this is a request for the entire collection, include child document IDs
+                    if (formData.is_entire_collection && mainDocumentData && mainDocumentData.contained_documents) {
+                        // Extract child document IDs
+                        const childDocIds = mainDocumentData.contained_documents
+                            .map(doc => doc.id || doc.doc_id)
+                            .filter(id => id); // Filter out any undefined/null IDs
+                        
+                        if (childDocIds.length > 0) {
+                            formData.child_document_ids = childDocIds;
+                            formData.reason_details += `\n\nThis request includes the main document and ${childDocIds.length} child documents.`;
+                        }
+                    }
                     
                     // Ensure reason_details is always populated (it's required by the backend)
                     if (selectedReasons.includes('Other') && reasonDescription && reasonDescription.value.trim()) {
@@ -2119,6 +2141,22 @@
                 
                 // If we couldn't extract a valid date from any field
                 return null;
+            }
+        });
+    </script>
+
+    <!-- Initialize document visit tracking -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof initCompiledDocumentTracking === 'function') {
+                // Get document ID from URL
+                const documentId = getDocumentIdFromUrl();
+                if (documentId) {
+                    console.log('Tracking guest visit for compiled document:', documentId);
+                    initCompiledDocumentTracking(documentId);
+                }
+            } else {
+                console.error('DocumentTracker not found! Make sure document-visit-tracker.js is loaded correctly.');
             }
         });
     </script>

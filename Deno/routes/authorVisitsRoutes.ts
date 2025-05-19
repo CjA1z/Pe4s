@@ -77,11 +77,15 @@ async function getAuthorVisitStats(ctx: RouterContext<string>) {
     // For backward compatibility, also include total visits from legacy method
     const totalVisits = await AuthorVisitsModel.getTotalVisits(authorId);
     
+    // Get the visitor type breakdown from the legacy table
+    const visitsByType = await AuthorVisitsModel.getVisitsByType(authorId);
+    
     ctx.response.status = 200;
     ctx.response.body = { 
       authorId,
       ...visitStats,
-      legacy_total: totalVisits
+      legacy_total: totalVisits,
+      visitsByType  // Add the breakdown information expected by the frontend
     };
   } catch (error) {
     console.error("Error in getAuthorVisitStats:", error);
@@ -124,6 +128,15 @@ async function getTopAuthors(ctx: RouterContext<string>) {
  */
 async function compatGetTopAuthorsForDashboard(ctx: RouterContext<string>) {
   try {
+    console.log("Top authors dashboard endpoint called");
+    
+    // Debug log what's in the database
+    const { client } = await import("../db/denopost_conn.ts");
+    const debugResult = await client.queryObject(
+      `SELECT COUNT(*) as count FROM author_visits_counter`
+    );
+    console.log(`Database contains ${(debugResult.rows[0] as any)?.count || 0} records in author_visits_counter table`);
+    
     // Default limit for dashboard is 5
     const limit = 5;
     
@@ -132,10 +145,15 @@ async function compatGetTopAuthorsForDashboard(ctx: RouterContext<string>) {
     
     // Get top authors
     const authors = await AuthorVisitsModel.getTopAuthors(limit, days);
+    console.log(`Found ${authors.length} top authors to display`);
     
-    // Format response for dashboard compatibility
-    ctx.response.status = 200;
-    ctx.response.body = { 
+    // Debug log each author
+    authors.forEach(author => {
+      console.log(`Author ${author.full_name}: visit_count = ${author.visit_count}`);
+    });
+    
+    // Format response for dashboard compatibility - CRITICAL: This must be the exact format expected
+    const responseData = { 
       success: true,
       topAuthors: authors.map(author => ({
         author_id: author.author_id,
@@ -144,10 +162,19 @@ async function compatGetTopAuthorsForDashboard(ctx: RouterContext<string>) {
         profile_picture: author.profile_picture || '/admin/Components/img/samp_pfp.jpg'
       }))
     };
+    
+    console.log(`Returning response with ${responseData.topAuthors.length} authors`);
+    
+    ctx.response.status = 200;
+    ctx.response.body = responseData;
   } catch (error) {
     console.error("Error in compatGetTopAuthorsForDashboard:", error);
     ctx.response.status = 500;
-    ctx.response.body = { error: "Internal server error" };
+    ctx.response.body = { 
+      success: false, 
+      error: "Internal server error",
+      topAuthors: [] // Include empty array to avoid frontend errors
+    };
   }
 }
 
@@ -194,3 +221,44 @@ router.delete("/api/author-visits/purge", purgeOldVisitData);
 // Export the router
 export const authorVisitsRoutes = router.routes();
 export const authorVisitsAllowedMethods = router.allowedMethods(); 
+
+/**
+ * DEBUG Endpoint: Directly get all data from author_visits_counter table
+ * GET /api/debug/author-visits-counter
+ */
+router.get("/api/debug/author-visits-counter", async (ctx: RouterContext<string>) => {
+  try {
+    // Query database directly without any joins or filters
+    const { client } = await import("../db/denopost_conn.ts");
+    
+    // Get raw counter data
+    const counters = await client.queryObject(
+      `SELECT * FROM author_visits_counter ORDER BY date DESC LIMIT 50`
+    );
+    
+    // Get sample of authors data for reference
+    const authors = await client.queryObject(
+      `SELECT id, full_name FROM authors LIMIT 10`
+    );
+    
+    // Get schema information
+    const schema = await client.queryObject(
+      `SELECT column_name, data_type 
+       FROM information_schema.columns 
+       WHERE table_name = 'author_visits_counter'`
+    );
+    
+    ctx.response.status = 200;
+    ctx.response.body = {
+      message: "Debug data from author_visits_counter table",
+      schema: schema.rows,
+      sample_authors: authors.rows,
+      counter_data: counters.rows,
+      row_count: counters.rows.length,
+    };
+  } catch (error) {
+    console.error("Error in debug endpoint:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Error querying database directly", details: String(error) };
+  }
+}); 

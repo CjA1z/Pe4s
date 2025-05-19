@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/admin/Components/css/navbar_header.css">
     <link rel="stylesheet" href="/admin/Components/css/admin_logs.css">
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide-react@0.292.0/dist/umd/lucide-react.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@latest"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -24,8 +24,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
-    
   </head>
   <body>
     <!-- Navbar container -->
@@ -33,10 +31,46 @@
     <!-- Sidebar container -->
   <div id="sidebar-container"></div>
   
-  
-
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6" style="width: 1200px; max-width: 100%; margin: 0 auto;">
-
+    <div class="main-content p-6 ml-64 mt-16">
+        <div class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center">
+            <h1 class="text-2xl font-bold text-gray-800 mb-4 md:mb-0">System Logs</h1>
+            
+            <div class="flex flex-wrap gap-3">
+                <!-- Log type filter -->
+                <select id="logTypeFilter" class="form-select px-3 py-2 rounded-md border border-gray-300">
+                    <option value="">All Log Types</option>
+                    <option value="login">Login</option>
+                    <option value="download">Download</option>
+                    <option value="document">Document</option>
+                    <option value="error">Error</option>
+                    <option value="system">System</option>
+                </select>
+                
+                <!-- Status filter -->
+                <select id="statusFilter" class="form-select px-3 py-2 rounded-md border border-gray-300">
+                    <option value="">All Statuses</option>
+                    <option value="success">Success</option>
+                    <option value="failed">Failed</option>
+                </select>
+                
+                <!-- Date range -->
+                <input type="date" id="fromDateFilter" class="form-date px-3 py-2 rounded-md border border-gray-300" placeholder="From Date">
+                <input type="date" id="toDateFilter" class="form-date px-3 py-2 rounded-md border border-gray-300" placeholder="To Date">
+                
+                <!-- Search button -->
+                <button id="searchButton" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                    Search
+                </button>
+                
+                <!-- Refresh button -->
+                <button id="refreshButton" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors flex items-center">
+                    <svg class="lucide lucide-refresh-cw h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M3 22v-6h6"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path></svg>
+                    Refresh
+                </button>
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div class="bg-white shadow-md rounded-lg overflow-hidden log-card">
             <div class="p-4 border-b border-gray-200">
                 <h2 class="text-lg font-semibold text-gray-800 flex items-center">
@@ -54,18 +88,9 @@
                             <th>FILE</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200">
-                        <tr>
-                            <td class="text-center text-gray-500">1</td>
-                            <td>2024-12-20 10:05:00</td>
-                            <td class="font-medium text-gray-700">Jane Doe</td>
-                            <td class="italic">thesis.pdf</td>
-                        </tr>
-                        <tr>
-                            <td class="text-center text-gray-500">2</td>
-                            <td>2024-12-21 14:30:15</td>
-                            <td class="font-medium text-gray-700">John Doe</td>
-                            <td class="italic">project_brief.docx</td>
+                        <tbody id="downloadsTableBody" class="divide-y divide-gray-200">
+                            <tr>
+                                <td colspan="4" class="text-center py-4 text-gray-500">Fetching data from database...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -89,36 +114,20 @@
                             <th>STATUS</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200">
-                        <tr>
-                            <td class="text-center text-gray-500">1</td>
-                            <td>2024-12-20 10:00:00</td>
-                            <td class="font-medium text-gray-700">John Doe</td>
-                            <td>
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                                    Success
-                                </span>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="text-center text-gray-500">2</td>
-                            <td>2024-12-20 09:55:15</td>
-                            <td class="font-medium text-gray-700">Jane Doe</td>
-                            <td>
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
-                                    Failed
-                                </span>
-                            </td>
+                        <tbody id="loginsTableBody" class="divide-y divide-gray-200">
+                            <tr>
+                                <td colspan="4" class="text-center py-4 text-gray-500">Fetching data from database...</td>
                         </tr>
                          </tbody>
                 </table>
             </div>
         </div>
 
-        <div class="bg-white shadow-md rounded-lg overflow-hidden log-card lg:col-span-2"> <div class="p-4 border-b border-gray-200">
+            <div class="bg-white shadow-md rounded-lg overflow-hidden log-card lg:col-span-2">
+                <div class="p-4 border-b border-gray-200">
                  <h2 class="text-lg font-semibold text-gray-800 flex items-center">
-                    <svg class="lucide lucide-save h-5 w-5 mr-2 text-blue-600" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                    Saved Documents
+                        <svg class="lucide lucide-file-text h-5 w-5 mr-2 text-blue-600" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>
+                        All System Logs
                 </h2>
             </div>
              <div class="overflow-x-auto">
@@ -127,31 +136,41 @@
                         <tr>
                             <th class="w-16">NO</th>
                             <th>TIMESTAMP</th>
+                                <th>TYPE</th>
                             <th>USER</th>
-                            <th>DOCUMENT</th>
+                                <th>ACTION</th>
+                                <th>STATUS</th>
+                                <th>DETAILS</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200">
-                        <tr>
-                           <td class="text-center text-gray-500">1</td>
-                            <td>2024-12-20 10:10:00</td>
-                            <td class="font-medium text-gray-700">John Doe</td>
-                            <td class="italic">research_paper.pdf</td>
-                        </tr>
-                        <tr>
-                           <td class="text-center text-gray-500">2</td>
-                            <td>2024-12-21 11:05:30</td>
-                            <td class="font-medium text-gray-700">Jane Doe</td>
-                            <td class="italic">meeting_notes_v2.txt</td>
+                        <tbody id="allLogsTableBody" class="divide-y divide-gray-200">
+                            <tr>
+                                <td colspan="7" class="text-center py-4 text-gray-500">Fetching system logs from database...</td>
                         </tr>
                     </tbody>
                 </table>
+                </div>
+                <div class="p-4 border-t border-gray-200 flex justify-between items-center">
+                    <div id="logsPagination" class="flex items-center space-x-2">
+                        <button id="prevPageBtn" class="px-3 py-1 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                            Previous
+                        </button>
+                        <span id="paginationInfo" class="text-sm text-gray-600">Page 1 of 1</span>
+                        <button id="nextPageBtn" class="px-3 py-1 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                            Next
+                        </button>
+                    </div>
+                    <div class="text-sm text-gray-600">
+                        <span id="totalLogs">0</span> logs found
+                    </div>
+                </div>
             </div>
         </div>
-
     </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Load sidebar and navbar
           fetch('/admin/Components/side_bar.html')
               .then(response => response.text())
               .then(data => {
@@ -175,7 +194,286 @@
                   document.getElementById('navbar-header').innerHTML = data;
               })
               .catch(error => console.error('Error loading navbar:', error));
+                
+            // Initialize logs data
+            initSystemLogs();
         });
+        
+        // Global variables for pagination
+        let currentPage = 1;
+        let totalPages = 1;
+        let pageSize = 20;
+        
+        // Initialize system logs
+        async function initSystemLogs() {
+            // Load the summary data for widgets
+            await fetchLogSummary();
+            
+            // Load the main logs table with pagination
+            await fetchLogs(1);
+            
+            // Setup event listeners
+            document.getElementById('searchButton').addEventListener('click', () => {
+                currentPage = 1;
+                fetchLogs(currentPage);
+            });
+            
+            document.getElementById('refreshButton').addEventListener('click', () => {
+                fetchLogSummary();
+                fetchLogs(currentPage);
+            });
+            
+            document.getElementById('prevPageBtn').addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    fetchLogs(currentPage);
+                }
+            });
+            
+            document.getElementById('nextPageBtn').addEventListener('click', () => {
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    fetchLogs(currentPage);
+                }
+            });
+        }
+        
+        // Fetch log summary for widget displays
+        async function fetchLogSummary() {
+            try {
+                const response = await fetch('/api/system-logs/summary');
+                if (!response.ok) {
+                    throw new Error(`Error fetching log summary: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // Update downloads widget
+                updateDownloadsTable(data.recentDownloads);
+                
+                // Update logins widget
+                updateLoginsTable(data.recentLogins);
+                
+            } catch (error) {
+                console.error('Failed to fetch log summary:', error);
+                // Show error message in each table
+                document.getElementById('downloadsTableBody').innerHTML = `
+                    <tr>
+                        <td colspan="4" class="text-center py-4 text-red-500">
+                            Failed to load data: ${error.message}
+                        </td>
+                    </tr>
+                `;
+                
+                document.getElementById('loginsTableBody').innerHTML = `
+                    <tr>
+                        <td colspan="4" class="text-center py-4 text-red-500">
+                            Failed to load data: ${error.message}
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+        
+        // Fetch logs with filtering and pagination
+        async function fetchLogs(page) {
+            try {
+                // Get filter values
+                const logType = document.getElementById('logTypeFilter').value;
+                const status = document.getElementById('statusFilter').value;
+                const fromDate = document.getElementById('fromDateFilter').value;
+                const toDate = document.getElementById('toDateFilter').value;
+                
+                // Build query parameters
+                const params = new URLSearchParams();
+                params.append('limit', pageSize);
+                params.append('offset', (page - 1) * pageSize);
+                
+                if (logType) params.append('type', logType);
+                if (status) params.append('status', status);
+                if (fromDate) params.append('from', fromDate);
+                if (toDate) params.append('to', toDate);
+                
+                // Fetch logs
+                const response = await fetch(`/api/system-logs?${params.toString()}`);
+                if (!response.ok) {
+                    throw new Error(`Error fetching logs: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // Update global pagination variables
+                totalPages = Math.ceil(data.total / pageSize);
+                currentPage = page;
+                
+                // Update pagination UI
+                updatePagination(data.total);
+                
+                // Update logs table
+                updateAllLogsTable(data.logs);
+                
+            } catch (error) {
+                console.error('Failed to fetch logs:', error);
+                document.getElementById('allLogsTableBody').innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-red-500">
+                            Failed to load data: ${error.message}
+                        </td>
+                    </tr>
+                `;
+                
+                // Reset pagination
+                document.getElementById('paginationInfo').textContent = 'Page 1 of 1';
+                document.getElementById('totalLogs').textContent = '0';
+                document.getElementById('prevPageBtn').disabled = true;
+                document.getElementById('nextPageBtn').disabled = true;
+            }
+        }
+        
+        // Update the downloads table
+        function updateDownloadsTable(downloads) {
+            if (!downloads || downloads.length === 0) {
+                document.getElementById('downloadsTableBody').innerHTML = `
+                    <tr>
+                        <td colspan="4" class="text-center py-4 text-gray-500">No download records found in the database</td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            const html = downloads.map((log, index) => {
+                // Try to extract document title from details
+                const docTitle = log.details && log.details.document_title ? 
+                    log.details.document_title : 'Unknown Document';
+                    
+                return `
+                    <tr>
+                        <td class="text-center text-gray-500">${index + 1}</td>
+                        <td>${log.formatted_timestamp || new Date(log.timestamp).toLocaleString()}</td>
+                        <td class="font-medium text-gray-700">${log.username || 'Anonymous'}</td>
+                        <td class="italic">${docTitle}</td>
+                    </tr>
+                `;
+            }).join('');
+            
+            document.getElementById('downloadsTableBody').innerHTML = html;
+        }
+        
+        // Update the logins table
+        function updateLoginsTable(logins) {
+            if (!logins || logins.length === 0) {
+                document.getElementById('loginsTableBody').innerHTML = `
+                    <tr>
+                        <td colspan="4" class="text-center py-4 text-gray-500">No login records found in the database</td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            const html = logins.map((log, index) => {
+                const statusClass = log.status === 'success' ? 
+                    'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                    
+                const statusText = log.status === 'success' ? 'Success' : 'Failed';
+                
+                return `
+                    <tr>
+                        <td class="text-center text-gray-500">${index + 1}</td>
+                        <td>${log.formatted_timestamp || new Date(log.timestamp).toLocaleString()}</td>
+                        <td class="font-medium text-gray-700">${log.username || 'Anonymous'}</td>
+                        <td>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusClass}">
+                                ${statusText}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            
+            document.getElementById('loginsTableBody').innerHTML = html;
+        }
+        
+        // Update the main logs table
+        function updateAllLogsTable(logs) {
+            if (!logs || logs.length === 0) {
+                document.getElementById('allLogsTableBody').innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-gray-500">No logs found in the database matching the selected filters</td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            const html = logs.map((log, index) => {
+                const actualIndex = ((currentPage - 1) * pageSize) + index + 1;
+                const statusClass = log.status === 'success' ? 
+                    'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                    
+                // Format type with color
+                let typeClass = '';
+                switch (log.log_type) {
+                    case 'login': 
+                        typeClass = 'text-green-600'; 
+                        break;
+                    case 'download': 
+                        typeClass = 'text-purple-600'; 
+                        break;
+                    case 'document': 
+                        typeClass = 'text-blue-600'; 
+                        break;
+                    case 'error': 
+                        typeClass = 'text-red-600'; 
+                        break;
+                    case 'system': 
+                        typeClass = 'text-orange-600'; 
+                        break;
+                    default: 
+                        typeClass = 'text-gray-600';
+                }
+                
+                // Format details as a truncated string
+                let details = 'N/A';
+                if (log.details) {
+                    try {
+                        const detailsObj = typeof log.details === 'string' ? 
+                            JSON.parse(log.details) : log.details;
+                        details = JSON.stringify(detailsObj).substring(0, 50);
+                        if (JSON.stringify(detailsObj).length > 50) details += '...';
+                    } catch (e) {
+                        details = String(log.details).substring(0, 50);
+                        if (String(log.details).length > 50) details += '...';
+                    }
+                }
+                
+                return `
+                    <tr>
+                        <td class="text-center text-gray-500">${actualIndex}</td>
+                        <td>${log.formatted_timestamp || new Date(log.timestamp).toLocaleString()}</td>
+                        <td class="font-medium ${typeClass}">${log.log_type}</td>
+                        <td>${log.username || 'System'}</td>
+                        <td>${log.action}</td>
+                        <td>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusClass}">
+                                ${log.status || 'unknown'}
+                            </span>
+                        </td>
+                        <td class="text-xs" title="${details}">${details}</td>
+                    </tr>
+                `;
+            }).join('');
+            
+            document.getElementById('allLogsTableBody').innerHTML = html;
+        }
+        
+        // Update pagination UI
+        function updatePagination(total) {
+            document.getElementById('paginationInfo').textContent = `Page ${currentPage} of ${totalPages || 1}`;
+            document.getElementById('totalLogs').textContent = total;
+            
+            // Enable/disable pagination buttons
+            document.getElementById('prevPageBtn').disabled = currentPage <= 1;
+            document.getElementById('nextPageBtn').disabled = currentPage >= totalPages;
+        }
       </script>
 </body>
 </html>

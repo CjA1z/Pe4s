@@ -46,6 +46,7 @@ import { DocumentRequestController } from "./controllers/documentRequestControll
 import { emailRoutes } from "./routes/emailRoutes.ts"; // Import email routes
 import { authorVisitsRoutes, authorVisitsAllowedMethods } from "./routes/authorVisitsRoutes.ts"; // Import author visits routes
 import { pageVisitsRoutes, pageVisitsAllowedMethods } from "./routes/pageVisitsRoutes.ts"; // Import page visits routes
+import { systemLogsRoutes, systemLogsAllowedMethods } from "./routes/systemLogsRoutes.ts"; // Import system logs routes
 import keywordsRoutes from "./routes/keywordsRoutes.ts"; // Import keywords routes
 import { getCompiledDocument } from "./api/compiledDocument.ts";
 import { handleGetUserProfileForNavbar } from "./api/user.ts"; // Import user profile handler
@@ -116,9 +117,9 @@ async function ensureVisitCounterTablesExist() {
       CREATE INDEX IF NOT EXISTS idx_page_visits_counter_date ON page_visits_counter(date);
     `);
     
-    console.log("✅ Visit counter tables are ready");
+    console.log(" Visit counter tables are ready");
   } catch (error) {
-    console.error("❌ Error setting up visit counter tables:", error);
+    console.error(" Error setting up visit counter tables:", error);
   }
 }
 
@@ -1219,6 +1220,24 @@ async function startServer() {
     app.use(pageVisitsRoutes);
     app.use(pageVisitsAllowedMethods);
     
+    // Register system logs routes
+    console.log("Registering system logs routes...");
+    app.use(systemLogsRoutes);
+    app.use((ctx, next) => {
+      if (ctx.request.method === "OPTIONS" && 
+          ctx.request.url.pathname.startsWith("/api/system-logs")) {
+        ctx.response.status = 204;
+        
+        // Add CORS headers
+        ctx.response.headers.set("Access-Control-Allow-Origin", "*");
+        ctx.response.headers.set("Access-Control-Allow-Methods", systemLogsAllowedMethods.join(", "));
+        ctx.response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        
+        return;
+      }
+      return next();
+    });
+    
     // Register keywords routes
     console.log("Registering keywords routes...");
     app.use(keywordsRoutes.routes());
@@ -1267,7 +1286,7 @@ router.get("/ping", (ctx) => {
 
 // Initialize document request system
 const documentRequestModel = new DocumentRequestModel(client);
-const documentRequestController = new DocumentRequestController(documentRequestModel, DocumentModel);
+const documentRequestController = new DocumentRequestController(documentRequestModel);
 const documentRequestRoutes = createDocumentRequestRoutes(documentRequestController);
 
 // Add document request routes
@@ -1428,6 +1447,103 @@ router.get("/api/compiled-documents/:id", async (ctx) => {
     console.error(`Error fetching compiled document: ${error.message}`);
     ctx.response.status = 500;
     ctx.response.body = { error: "Failed to fetch compiled document" };
+  }
+});
+
+// Add a route for getting detailed compiled document information with visit statistics
+router.get("/api/compiled-documents/:id/details", async (ctx) => {
+  try {
+    const id = parseInt(ctx.params.id);
+    if (isNaN(id)) {
+      ctx.response.status = 400;
+      ctx.response.body = { error: "Invalid ID" };
+      return;
+    }
+    
+    // Import the PageVisitsModel dynamically
+    const { PageVisitsModel } = await import("./models/pageVisitsModel.ts");
+    
+    // Fetch the compiled document
+    const compiledDoc = await getCompiledDocument(id);
+    if (!compiledDoc) {
+      ctx.response.status = 404;
+      ctx.response.body = { error: "Compiled document not found" };
+      return;
+    }
+    
+    // Get visit statistics for the compiled document
+    let visitStats = { total: 0, guest: 0, user: 0 };
+    try {
+      visitStats = await PageVisitsModel.getDocumentVisitCounters(id.toString());
+    } catch (visitError) {
+      console.warn(`Could not fetch visit statistics for compiled doc ${id}:`, visitError);
+    }
+    
+    // Get child documents
+    let childDocs = [];
+    try {
+      const childDocsResponse = await fetchChildDocuments(id);
+      childDocs = childDocsResponse.documents || [];
+      
+      // For each child document, fetch visit statistics
+      for (let i = 0; i < childDocs.length; i++) {
+        const childDoc = childDocs[i];
+        const childId = childDoc.id;
+        
+        if (childId) {
+          try {
+            const childVisitStats = await PageVisitsModel.getDocumentVisitCounters(childId.toString());
+            childDoc.visit_count = childVisitStats.total || 0;
+            childDoc.guest_count = childVisitStats.guest || 0;
+            childDoc.user_count = childVisitStats.user || 0;
+          } catch (childVisitError) {
+            console.warn(`Could not fetch visit statistics for child doc ${childId}:`, childVisitError);
+            childDoc.visit_count = 0;
+            childDoc.guest_count = 0;
+            childDoc.user_count = 0;
+          }
+        }
+      }
+      
+      // Sort child documents by visit count (descending)
+      childDocs.sort((a, b) => (b.visit_count || 0) - (a.visit_count || 0));
+      
+    } catch (childError) {
+      console.warn(`Could not fetch child documents for compiled doc ${id}:`, childError);
+    }
+    
+    // Fetch authors for the document if they're not already included
+    let authors = [];
+    try {
+      // Authors might already be included in the document
+      if (compiledDoc.authors && Array.isArray(compiledDoc.authors)) {
+        authors = compiledDoc.authors;
+      } else {
+        // Try to fetch authors separately
+        const authorsData = await getDocumentAuthors(id);
+        authors = authorsData || [];
+      }
+    } catch (authorError) {
+      console.warn(`Could not fetch authors for compiled doc ${id}:`, authorError);
+    }
+    
+    // Combine all data
+    const result = {
+      ...compiledDoc,
+      authors: authors,
+      child_documents: childDocs,
+      visit_count: visitStats.total || 0,
+      guest_count: visitStats.guest || 0,
+      user_count: visitStats.user || 0
+    };
+    
+    console.log(`Fetched detailed compiled document ${id} with ${childDocs.length} child documents and visit stats`);
+    
+    ctx.response.body = result;
+  } catch (error) {
+    console.error(`Error fetching compiled document details: ${error.message}`);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Failed to fetch compiled document details" };
   }
 });
 
@@ -1711,8 +1827,9 @@ router.get("/api/compiled-documents/:id/foreword", async (ctx) => {
     // Parse the URL to check for the category query parameter
     const url = new URL(ctx.request.url);
     const categoryParam = url.searchParams.get('category');
+    const format = url.searchParams.get('format') || 'auto'; // Get format parameter
     
-    console.log(`Fetching foreword for document ID: ${id}, category param: ${categoryParam || 'none'}`);
+    console.log(`Fetching foreword for document ID: ${id}, category param: ${categoryParam || 'none'}, format: ${format}`);
     
     // First, get the category of the compiled document from the database
     const categoryQuery = `
@@ -1774,7 +1891,31 @@ router.get("/api/compiled-documents/:id/foreword", async (ctx) => {
       const absolutePath = join(workspaceRoot, normalizedPath);
       console.log(`Attempting to read foreword from: ${absolutePath}`);
       
-      // Read the file
+      // Check if the file exists
+      await Deno.stat(absolutePath);
+      
+      // Check if the file is a PDF based on extension
+      const isPdf = normalizedPath.toLowerCase().endsWith('.pdf');
+      
+      // If it's a PDF and format isn't explicitly set to 'json', serve it directly with the proper content type
+      if (isPdf && format !== 'json') {
+        console.log(`Serving PDF foreword file directly with application/pdf content type`);
+        
+        // Set PDF content type header
+        ctx.response.headers.set('Content-Type', 'application/pdf');
+        
+        // Disable cache for development ease
+        ctx.response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+        ctx.response.headers.set('Pragma', 'no-cache');
+        ctx.response.headers.set('Expires', '0');
+        
+        // Read and serve the file directly
+        const file = await Deno.readFile(absolutePath);
+        ctx.response.body = file;
+        return;
+      }
+      
+      // If not a PDF or format is explicitly 'json', return as text in JSON
       const forewordContent = await Deno.readTextFile(absolutePath);
       
       // Return the foreword content
@@ -1850,6 +1991,195 @@ router.all("/api/user/library(/.*)?", async (ctx) => {
     ctx.response.status = 500;
     ctx.response.body = {
       error: "Internal server error processing user library request",
+      details: error instanceof Error ? error.message : String(error)
+    };
+  }
+});
+
+// Add endpoint to save compiled documents to user's library
+router.post("/api/compiled-documents/save-to-library", async (ctx) => {
+  try {
+    console.log(`[SERVER] Processing request to save compiled document to library`);
+    
+    // Verify user authentication
+    const authHeader = ctx.request.headers.get("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      ctx.response.status = 401;
+      ctx.response.body = { error: "Authentication required" };
+      return;
+    }
+    
+    // Extract token
+    const token = authHeader.split(" ")[1];
+    
+    // Import verification function
+    try {
+      // Import verification function dynamically
+      const { verifySessionToken } = await import("./utils/sessionUtils.ts");
+      const session = await verifySessionToken(token);
+      
+      if (!session) {
+        ctx.response.status = 401;
+        ctx.response.body = { error: "Invalid or expired token" };
+        return;
+      }
+      
+      // Get user ID from session
+      const userId = session.id;
+      
+      // Get document ID from request body
+      const body = await ctx.request.body({ type: "json" }).value;
+      
+      if (!body.documentId) {
+        ctx.response.status = 400;
+        ctx.response.body = { error: "Document ID is required" };
+        return;
+      }
+      
+      const documentId = parseInt(String(body.documentId), 10);
+      
+      if (isNaN(documentId)) {
+        ctx.response.status = 400;
+        ctx.response.body = { error: "Invalid document ID" };
+        return;
+      }
+      
+      console.log(`[SERVER] Adding compiled document ${documentId} to library for user ${userId}`);
+      
+      // Import the UserLibraryModel dynamically
+      const { UserLibraryModel } = await import("./models/userLibraryModel.ts");
+      
+      // Check if the document is already in the library
+      const isInLibrary = await UserLibraryModel.isInLibrary(userId, documentId);
+      
+      if (isInLibrary) {
+        ctx.response.status = 200;
+        ctx.response.body = {
+          success: true,
+          message: "Document is already in your library",
+          inLibrary: true,
+          count: await UserLibraryModel.getLibraryCount(userId)
+        };
+        return;
+      }
+      
+      // Add the document to the library
+      const result = await UserLibraryModel.addToLibrary(userId, documentId);
+      
+      if (result) {
+        // Get the updated library count
+        const libraryCount = await UserLibraryModel.getLibraryCount(userId);
+        
+        ctx.response.status = 200;
+        ctx.response.body = {
+          success: true,
+          message: "Compiled document added to library successfully",
+          count: libraryCount
+        };
+      } else {
+        throw new Error("Failed to add compiled document to library");
+      }
+    } catch (authError) {
+      console.error(`[SERVER] Authentication error:`, authError);
+      ctx.response.status = 401;
+      ctx.response.body = { error: "Authentication failed" };
+    }
+  } catch (error) {
+    console.error(`[SERVER] Error saving compiled document to library:`, error);
+    ctx.response.status = 500;
+    ctx.response.body = {
+      error: "Failed to add compiled document to library",
+      details: error instanceof Error ? error.message : String(error)
+    };
+  }
+});
+
+// Also add a matching endpoint for the alternative method
+router.post("/api/library/save-compiled", async (ctx) => {
+  try {
+    console.log(`[SERVER] Processing alternative request to save compiled document to library`);
+    
+    // Verify user authentication
+    const authHeader = ctx.request.headers.get("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      ctx.response.status = 401;
+      ctx.response.body = { error: "Authentication required" };
+      return;
+    }
+    
+    // Extract token
+    const token = authHeader.split(" ")[1];
+    
+    // Import verification function dynamically
+    const { verifySessionToken } = await import("./utils/sessionUtils.ts");
+    const session = await verifySessionToken(token);
+    
+    if (!session) {
+      ctx.response.status = 401;
+      ctx.response.body = { error: "Invalid or expired token" };
+      return;
+    }
+    
+    // Get user ID from session
+    const userId = session.id;
+    
+    // Get document ID from request body
+    const body = await ctx.request.body({ type: "json" }).value;
+    
+    if (!body.compiledDocumentId) {
+      ctx.response.status = 400;
+      ctx.response.body = { error: "Compiled document ID is required" };
+      return;
+    }
+    
+    const documentId = parseInt(String(body.compiledDocumentId), 10);
+    
+    if (isNaN(documentId)) {
+      ctx.response.status = 400;
+      ctx.response.body = { error: "Invalid document ID" };
+      return;
+    }
+    
+    console.log(`[SERVER] Adding compiled document ${documentId} to library for user ${userId} via alternative method`);
+    
+    // Import the UserLibraryModel dynamically
+    const { UserLibraryModel } = await import("./models/userLibraryModel.ts");
+    
+    // Check if the document is already in the library
+    const isInLibrary = await UserLibraryModel.isInLibrary(userId, documentId);
+    
+    if (isInLibrary) {
+      ctx.response.status = 200;
+      ctx.response.body = {
+        success: true,
+        message: "Document is already in your library",
+        inLibrary: true,
+        count: await UserLibraryModel.getLibraryCount(userId)
+      };
+      return;
+    }
+    
+    // Add the document to the library
+    const result = await UserLibraryModel.addToLibrary(userId, documentId);
+    
+    if (result) {
+      // Get the updated library count
+      const libraryCount = await UserLibraryModel.getLibraryCount(userId);
+      
+      ctx.response.status = 200;
+      ctx.response.body = {
+        success: true,
+        message: "Compiled document added to library successfully via alternative method",
+        count: libraryCount
+      };
+    } else {
+      throw new Error("Failed to add compiled document to library");
+    }
+  } catch (error) {
+    console.error(`[SERVER] Error saving compiled document to library via alternative method:`, error);
+    ctx.response.status = 500;
+    ctx.response.body = {
+      error: "Failed to add compiled document to library",
       details: error instanceof Error ? error.message : String(error)
     };
   }
@@ -2066,6 +2396,54 @@ router.post("/api/documents/by-ids", async (ctx) => {
     console.error("[SERVER] Error fetching documents by IDs:", error);
     ctx.response.status = 500;
     ctx.response.body = { error: "Internal server error" };
+  }
+});
+
+// Serve PDF files with proper content type
+router.get(/\.(pdf)$/i, async (ctx) => {
+  try {
+    const urlPath = ctx.request.url.pathname;
+    console.log(`PDF file requested: ${urlPath}`);
+    
+    // Map URL path to file system path
+    let filePath = urlPath;
+    
+    // Resolve relative to workspace root
+    if (filePath.startsWith('/storage/')) {
+      filePath = filePath.substring(1); // Remove leading slash
+    } else if (filePath.startsWith('/files/') || filePath.startsWith('/uploads/')) {
+      filePath = filePath.substring(1); // Remove leading slash
+    }
+    
+    // Get absolute path
+    const absolutePath = join(Deno.cwd(), '..', filePath);
+    console.log(`Serving PDF from: ${absolutePath}`);
+    
+    try {
+      // Check if file exists
+      await Deno.stat(absolutePath);
+      
+      // Set PDF content type header
+      ctx.response.headers.set('Content-Type', 'application/pdf');
+      
+      // Disable cache for development ease
+      ctx.response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      ctx.response.headers.set('Pragma', 'no-cache');
+      ctx.response.headers.set('Expires', '0');
+      
+      // Send the file
+      const file = await Deno.readFile(absolutePath);
+      ctx.response.body = file;
+      
+    } catch (err: unknown) {
+      console.error(`Error serving PDF file: ${err instanceof Error ? err.message : String(err)}`);
+      ctx.response.status = 404;
+      ctx.response.body = { error: 'PDF file not found' };
+    }
+  } catch (error: unknown) {
+    console.error(`General error serving PDF: ${error instanceof Error ? error.message : String(error)}`);
+    ctx.response.status = 500;
+    ctx.response.body = { error: 'Internal server error' };
   }
 });
 

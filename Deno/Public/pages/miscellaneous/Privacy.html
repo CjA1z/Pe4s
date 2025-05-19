@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Our Privacy Commitment - PeAS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        :root {
+            --theme-gold: #FDB813;
+            --theme-gold-darker: #EAA10F;
+            --theme-gold-light-bg: rgba(253, 184, 19, 0.2);
+            --theme-gold-lighter-bg: rgba(253, 184, 19, 0.1);
+            --theme-gold-highlight: rgba(253, 184, 19, 0.4);
+            --theme-green-dark: #006A4E;
+            --theme-green-darker-text: #00523D;
+            --theme-green-light-bg: rgba(0, 106, 78, 0.3);
+            --theme-green-lighter-bg: rgba(0, 106, 78, 0.15);
+            --theme-green-border: rgba(0, 106, 78, 0.7);
+            --theme-page-bg: #F9F6EE;
+            --neutral-border-color: #e5e7eb;
+            --input-border-color: #d1d5db;
+            --placeholder-text-color: #9ca3af;
+            --text-on-gold: #000000;
+            --text-on-green: #FFFFFF;
+            --primary-text-color: #1f2937;
+            --secondary-text-color: #4b5563;
+            --tertiary-text-color: #6b7280;
+            --theme-accent-gray: #6b7280;
+            --pastel-gold: #FFF5CC;
+            --pastel-green: #D0EAD0;
+            --footer-glass-bg-color: rgba(255, 255, 255, 0.25);
+            --footer-glass-border-color: rgba(255, 255, 255, 0.4);
+            --footer-glass-blur-radius: 6px;
+        }
+
+        html {
+            height: 100%;
+            box-sizing: border-box;
+        }
+        *, *:before, *:after {
+            box-sizing: inherit;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--theme-page-bg);
+            background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23D3CBBF' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            color: var(--primary-text-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            margin: 0;
+            line-height: 1.6;
+        }
+
+        .page-wrapper {
+            flex-grow: 1;
+            /* padding-top: 2.5rem; REMOVED to eliminate space before header */
+        }
+        /* @media (min-width: 768px) {
+            .page-wrapper {
+                padding-top: 4rem; REMOVED to eliminate space before header
+            }
+        } */
+
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Inter', sans-serif;
+            color: var(--primary-text-color);
+            font-weight: 600;
+            margin-top: 0;
+            line-height: 1.3;
+        }
+        h1 { font-size: 2.5rem; margin-bottom: 1rem;}
+        h2 { font-size: 1.8rem; margin-bottom: 0.75rem; }
+        h3 { font-size: 1.25rem; margin-bottom: 0.5rem; color: var(--theme-green-darker-text);}
+
+
+        .font-libre { font-family: 'Libre Baskerville', serif; }
+        .font-inter { font-family: 'Inter', sans-serif; }
+
+        .container {
+            width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+        @media (min-width: 640px) { .container { max-width: 640px; padding-left: 1.5rem; padding-right: 1.5rem; } }
+        @media (min-width: 768px) { .container { max-width: 768px; } }
+        @media (min-width: 1024px) { .container { max-width: 1024px; padding-left: 2rem; padding-right: 2rem; } }
+        @media (min-width: 1280px) { .container { max-width: 1280px; } }
+
+        .page-header {
+            position: relative;
+            overflow: hidden;
+            background-color: var(--theme-green-dark);
+            color: var(--text-on-green);
+            padding-top: 3rem; /* Kept padding for header content */
+            padding-bottom: 3rem; /* Kept padding for header content */
+            margin-bottom: 3rem;
+        }
+
+        @keyframes headerGradientAnimation {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .page-header::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 0;
+            background-image: linear-gradient(135deg,
+                rgba(220, 38, 38, 0.25), rgba(253, 184, 19, 0.25), 
+                rgba(220, 38, 38, 0.28), rgba(253, 184, 19, 0.28));
+            background-size: 400% 400%;
+            animation: headerGradientAnimation 25s ease infinite;
+            opacity: 0.8;
+        }
+        .page-header .header-content {
+            position: relative;
+            z-index: 1;
+            text-align: center; 
+        }
+        .page-header .header-content h1 {
+            color: var(--text-on-green);
+            font-weight: 700;
+            font-size: 1.875rem; 
+            line-height: 1.2;
+            margin-bottom: 0.5rem;
+        }
+        .page-header .header-content p {
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 1.125rem;
+            margin-bottom: 0;
+            max-width: 700px; 
+            margin-left: auto;
+            margin-right: auto;
+        }
+        @media (min-width: 640px) {
+            .page-header .header-content h1 { font-size: 2.5rem; }
+            .page-header .header-content p { font-size: 1.25rem; }
+        }
+        @media (min-width: 1024px) {
+            .page-header .header-content h1 { font-size: 3.25rem; }
+        }
+
+        .policy-section {
+            background-color: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(12px) saturate(130%); 
+            -webkit-backdrop-filter: blur(12px) saturate(130%);
+            border: 1px solid rgba(229, 231, 235, 0.35);
+            border-radius: 0.75rem;
+            margin-bottom: 2rem;
+            overflow: hidden; 
+        }
+
+        .policy-section-header {
+            padding: 1.5rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--theme-gold-lighter-bg); 
+            border-bottom: 1px solid var(--theme-gold-light-bg);
+            transition: background-color 0.3s ease;
+        }
+        .policy-section-header:hover {
+            background-color: var(--theme-gold-light-bg);
+        }
+        .policy-section-header h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0;
+            color: var(--theme-green-darker-text);
+            display: flex;
+            align-items: center;
+        }
+         .policy-section-header h2 i {
+            margin-right: 0.75rem;
+            color: var(--theme-gold-darker);
+            font-size: 1.3em;
+         }
+
+        .policy-section-header .accordion-icon {
+            font-size: 1.2rem;
+            transition: transform 0.3s ease-in-out;
+            color: var(--theme-green-dark);
+        }
+        .policy-section.active .accordion-icon {
+            transform: rotate(180deg);
+        }
+
+        .policy-section-content {
+            padding: 0 1.5rem; 
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease-in-out, padding 0.4s ease-in-out;
+            color: var(--secondary-text-color);
+            font-size: 1rem;
+            position: relative; 
+        }
+        .policy-section.active .policy-section-content {
+            padding: 1.5rem; 
+            max-height: 1000px; 
+        }
+        .policy-section-content p {
+            margin-bottom: 1rem;
+        }
+        .policy-section-content p:last-child {
+            margin-bottom: 0;
+        }
+        .policy-section-content ul {
+            list-style: none;
+            padding-left: 1.5rem;
+        }
+        .policy-section-content ul li {
+            position: relative;
+            padding-left: 1.25rem;
+            margin-bottom: 0.5rem;
+        }
+        .policy-section-content ul li::before {
+            content: "\f105"; 
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+            position: absolute;
+            left: 0;
+            top: 1px; 
+            color: var(--theme-gold-darker);
+        }
+
+        .quirky-box {
+            background-color: var(--theme-green-lighter-bg);
+            border: 1px solid var(--theme-green-border);
+            border-left: 5px solid var(--theme-green-dark);
+            padding: 1rem 1.5rem;
+            margin-top: 1.5rem;
+            border-radius: 0.5rem;
+            font-size: 0.95rem;
+        }
+        .quirky-box h4 {
+            color: var(--theme-green-darker-text);
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+        .quirky-box p {
+            color: var(--theme-green-darker-text);
+            opacity: 0.9;
+            margin-bottom: 0;
+        }
+        .quirky-box i {
+            margin-right: 0.5rem;
+            color: var(--theme-green-dark);
+        }
+
+        .contact-us-section {
+            text-align: center;
+            padding: 2rem 0;
+        }
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            text-align: center;
+            transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.3s ease, transform 0.3s ease, box-shadow 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            font-size: 1rem;
+            line-height: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            cursor: pointer;
+            text-decoration: none;
+            border: 1px solid transparent;
+        }
+        .btn:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            transform: translateY(-1px);
+        }
+        .btn-primary {
+            background-color: var(--theme-green-dark);
+            color: var(--text-on-green);
+            border-color: var(--theme-green-dark);
+        }
+        .btn-primary:hover {
+            background-color: var(--theme-green-darker-text);
+            border-color: var(--theme-green-darker-text);
+        }
+        .btn-secondary {
+            background-color: var(--theme-gold);
+            color: var(--text-on-gold);
+            border-color: var(--theme-gold);
+        }
+        .btn-secondary:hover {
+            background-color: var(--theme-gold-darker);
+            border-color: var(--theme-gold-darker);
+        }
+        .btn i, .btn svg {
+            width: 1.25rem;
+            height: 1.25rem;
+        }
+
+        .footer-wrapper {
+            margin-top: auto;
+            width: 100%;
+        }
+        .site-footer {
+            position: relative;
+            overflow: hidden;
+            background-color: var(--footer-glass-bg-color);
+            -webkit-backdrop-filter: blur(var(--footer-glass-blur-radius));
+            backdrop-filter: blur(var(--footer-glass-blur-radius));
+            border-top: 1px solid var(--footer-glass-border-color);
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+            color: #374151;
+        }
+        @keyframes subtleGradientAnimation {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .site-footer::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: -1;
+            background: linear-gradient(45deg, var(--pastel-gold), var(--pastel-green), var(--pastel-gold));
+            background-size: 200% 200%;
+            animation: subtleGradientAnimation 18s ease infinite;
+            opacity: 0.7;
+        }
+        .footer-content-padding {
+            position: relative;
+            z-index: 1;
+            padding: 2rem 1.5rem;
+            max-width: 80rem;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        @media (min-width: 640px) { .footer-content-padding { padding-left: 2rem; padding-right: 2rem; } }
+        @media (min-width: 1024px) { .footer-content-padding { padding-left: 2.5rem; padding-right: 2.5rem; } }
+
+        .footer-layout {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2rem;
+            text-align: center;
+        }
+        @media (min-width: 1024px) {
+            .footer-layout {
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: flex-start;
+                text-align: left;
+            }
+        }
+        .footer-logo-section { flex-shrink: 0; }
+        .footer-logo-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            margin-bottom: 0.75rem;
+        }
+        @media (min-width: 640px) {
+            .footer-logo-container { align-items: flex-start; text-align: left; }
+        }
+        @media (min-width: 1024px) {
+             .footer-logo-container { align-items: flex-start; }
+        }
+        .footer-logo-container img {
+            height: 3rem; 
+            width: auto;
+            margin-bottom: 0.5rem;
+        }
+        @media (min-width: 640px) { .footer-logo-container img { height: 4rem; margin-bottom: 0; } }
+
+        .footer-nav {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+        }
+        @media (min-width: 1024px) { .footer-nav { align-items: flex-start; } }
+
+        .footer-link {
+            color: var(--theme-green-dark);
+            transition: color 0.2s ease-in-out, opacity 0.2s ease-in-out;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .footer-link:hover {
+            color: var(--theme-gold);
+            opacity: 0.85;
+        }
+        .copyright-text {
+            color: #6b7280;
+            font-size: 0.75rem;
+        }
+
+        .tooltip {
+            position: relative; 
+            display: inline-block;
+            cursor: help;
+            border-bottom: 1px dotted var(--theme-gold-darker);
+        }
+
+        .tooltip .tooltiptext {
+            visibility: hidden; 
+            opacity: 0; 
+            width: 220px;
+            background-color: var(--theme-green-darker-text);
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 8px;
+            position: absolute;
+            z-index: 1000; 
+            bottom: calc(100% + 8px); 
+            left: 50%;
+            transform: translateX(-50%); 
+            transition: opacity 0.3s ease, visibility 0.3s ease; 
+            font-size: 0.875rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            pointer-events: none; 
+        }
+
+        .tooltip .tooltiptext::after { 
+            content: "";
+            position: absolute;
+            top: 100%; 
+            left: 50%;
+            margin-left: -5px; 
+            border-width: 5px;
+            border-style: solid;
+            border-color: var(--theme-green-darker-text) transparent transparent transparent; 
+        }
+
+        .tooltip:hover .tooltiptext {
+            visibility: visible; 
+            opacity: 1; 
+            pointer-events: auto; 
+        }
+
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+
+        <header class="page-header" role="banner">
+            <div class="header-content container">
+                <h1><i class="fas fa-user-secret"></i> Our Commitment to Your Privacy</h1>
+                <p class="font-libre">At PeAS (Paulinian electronic Archiving System), we're not just about preserving documents; we're serious about protecting your personal information too. This policy explains how we collect, use, and safeguard your data with transparency and a touch of diligence.</p>
+            </div>
+        </header>
+
+        <main class="container" role="main">
+            <p style="text-align: center; margin-bottom: 2rem; font-size: 1.1rem; color: var(--secondary-text-color);">
+                For detailed information regarding our data practices, please review the sections below.
+            </p>
+
+            <section class="policy-section">
+                <div class="policy-section-header">
+                    <h2><i class="fas fa-microscope"></i>What Information We Collect (and Why!)</h2>
+                    <span class="accordion-icon"><i class="fas fa-chevron-down"></i></span>
+                </div>
+                <div class="policy-section-content">
+                    <p>To provide and improve our services, we may collect a smidgen of information. Here’s the lowdown:</p>
+                    <h3><i class="fas fa-keyboard"></i>Information You Provide Directly:</h3>
+                    <ul>
+                        <li><strong>Account Information:</strong> When you create an account, we ask for things like your name, email address, and affiliation. This helps us know who you are (it's not for sending spam, promise!).</li>
+                        <li><strong>Uploaded Content:</strong> Any documents or data you upload for archiving or analysis. This is YOUR data, and we treat it with utmost respect.</li>
+                        <li><strong>Communications:</strong> If you contact us, we'll keep a record of that chat to help you better next time.</li>
+                    </ul>
+                    <h3><i class="fas fa-cogs"></i>Information We Collect Automatically:</h3>
+                    <ul>
+                        <li><strong>Log Data:</strong> Like most websites, our servers automatically record information ("log data") created by your use of the Services. This may include your IP address, browser type, operating system, the referring web page, pages visited, location, your mobile carrier, device information, search terms, and cookie information. We use this to keep things running smoothly and securely.</li>
+                        <li><strong>Cookies & Similar Tech:</strong> We use cookies (tiny data files) to make your experience better – like remembering your login. You can control cookies through your browser settings. Some cookies are essential, others help us understand how you use PeAS.
+                            <span class="tooltip">Fun Fact!
+                                <span class="tooltiptext">The term "cookie" was coined by web browser programmer Lou Montulli. It derives from "magic cookie," a term from programming that refers to a packet of data a program receives and sends back unchanged.</span>
+                            </span>
+                        </li>
+                    </ul>
+                    <div class="quirky-box">
+                        <h4><i class="fas fa-glasses"></i>Data We DON'T Go Snooping For:</h4>
+                        <p>Your secret cookie recipe, your cat's middle name, or your plans for world domination (unless it's in a document you explicitly upload for archiving, of course!). We only collect what's necessary to provide our awesome services.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="policy-section">
+                <div class="policy-section-header">
+                    <h2><i class="fas fa-cogs"></i>How We Use Your Information</h2>
+                    <span class="accordion-icon"><i class="fas fa-chevron-down"></i></span>
+                </div>
+                <div class="policy-section-content">
+                    <p>We use your information to:</p>
+                    <ul>
+                        <li>Provide, maintain, and improve PeAS services.</li>
+                        <li>Personalize your experience (e.g., showing relevant research areas).</li>
+                        <li>Communicate with you about your account or services.</li>
+                        <li>Ensure security and prevent fraud. <span class="tooltip">Did you know? <span class="tooltiptext">Good data security is like a digital fortress, protecting valuable information from unwanted intruders!</span></span></li>
+                        <li>Analyze usage to understand how our services are used and make them better.</li>
+                        <li>Comply with legal obligations.</li>
+                    </ul>
+                     <p>We're not in the business of selling your personal data to third-party marketers. That's just not our style.</p>
+                </div>
+            </section>
+
+            <section class="policy-section">
+                <div class="policy-section-header">
+                    <h2><i class="fas fa-share-alt"></i>Sharing & Disclosure (The Who, What, When)</h2>
+                    <span class="accordion-icon"><i class="fas fa-chevron-down"></i></span>
+                </div>
+                <div class="policy-section-content">
+                    <p>We don't share your personal information lightly. Here are the limited circumstances when we might:</p>
+                    <ul>
+                        <li><strong>With Your Consent:</strong> If you tell us it's okay.</li>
+                        <li><strong>Service Providers:</strong> We work with trusted third-party companies to help us provide, analyze, and improve the Services (e.g., data hosting, maintenance services, database management). These providers only have access to your information to perform these tasks on our behalf and are obligated not to disclose or use it for other purposes.</li>
+                        <li><strong>Legal Requirements:</strong> If required by law, such as to comply with a subpoena or other legal process. We'll aim to notify you unless legally prohibited.</li>
+                        <li><strong>To Protect Rights:</strong> To protect the rights, property, or safety of PeAS, our users, or the public as required or permitted by law.</li>
+                        <li><strong>Aggregated or De-Identified Data:</strong> We may share aggregated or de-identified information that cannot reasonably be used to identify you. For example, we might share statistics about the most common research keywords.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section class="policy-section">
+                <div class="policy-section-header">
+                    <h2><i class="fas fa-user-shield"></i>Your Rights & Choices (You're in Control!)</h2>
+                    <span class="accordion-icon"><i class="fas fa-chevron-down"></i></span>
+                </div>
+                <div class="policy-section-content">
+                    <p>You have rights regarding your personal information:</p>
+                    <ul>
+                        <li><strong>Access & Update:</strong> You can review and update your account information through your profile settings.</li>
+                        <li><strong>Data Portability:</strong> You may be able to request a copy of your information in a machine-readable format.</li>
+                        <li><strong>Deletion:</strong> You can request deletion of your account and associated data, subject to certain exceptions (like legal obligations to retain data).
+                            <span class="tooltip">Heads up!
+                                <span class="tooltiptext">Deleting your account is permanent. We might not be able to recover your data once it's gone, so be sure!</span>
+                            </span>
+                        </li>
+                        <li><strong>Cookie Control:</strong> As mentioned, you can manage cookies via your browser settings.</li>
+                        <li><strong>Opt-out of Communications:</strong> You can opt-out of promotional emails by following the unsubscribe instructions in those emails.</li>
+                    </ul>
+                    <p>To exercise these rights, please contact us. We'll respond to your request in a timely manner.</p>
+                </div>
+            </section>
+
+            <section class="policy-section">
+                <div class="policy-section-header">
+                    <h2><i class="fas fa-lock"></i>Data Security (Our Digital Fortress)</h2>
+                    <span class="accordion-icon"><i class="fas fa-chevron-down"></i></span>
+                </div>
+                <div class="policy-section-content">
+                    <p>We take the security of your data very seriously and implement a variety of security measures to maintain the safety of your personal information. This includes technical, administrative, and physical safeguards.</p>
+                    <p>However, please remember that no method of transmission over the Internet or method of electronic storage is 100% secure. While we strive to use commercially acceptable means to protect your Personal Information, we cannot guarantee its absolute security. <span class="tooltip">Cybersecurity Tip: <span class="tooltiptext">Use strong, unique passwords for all your online accounts and enable two-factor authentication whenever possible!</span></span></p>
+                </div>
+            </section>
+
+            <section class="policy-section">
+                <div class="policy-section-header">
+                    <h2><i class="fas fa-child"></i>Children's Privacy (For the Young Scholars)</h2>
+                    <span class="accordion-icon"><i class="fas fa-chevron-down"></i></span>
+                </div>
+                <div class="policy-section-content">
+                    <p>Our services are not directed to individuals under the age of 13 (or a higher age threshold depending on your local jurisdiction). We do not knowingly collect personal information from children. If we become aware that a child has provided us with personal information, we will take steps to delete such information.</p>
+                    <p>If you are a parent or guardian and believe your child has provided us with information without your consent, please contact us.</p>
+                </div>
+            </section>
+
+            <section class="policy-section">
+                <div class="policy-section-header">
+                    <h2><i class="fas fa-history"></i>Changes to This Policy (We'll Keep You Posted)</h2>
+                    <span class="accordion-icon"><i class="fas fa-chevron-down"></i></span>
+                </div>
+                <div class="policy-section-content">
+                    <p>We may update this Privacy Policy from time to time. If we make changes, we will notify you by revising the date at the top of the policy and, in some cases, we may provide you with additional notice (such as adding a statement to our homepage or sending you a notification).</p>
+                    <p>We encourage you to review the Privacy Policy whenever you access our services to stay informed about our information practices and the choices available to you.</p>
+                </div>
+            </section>
+
+            <section class="contact-us-section">
+                 <h3><i class="fas fa-question-circle" style="color: var(--theme-green-dark); margin-right: 0.5rem;"></i>Got Questions or Ponderings?</h3>
+                 <p style="margin-bottom: 1.5rem; color: var(--secondary-text-color);">If you have any questions about this Privacy Policy, or just want to chat about data (we love data!), feel free to reach out.</p>
+                 <a href="mailto:privacy@peas-archive.example.com" class="btn btn-primary">
+                     <i class="fas fa-envelope"></i> Contact us
+                 </a>
+            </section>
+
+        </main>
+    </div>
+
+    <div class="footer-wrapper">
+        <footer id="site-footer-element" class="site-footer" role="contentinfo">
+            <div class="footer-content-padding">
+                <div class="footer-layout">
+                    <div class="footer-logo-section">
+                        <div class="footer-logo-container">
+                            <img
+                                src="https://placehold.co/200x80/006A4E/FFFFFF?text=PeAS+Logo"
+                                alt="PeAS Logo"
+                                onerror="this.onerror=null; this.src='https://placehold.co/200x80/cccccc/ffffff?text=Logo+Error';">
+                        </div>
+                        <p class="copyright-text">&copy; <span id="footerCurrentYear"></span> PeAS. Your Trust, Our Priority.</p>
+                    </div>
+                    <nav class="footer-nav" role="navigation" aria-label="Footer Navigation">
+                        <a href="#" class="footer-link">Home</a>
+                        <a href="#" class="footer-link">About Us</a>
+                        <a href="#" class="footer-link">Terms & Conditions</a>
+                        <a href="#top" class="footer-link">Back to Privacy Policy</a>
+                    </nav>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Accordion Functionality
+            const accordionItems = document.querySelectorAll('.policy-section');
+
+            accordionItems.forEach(item => {
+                const header = item.querySelector('.policy-section-header');
+                header.addEventListener('click', () => {
+                    const isActive = item.classList.contains('active');
+                    
+                    item.classList.toggle('active'); 
+                });
+            });
+
+            // Set current year in footer
+            const yearElement = document.getElementById('footerCurrentYear');
+            if (yearElement) {
+                yearElement.textContent = new Date().getFullYear();
+            }
+
+            // Smooth scroll for "Back to Privacy Policy" link in footer
+            const privacyLinkInFooter = document.querySelector('.footer-nav a[href="#top"]');
+            if (privacyLinkInFooter) {
+                privacyLinkInFooter.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                });
+            }
+
+        });
+    </script>
+
+</body>
+</html>

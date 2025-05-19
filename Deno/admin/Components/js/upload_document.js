@@ -848,23 +848,39 @@ async function handleCompiledDocumentSubmit(e) {
         let forewordAbstract = null;
         
         if (forewordFileInput && forewordFileInput.files && forewordFileInput.files.length > 0) {
-            console.log('Found foreword file:', forewordFileInput.files[0].name);
+            const forewordFile = forewordFileInput.files[0];
             
-            // Use the same path for foreword files
-            const forewordPath = compiledStoragePath;
+            try {
+                // Create a specific path for foreword files with their own subfolder
+                const baseStoragePath = compiledStoragePath;
+                const forewordPath = `${baseStoragePath}forewords/`;
             console.log(`Using foreword storage path: ${forewordPath}`);
             
-            // Create foreword-specific form data
             const forewordFormData = new FormData();
-            forewordFormData.append('file', forewordFileInput.files[0]);
+                forewordFormData.append('file', forewordFile);
             forewordFormData.append('storagePath', forewordPath);
-            forewordFormData.append('document_type', documentType);
+                forewordFormData.append('document_type', documentType.toUpperCase());
+                forewordFormData.append('category', category);
+                forewordFormData.append('is_foreword', 'true'); // Flag to indicate this is a foreword file
+                
+                // First ensure the directory exists using direct API call
+                console.log(`Ensuring foreword directory exists: ${forewordPath}`);
+                await fetch('/api/ensure-directory', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        path: forewordPath,
+                        force: true,
+                        createParents: true 
+                    })
+                });
             
-            // Create the foreword directory
-            await ensureDirectoriesExist(forewordPath);
-            console.log(`Foreword directory ensured: ${forewordPath}`);
-            
-            // Upload the foreword file
+                // Wait a moment to ensure directory creation completes
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                console.log('Attempting to upload foreword file...');
             const forewordFileResponse = await fetch('/api/upload', {
                 method: 'POST',
                 body: forewordFormData
@@ -899,10 +915,10 @@ async function handleCompiledDocumentSubmit(e) {
                 console.log('Uploaded foreword file to:', forewordFilePath);
                 
                 // Try to extract abstract from foreword file
-                if (forewordFileInput.files[0].type === 'application/pdf') {
+                    if (forewordFile.type === 'application/pdf') {
                     try {
                         console.log('Extracting abstract from foreword PDF...');
-                        forewordAbstract = await extractPDFAbstractPromise(forewordFileInput.files[0]);
+                            forewordAbstract = await extractPDFAbstractPromise(forewordFile);
                         console.log('Foreword abstract extracted:', forewordAbstract?.substring(0, 100) + '...');
                     } catch (extractionError) {
                         console.error('Error extracting foreword abstract:', extractionError);
@@ -915,6 +931,11 @@ async function handleCompiledDocumentSubmit(e) {
                         console.log('Using server-extracted foreword abstract:', forewordAbstract?.substring(0, 100) + '...');
                     }
                 }
+                }
+            } catch (error) {
+                console.error('Error handling foreword file:', error);
+                forewordFilePath = null;
+                forewordAbstract = null;
             }
         } else {
             console.log('No foreword file found');
