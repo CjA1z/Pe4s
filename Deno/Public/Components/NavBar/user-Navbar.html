@@ -649,9 +649,9 @@
                     </div>
                     <div class="hidden md:block">
                         <div class="ml-10 flex items-baseline space-x-4">
-                            <a href="#" class="nav-link-desktop text-gray-700 px-3 py-2 rounded-md text-sm font-medium">Home</a>
-                            <a href="#" class="nav-link-desktop text-gray-700 px-3 py-2 rounded-md text-sm font-medium">About</a>
-                            <a href="#" class="nav-link-desktop text-gray-700 px-3 py-2 rounded-md text-sm font-medium">Contact</a>
+                            <a href="#" class="nav-link-desktop text-gray-700 px-3 py-2 rounded-md text-sm font-medium"></a>
+                            <a href="#" class="nav-link-desktop text-gray-700 px-3 py-2 rounded-md text-sm font-medium"></a>
+                            <a href="#" class="nav-link-desktop text-gray-700 px-3 py-2 rounded-md text-sm font-medium"></a>
                         </div>
                     </div>
                 </div>
@@ -1256,39 +1256,95 @@
         // Make this function available in the global scope
         window.createProfileBadge = createProfileBadge;
         
+        console.log("Creating profile badge with user data:", user);
+        
         const profileBadgeContainer = document.createElement('div'); 
         profileBadgeContainer.id = 'profile-badge-container-dynamic'; 
         profileBadgeContainer.className = 'relative inline-block text-left'; 
         const button = document.createElement('button');
         button.type = 'button';
         button.id = 'profile-badge-button';
-        button.className = 'flex items-center justify-center w-10 h-10 bg-green-600 rounded-full hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white focus:ring-green-600 profile-initials text-lg select-none'; 
+        button.className = 'flex items-center justify-center w-10 h-10 bg-green-600 rounded-full hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white focus:ring-green-600 profile-initials text-lg select-none overflow-hidden'; 
+        button.style.borderRadius = '50%'; // Force circular shape
         button.setAttribute('aria-expanded', 'false');
         button.setAttribute('aria-haspopup', 'true');
         
-        // Generate initials - prioritize first_name from database
-        let initials = '??';
-        if (user.first_name && user.last_name) {
-            initials = user.first_name.charAt(0) + user.last_name.charAt(0);
-        } else if (user.first_name) {
-            initials = user.first_name.charAt(0) + (user.middle_name ? user.middle_name.charAt(0) : '');
-        } else if (user.name) {
-            const parts = user.name.split(' ');
-            if (parts.length > 1) {
-                initials = parts[0].charAt(0) + parts[parts.length-1].charAt(0);
-            } else {
-                initials = user.name.substring(0, 2);
-            } 
-        } else if (user.username) {
-            const parts = user.username.split(' ');
-            if (parts.length > 1) {
-                initials = parts[0].charAt(0) + parts[parts.length-1].charAt(0);
-            } else {
-                initials = user.username.substring(0, 2);
+        // Check for profile picture in different possible property names
+        const profilePicture = user.profilePicture || user.profile_picture || null;
+        console.log("Profile picture in createProfileBadge:", profilePicture);
+        
+        // Check if we have a profile picture
+        if (profilePicture) {
+            // Use profile picture from database
+            const imgElement = document.createElement('img');
+            // Ensure URL has leading slash if needed
+            imgElement.src = profilePicture.startsWith('/') ? profilePicture : `/${profilePicture}`;
+            imgElement.className = 'w-full h-full object-cover';
+            imgElement.alt = 'Profile';
+            imgElement.style.borderRadius = '50%';  // Force circular shape
+            
+            console.log("Adding profile picture to badge:", imgElement.src);
+            
+            // If image fails to load, fall back to initials
+            imgElement.onerror = function() {
+                console.error("Failed to load profile picture in createProfileBadge, falling back to initials");
+                this.style.display = 'none';
+                
+                // Generate initials
+                let initials = '??';
+                if (user.first_name && user.last_name) {
+                    initials = user.first_name.charAt(0) + user.last_name.charAt(0);
+                } else if (user.first_name) {
+                    initials = user.first_name.charAt(0) + (user.middle_name ? user.middle_name.charAt(0) : '');
+                } else if (user.name) {
+                    const parts = user.name.split(' ');
+                    if (parts.length > 1) {
+                        initials = parts[0].charAt(0) + parts[parts.length-1].charAt(0);
+                    } else {
+                        initials = user.name.substring(0, 2);
+                    } 
+                } else if (user.username) {
+                    const parts = user.username.split(' ');
+                    if (parts.length > 1) {
+                        initials = parts[0].charAt(0) + parts[parts.length-1].charAt(0);
+                    } else {
+                        initials = user.username.substring(0, 2);
+                    }
+                }
+                
+                const initialsSpan = document.createElement('span');
+                initialsSpan.className = 'text-white font-medium';
+                initialsSpan.textContent = initials.toUpperCase();
+                button.appendChild(initialsSpan);
+            };
+            
+            button.appendChild(imgElement);
+        } else {
+            // Generate initials - prioritize first_name from database
+            let initials = '??';
+            if (user.first_name && user.last_name) {
+                initials = user.first_name.charAt(0) + user.last_name.charAt(0);
+            } else if (user.first_name) {
+                initials = user.first_name.charAt(0) + (user.middle_name ? user.middle_name.charAt(0) : '');
+            } else if (user.name) {
+                const parts = user.name.split(' ');
+                if (parts.length > 1) {
+                    initials = parts[0].charAt(0) + parts[parts.length-1].charAt(0);
+                } else {
+                    initials = user.name.substring(0, 2);
+                } 
+            } else if (user.username) {
+                const parts = user.username.split(' ');
+                if (parts.length > 1) {
+                    initials = parts[0].charAt(0) + parts[parts.length-1].charAt(0);
+                } else {
+                    initials = user.username.substring(0, 2);
+                }
             }
+            
+            button.innerHTML = `<span class="text-white font-medium">${initials.toUpperCase()}</span>`;
         }
         
-        button.innerHTML = `<span class="text-white font-medium">${initials.toUpperCase()}</span>`;
         button.addEventListener('click', (event) => { 
             event.stopPropagation(); 
             toggleDropdown(); 
@@ -1347,6 +1403,8 @@
         // Make this function available in the global scope
         window.createMobileProfileSection = createMobileProfileSection;
 
+        console.log("Creating mobile profile section with user data:", user);
+        
         // Generate initials - prioritize first_name from database
         let initials = '??';
         if (user.first_name && user.last_name) {
@@ -1373,28 +1431,67 @@
         const displayName = user.first_name || user.name || user.username || 'User';
         const emailDisplay = user.email || '';
         
+        // Check for profile picture in different possible property names
+        const profilePicture = user.profilePicture || user.profile_picture || null;
+        console.log("Mobile profile picture:", profilePicture);
+        
         const section = document.createElement('div');
-        section.innerHTML = `
-            <div class="flex items-center px-5">
-                <div class="flex-shrink-0">
-                    <div class="flex items-center justify-center w-10 h-10 bg-green-600 rounded-full profile-initials text-lg select-none">
-                        <span class="text-white font-medium">${initials.toUpperCase()}</span>
+        
+        // Create the profile HTML based on whether we have a profile picture
+        if (profilePicture) {
+            // With profile picture
+            const imgSrc = profilePicture.startsWith('/') ? profilePicture : `/${profilePicture}`;
+            const fallbackHTML = `<div class='flex items-center justify-center w-10 h-10 bg-green-600 rounded-full profile-initials text-lg select-none'><span class='text-white font-medium'>${initials.toUpperCase()}</span></div>`;
+            
+            section.innerHTML = `
+                <div class="flex items-center px-5">
+                    <div class="flex-shrink-0">
+                        <div class="w-10 h-10 rounded-full overflow-hidden" style="border-radius: 50% !important;">
+                            <img src="${imgSrc}" 
+                                 class="w-full h-full object-cover" 
+                                 style="border-radius: 50% !important;"
+                                 alt="Profile"
+                                 onerror="this.onerror=null; this.parentNode.innerHTML='${fallbackHTML}';">
+                        </div>
+                    </div>
+                    <div class="ml-3">
+                        <div id="user-full-name" class="text-base font-medium leading-none text-gray-800">${displayName}</div>
+                        <div id="user-email" class="text-sm font-medium leading-none text-gray-500">${emailDisplay}</div>
                     </div>
                 </div>
-                <div class="ml-3">
-                    <div id="user-full-name" class="text-base font-medium leading-none text-gray-800">${displayName}</div>
-                    <div id="user-email" class="text-sm font-medium leading-none text-gray-500">${emailDisplay}</div>
+                <div class="mt-3 px-2 space-y-1">
+                    <a href="/pages/userProfile.html" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-amber-100 hover:text-green-800">Profile</a>
+                    <a href="/pages/userHistory.html" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-amber-100 hover:text-green-800">History</a>
+                    <a href="/pages/savedDocuments.html" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-amber-100 hover:text-green-800">
+                        Library ${user.libraryCount > 0 ? `<span class="ml-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-green-800">${user.libraryCount}</span>` : ''}
+                    </a>
+                    <button type="button" id="logout-button-mobile" class="w-full text-left block px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-red-200 hover:text-red-800">Log Out</button>
                 </div>
-            </div>
-            <div class="mt-3 px-2 space-y-1">
-                <a href="/pages/userProfile.html" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-amber-100 hover:text-green-800">Profile</a>
-                <a href="/pages/userHistory.html" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-amber-100 hover:text-green-800">History</a>
-                <a href="/pages/savedDocuments.html" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-amber-100 hover:text-green-800">
-                    Library ${user.libraryCount > 0 ? `<span class="ml-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-green-800">${user.libraryCount}</span>` : ''}
-                </a>
-                <button type="button" id="logout-button-mobile" class="w-full text-left block px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-red-200 hover:text-red-800">Log Out</button>
-            </div>
-        `;
+            `;
+        } else {
+            // With initials
+            section.innerHTML = `
+                <div class="flex items-center px-5">
+                    <div class="flex-shrink-0">
+                        <div class="flex items-center justify-center w-10 h-10 bg-green-600 rounded-full profile-initials text-lg select-none">
+                            <span class="text-white font-medium">${initials.toUpperCase()}</span>
+                        </div>
+                    </div>
+                    <div class="ml-3">
+                        <div id="user-full-name" class="text-base font-medium leading-none text-gray-800">${displayName}</div>
+                        <div id="user-email" class="text-sm font-medium leading-none text-gray-500">${emailDisplay}</div>
+                    </div>
+                </div>
+                <div class="mt-3 px-2 space-y-1">
+                    <a href="/pages/userProfile.html" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-amber-100 hover:text-green-800">Profile</a>
+                    <a href="/pages/userHistory.html" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-amber-100 hover:text-green-800">History</a>
+                    <a href="/pages/savedDocuments.html" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-amber-100 hover:text-green-800">
+                        Library ${user.libraryCount > 0 ? `<span class="ml-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-green-800">${user.libraryCount}</span>` : ''}
+                    </a>
+                    <button type="button" id="logout-button-mobile" class="w-full text-left block px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-red-200 hover:text-red-800">Log Out</button>
+                </div>
+            `;
+        }
         return section;
     }
 
@@ -2116,6 +2213,23 @@
             }
         };
 
+        // Debug profile picture data
+        console.log("formatUserData received profile picture data:", {
+            profile_picture: user.profile_picture || "not set",
+            profilePicture: user.profilePicture || "not set",
+            profilePictureUrl: user.profilePictureUrl || "not set"
+        });
+
+        // Find the profile picture URL from any of the possible properties
+        let profilePic = null;
+        if (user.profile_picture) profilePic = user.profile_picture;
+        else if (user.profilePicture) profilePic = user.profilePicture;
+        else if (user.profilePictureUrl) profilePic = user.profilePictureUrl;
+        
+        if (profilePic) {
+            console.log("Formatted user data will include profile picture:", profilePic);
+        }
+
         // Create formatted user object
         return {
             id: user.id || user.username || 'unknown',
@@ -2125,11 +2239,21 @@
             role: user.role || 'USER',
             libraryCount: user.library_count || user.libraryCount || 0,
             isAdmin: (user.role || '').toUpperCase() === 'ADMIN',
+            // Include all possible profile picture fields for maximum compatibility
+            profilePicture: profilePic,
+            profile_picture: profilePic,
+            profilePictureUrl: profilePic
         };
     }
     
     async function updateUIForAuthenticatedUser(user) {
         console.log("Updating UI for authenticated user:", user);
+        
+        // Debug logging for profile picture
+        console.log("DEBUG: Profile picture available:", user.profilePicture ? "YES" : "NO");
+        if (user.profilePicture) {
+            console.log("DEBUG: Profile picture URL:", user.profilePicture);
+        }
         
         // Update user profile elements if they exist
         if (userAuthContainer) {

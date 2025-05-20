@@ -12,6 +12,7 @@ import { DocumentModel } from "../models/documentModel.ts";
 import { UserDocumentHistoryModel } from "../models/userDocumentHistoryModel.ts";
 import { verifySessionToken } from "../utils/sessionUtils.ts";
 import { client } from "../db/denopost_conn.ts";
+import { SystemLogsModel } from "../models/systemLogsModel.ts";
 
 // Document route handlers
 const getDocuments = async (ctx: RouterContext<any, any, any>) => {
@@ -668,8 +669,60 @@ const downloadDocument = async (ctx: RouterContext<any, any, any>) => {
             
             if (success) {
                 console.log(`✅ Download recorded for user ${sessionData.id}, document ${id}`);
+                
+                // Get document title if possible for better logging
+                let documentTitle = "Unknown";
+                try {
+                    const docInfo = await DocumentModel.getDocumentById(parseInt(id));
+                    documentTitle = docInfo?.title || `Document ${id}`;
+                } catch (docError) {
+                    console.warn(`⚠️ Could not retrieve document title for logging: ${docError.message}`);
+                }
+                
+                // Log the download to system logs
+                try {
+                    await SystemLogsModel.createLog({
+                        log_type: 'download',
+                        user_id: sessionData.id,
+                        username: sessionData.username || sessionData.id,
+                        action: 'Document download',
+                        details: {
+                            document_id: id,
+                            document_title: documentTitle,
+                            timestamp: new Date().toISOString(),
+                            file_path: filePath,
+                            file_name: filePath.split('/').pop() || filePath.split('\\').pop() || ''
+                        },
+                        ip_address: ctx.request.ip || 'Unknown',
+                        status: 'success',
+                        related_id: id
+                    });
+                } catch (logError) {
+                    console.error("Failed to log document download:", logError);
+                    // Non-critical error, continue with download
+                }
             } else {
                 console.warn(`⚠️ Failed to record download for user ${sessionData.id}, document ${id}`);
+                
+                // Log the failed download
+                try {
+                    await SystemLogsModel.createLog({
+                        log_type: 'download',
+                        user_id: sessionData.id,
+                        username: sessionData.username || sessionData.id,
+                        action: 'Failed document download',
+                        details: {
+                            document_id: id,
+                            timestamp: new Date().toISOString(),
+                            reason: 'Database recording failed'
+                        },
+                        ip_address: ctx.request.ip || 'Unknown',
+                        status: 'failed',
+                        related_id: id
+                    });
+                } catch (logError) {
+                    console.error("Failed to log failed document download:", logError);
+                }
             }
             
         } catch (error) {

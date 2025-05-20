@@ -6,8 +6,10 @@ export interface DocumentOptions {
   limit?: number;
   category?: string | null;
   search?: string | null;
+  keyword?: string | null;
   sort?: string;
   order?: string;
+  docTypes?: string; // Add docTypes option to filter by document type (all, compiled, single)
 }
 
 export interface Document {
@@ -102,8 +104,10 @@ export async function fetchDocuments(
       limit = 10,
       category = null,
       search = null,
+      keyword = null,
       sort = 'id',
       order = 'ASC',
+      docTypes = 'all', // Default to showing all document types
     } = options;
     
     // Build the parameters array
@@ -133,62 +137,150 @@ export async function fetchDocuments(
       paramIndex++;
     }
     
+    // For keyword filtering
+    let keywordWhereClause = '';
+    if (keyword) {
+      keywordWhereClause = `AND (
+        EXISTS (
+          SELECT 1 FROM research_agenda ra 
+          JOIN document_research_agenda dra ON ra.id = dra.research_agenda_id
+          WHERE dra.document_id = d.id AND ra.name ILIKE $${paramIndex}
+        )
+      )`;
+      params.push(`%${keyword}%`);
+      paramIndex++;
+    }
+    
     // For category filtering in documents
     let categoryDocWhereClause = '';
     if (category && category !== 'All') {
-      // Use text comparison instead of direct type casting
-      categoryDocWhereClause = `AND LOWER((d.document_type)::TEXT) = LOWER($${paramIndex})`;
-      params.push(category);
-      paramIndex++;
+      // Check if it's a comma-separated list of categories
+      if (category.includes(',')) {
+        const categories = category.split(',').map(c => c.trim());
+        
+        // Create a parameterized IN condition for multiple categories
+        const placeholders = categories.map((_, i) => `$${paramIndex + i}`).join(',');
+        categoryDocWhereClause = `AND LOWER((d.document_type)::TEXT) IN (${placeholders})`;
+        
+        // Add each category as a parameter
+        categories.forEach(cat => {
+          params.push(cat.toLowerCase());
+          paramIndex++;
+        });
+      } else {
+        // Single category - use the existing approach
+        categoryDocWhereClause = `AND LOWER((d.document_type)::TEXT) = LOWER($${paramIndex})`;
+        params.push(category);
+        paramIndex++;
+      }
     }
     
     // For category filtering in compiled documents
     let categoryCompWhereClause = '';
     if (category && category !== 'All') {
-      // Use text comparison without direct type casting
-      categoryCompWhereClause = `AND (LOWER((cd.category)::TEXT) = LOWER($${paramIndex-1}) OR cd.category ILIKE $${paramIndex})`;
-      // Only add a new parameter for the LIKE clause
-      params.push(`%${category}%`);
-      paramIndex++;
+      // Check if it's a comma-separated list of categories
+      if (category.includes(',')) {
+        const categories = category.split(',').map(c => c.trim());
+        
+        // Create a parameterized condition for multiple categories
+        const placeholders = [];
+        const likeParams = [];
+        
+        for (let i = 0; i < categories.length; i++) {
+          // Add exact match and like match placeholders for each category
+          placeholders.push(`LOWER((cd.category)::TEXT) = $${paramIndex + i}`);
+          placeholders.push(`cd.category ILIKE $${paramIndex + categories.length + i}`);
+          
+          // Add parameters for exact match and like match
+          params.push(categories[i].toLowerCase());
+          likeParams.push(`%${categories[i]}%`);
+        }
+        
+        // Combine placeholders with OR
+        categoryCompWhereClause = `AND (${placeholders.join(' OR ')})`;
+        
+        // Add like parameters
+        params.push(...likeParams);
+        paramIndex += categories.length * 2;
+      } else {
+        // Single category - use the existing approach
+        categoryCompWhereClause = `AND (LOWER((cd.category)::TEXT) = LOWER($${paramIndex}) OR cd.category ILIKE $${paramIndex+1})`;
+        params.push(category.toLowerCase());
+        params.push(`%${category}%`);
+        paramIndex += 2;
+      }
     }
     
-    // Combined query using UNION ALL to fetch both document types in a single query
-    // WITH SORTING AND PAGINATION applied to the combined result set
-    const query = `
-      WITH combined_docs AS (
+    // Determine which document types to include based on docTypes parameter
+    let includeRegularDocs = true;
+    let includeCompiledDocs = true;
+    
+    if (docTypes === 'compiled') {
+      includeRegularDocs = false;
+      includeCompiledDocs = true;
+      console.log('[DB] Filtering to show only compiled documents');
+    } else if (docTypes === 'single') {
+      includeRegularDocs = true;
+      includeCompiledDocs = false;
+      console.log('[DB] Filtering to show only single documents');
+    } else {
+      // Default is 'all' - show both types
+      includeRegularDocs = true;
+      includeCompiledDocs = true;
+      console.log('[DB] Showing all document types (single and compiled)');
+    }
+    
+    // Build the query dynamically based on document types to include
+    let combinedDocsQuery = 'WITH combined_docs AS (';
+    
+    // Include regular documents if requested
+    if (includeRegularDocs) {
+      combinedDocsQuery += `
         -- Regular documents that are not children of compilations
-      SELECT 
-        d.id, 
-          COALESCE(d.title, 'Untitled Document')::TEXT as title,
-          COALESCE(d.description, '')::TEXT as description,
-        d.publication_date, 
-        (d.document_type)::TEXT as document_type,
-          COALESCE(d.volume, '')::TEXT as volume,
-          COALESCE(d.issue, '')::TEXT as issue,
-          NULL as start_year,
-          NULL as end_year,
-          'document'::TEXT as doc_source,
-          false as is_parent,
-          false as is_compiled,
-          d.compiled_parent_id as parent_id,
-          (
-            SELECT COUNT(*) 
-            FROM compiled_document_items cdi 
-            WHERE cdi.compiled_document_id = d.id
-          )::BIGINT as child_count,
-          d.deleted_at
-      FROM 
-        documents d
-      WHERE 
-          -- Only include documents without compiled_parent_id for main document list
-          d.compiled_parent_id IS NULL
-          -- Exclude archived documents
-          AND d.deleted_at IS NULL
-          ${categoryDocWhereClause}
-          ${searchWhereClause}
-          
+        SELECT 
+          d.id, 
+            COALESCE(d.title, 'Untitled Document')::TEXT as title,
+            COALESCE(d.description, '')::TEXT as description,
+          d.publication_date, 
+          (d.document_type)::TEXT as document_type,
+            COALESCE(d.volume, '')::TEXT as volume,
+            COALESCE(d.issue, '')::TEXT as issue,
+            NULL as start_year,
+            NULL as end_year,
+            'document'::TEXT as doc_source,
+            false as is_parent,
+            false as is_compiled,
+            d.compiled_parent_id as parent_id,
+            (
+              SELECT COUNT(*) 
+              FROM compiled_document_items cdi 
+              WHERE cdi.compiled_document_id = d.id
+            )::BIGINT as child_count,
+            d.deleted_at
+        FROM 
+          documents d
+        WHERE 
+            -- Only include documents without compiled_parent_id for main document list
+            d.compiled_parent_id IS NULL
+            -- Exclude archived documents
+            AND d.deleted_at IS NULL
+            
+            ${searchWhereClause}
+            ${keywordWhereClause}
+            ${categoryDocWhereClause}
+      `;
+    }
+    
+    // Add UNION ALL if including both document types
+    if (includeRegularDocs && includeCompiledDocs) {
+      combinedDocsQuery += `
         UNION ALL
-        
+      `;
+    }
+    
+    // Include compiled documents if requested
+    if (includeCompiledDocs) {
+      combinedDocsQuery += `
         -- Compiled documents from the compiled_documents table directly
         SELECT
           cd.id,
@@ -223,51 +315,44 @@ export async function fetchDocuments(
           compiled_documents cd
         WHERE 
           cd.deleted_at IS NULL ${categoryCompWhereClause}
-      ),
+      `;
+    }
+    
+    // Close the CTE
+    combinedDocsQuery += `),`;
+    
+    // Complete the query with count and ordering
+    const fullQuery = `
+      ${combinedDocsQuery}
       count_query AS (
-        -- Count total documents, but count compiled documents as a single document
-        -- and exclude child documents that are part of compilations
-        SELECT 
-          (
-            -- Count regular documents that are NOT children of compilations
-            SELECT COUNT(*) 
-            FROM documents d
-            WHERE d.compiled_parent_id IS NULL
-              AND d.deleted_at IS NULL
-              ${category && category !== 'All' ? `AND LOWER((d.document_type)::TEXT) = LOWER('${category}')` : ''}
-              -- Exclude documents that are part of compilations
-              AND NOT EXISTS (
-                SELECT 1 
-                FROM compiled_document_items cdi 
-                WHERE cdi.document_id = d.id
-              )
-          ) + (
-            -- Count compiled documents from compiled_documents table
-            SELECT COUNT(*) 
-            FROM compiled_documents cd
-            WHERE cd.deleted_at IS NULL
-              ${category && category !== 'All' ? `AND (LOWER((cd.category)::TEXT) = LOWER('${category}') OR cd.category ILIKE '%${category}%')` : ''}
-          ) as total_count
+        SELECT COUNT(*) as total_count FROM combined_docs
       )
-      -- Main query with sorting and pagination applied to the combined result
       SELECT 
-        cd.*, 
-        cq.total_count
+        cd.*,
+        (SELECT total_count FROM count_query) as total_count
       FROM 
-        combined_docs cd,
-        count_query cq
+        combined_docs cd
       ORDER BY 
-        ${sortField} ${sortOrder} NULLS LAST,
-        title ASC
-      LIMIT ${limit} OFFSET ${(page - 1) * limit}
+        ${sortField} ${sortOrder} NULLS LAST, id ASC
+      LIMIT $${paramIndex} OFFSET $${paramIndex+1}
     `;
     
-    console.log(`[DB] Executing combined query with params:`, params);
-    // Output full SQL for debugging
-    console.log(`[DB] FULL SQL QUERY:\n${query}`);
+    // Add pagination parameters
+    params.push(limit, (page - 1) * limit);
     
-    const result = await client.queryObject(query, params);
+    console.log(`[DB] Executing query with ${params.length} parameters`);
+    
+    // Execute the query
+    const result = await client.queryObject(fullQuery, params);
+    
     console.log(`[DB] Query returned ${result.rowCount} rows`);
+    
+    // Check and log how many compiled and single documents were returned
+    if (result.rows && result.rows.length > 0) {
+      const compiledCount = result.rows.filter((row: any) => row.is_compiled === true).length;
+      const singleCount = result.rows.filter((row: any) => row.is_compiled !== true).length;
+      console.log(`[DB] Document type breakdown: ${compiledCount} compiled, ${singleCount} single documents`);
+    }
     
     // Check the first few results for deleted_at values
     if (result.rows && result.rows.length > 0) {
@@ -339,7 +424,7 @@ export async function fetchDocuments(
         issue: row.issue || '',
         authors: [],
         topics: [],
-        is_compiled: row.is_parent === true,
+        is_compiled: row.is_compiled === true || row.is_parent === true,
         child_count: parseInt(String(row.child_count || '0'), 10),
         parent_compiled_id: row.parent_id,
         start_year: row.start_year ? parseInt(String(row.start_year), 10) : undefined,
@@ -354,6 +439,9 @@ export async function fetchDocuments(
         console.warn(`[DB] WARNING: Document ${doc.id} has deleted_at=${row.deleted_at} but is still included in results!`);
       }
       
+      // Log document type information to help debug the UI display
+      console.log(`[DB] Document ${doc.id} type info: is_parent=${row.is_parent}, is_compiled=${doc.is_compiled}, doc_source=${row.doc_source}`);
+      
       // Add a doc_type property for frontend compatibility
       (doc as any).doc_type = row.document_type || '';
       
@@ -363,44 +451,46 @@ export async function fetchDocuments(
         continue;
       }
       
-      // Fetch authors for this document if it's not a compiled document
-      if (row.doc_source === 'document') {
-        try {
-          const authorsQuery = `
-            SELECT a.id, a.full_name
-            FROM authors a
-            JOIN document_authors da ON a.id = da.author_id
-            WHERE da.document_id = $1
-          `;
-          const authorsResult = await client.queryObject(authorsQuery, [doc.id]);
-          
-          doc.authors = authorsResult.rows.map((author: any) => ({
-            id: author.id,
-            full_name: author.full_name || '',
-          }));
-        } catch (error) {
-          console.error(`[DB] Error fetching authors for document ${doc.id}:`, error);
-          doc.authors = [];
-        }
+      // Fetch authors for this document - for ALL document types
+      try {
+        console.log(`[DB] Fetching authors for document ${doc.id} (${doc.title})`);
+        const authorsQuery = `
+          SELECT a.id, a.full_name
+          FROM authors a
+          JOIN document_authors da ON a.id = da.author_id
+          WHERE da.document_id = $1
+        `;
+        const authorsResult = await client.queryObject(authorsQuery, [doc.id]);
         
-        // Fetch topics for this document
-        try {
-          const topicsQuery = `
-            SELECT ra.id, ra.name
-            FROM research_agenda ra
-            JOIN document_research_agenda dra ON ra.id = dra.research_agenda_id
-            WHERE dra.document_id = $1
-          `;
-          const topicsResult = await client.queryObject(topicsQuery, [doc.id]);
-          
-          doc.topics = topicsResult.rows.map((topic: any) => ({
-            id: topic.id,
-            name: topic.name || '',
-          }));
-        } catch (error) {
-          console.error(`[DB] Error fetching topics for document ${doc.id}:`, error);
-          doc.topics = [];
-        }
+        doc.authors = authorsResult.rows.map((author: any) => ({
+          id: author.id,
+          full_name: author.full_name || '',
+        }));
+        
+        console.log(`[DB] Found ${doc.authors.length} authors for document ${doc.id}:`, 
+          doc.authors.map((author: any) => author.full_name || 'unnamed').join(', '));
+      } catch (error) {
+        console.error(`[DB] Error fetching authors for document ${doc.id}:`, error);
+        doc.authors = [];
+      }
+      
+      // Fetch topics for this document - for ALL document types 
+      try {
+        const topicsQuery = `
+          SELECT ra.id, ra.name
+          FROM research_agenda ra
+          JOIN document_research_agenda dra ON ra.id = dra.research_agenda_id
+          WHERE dra.document_id = $1
+        `;
+        const topicsResult = await client.queryObject(topicsQuery, [doc.id]);
+        
+        doc.topics = topicsResult.rows.map((topic: any) => ({
+          id: topic.id,
+          name: topic.name || '',
+        }));
+      } catch (error) {
+        console.error(`[DB] Error fetching topics for document ${doc.id}:`, error);
+        doc.topics = [];
       }
       
       documents.push(doc);

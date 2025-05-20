@@ -10,6 +10,7 @@ interface User {
   email?: string;
   role_id?: number;
   created_at?: Date;
+  profile_picture?: string;
 }
 
 /**
@@ -31,7 +32,7 @@ export const getCurrentUser = async (ctx: Context) => {
     }
     
     const result = await client.queryObject(
-      `SELECT id, first_name, middle_name, last_name, email, role_id, created_at
+      `SELECT id, first_name, middle_name, last_name, email, role_id, created_at, profile_picture
        FROM users 
        WHERE id = $1`,
       [userId]
@@ -77,7 +78,7 @@ export const getUserById = async (ctx: Context) => {
     }
     
     const result = await client.queryObject(
-      `SELECT id, first_name, middle_name, last_name, email, role_id, created_at
+      `SELECT id, first_name, middle_name, last_name, email, role_id, created_at, profile_picture
        FROM users 
        WHERE id = $1`,
       [id]
@@ -124,7 +125,7 @@ export const handleGetUserProfile = async (req: Request): Promise<Response> => {
     }
     
     const result = await client.queryObject(
-      `SELECT id, first_name, middle_name, last_name, email, role_id, created_at
+      `SELECT id, first_name, middle_name, last_name, email, role_id, created_at, profile_picture
        FROM users 
        WHERE id = $1`,
       [userId]
@@ -139,7 +140,14 @@ export const handleGetUserProfile = async (req: Request): Promise<Response> => {
       });
     }
     
-    const userData = result.rows[0];
+    // Define a type for the user data
+    interface UserRecord extends User {
+      library_count?: number;
+      [key: string]: unknown;
+    }
+    
+    // Type userData correctly
+    const userData = result.rows[0] as UserRecord;
     
     // Get the user's library count
     try {

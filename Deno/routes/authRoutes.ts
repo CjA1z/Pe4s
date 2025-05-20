@@ -1,6 +1,7 @@
 import { Route } from "./index.ts";
 import { RouterContext } from "../deps.ts";
 import * as sessionService from "../services/sessionService.ts";
+import { SystemLogsModel } from "../models/systemLogsModel.ts";
 
 // Create a function to get server start time without creating circular imports
 let cachedServerStartTime: number | null = null;
@@ -133,6 +134,26 @@ const login = async (ctx: RouterContext<any, any, any>) => {
         message: "Invalid credentials or user does not exist", 
         error: "Authentication failed" 
       };
+      
+      // Log the failed login attempt to system logs
+      try {
+        await SystemLogsModel.createLog({
+          log_type: 'login',
+          username: userId,
+          action: 'Failed login attempt',
+          details: {
+            reason: 'Invalid credentials or user not found',
+            timestamp: new Date().toISOString(),
+            browser: ctx.request.headers.get('user-agent') || 'Unknown',
+            ip: ctx.request.ip || 'Unknown'
+          },
+          ip_address: ctx.request.ip || 'Unknown',
+          status: 'failed'
+        });
+      } catch (logError) {
+        console.error("Failed to log failed login attempt:", logError);
+      }
+      
       return;
     }
     
@@ -198,6 +219,26 @@ const login = async (ctx: RouterContext<any, any, any>) => {
     
     // Log the user login with role information
     console.log(`User login: ${userId} (${userRole}) logged in at ${new Date().toISOString()}`);
+    
+    // Log the successful login to the system logs
+    try {
+      await SystemLogsModel.createLog({
+        log_type: 'login',
+        user_id: String(userId),
+        username: String(userId),
+        action: 'User login',
+        details: {
+          role: userRole,
+          timestamp: new Date().toISOString(),
+          browser: ctx.request.headers.get('user-agent') || 'Unknown',
+          ip: ctx.request.ip || 'Unknown'
+        },
+        ip_address: ctx.request.ip || 'Unknown',
+        status: 'success'
+      });
+    } catch (logError) {
+      console.error("Failed to log successful login:", logError);
+    }
     
     // Additional logging based on user role
     const lowerRole = String(userRole).toLowerCase();

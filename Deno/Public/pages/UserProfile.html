@@ -30,6 +30,30 @@
             --card-shadow-hover-color: rgba(0, 106, 78, 0.12);
             --muted-text-color: #6b7280; /* Tailwind gray-500 */
         }
+        
+        /* Ensure profile pictures are always circular */
+        #profile-badge-button,
+        #profile-badge-button img,
+        .profile-badge-button,
+        .profile-badge-button img,
+        .rounded-full img,
+        .w-10.h-10.rounded-full img,
+        [id*="profile-badge"] img,
+        [class*="profile-badge"] img,
+        .profile-initials img {
+            border-radius: 50% !important;
+            overflow: hidden;
+        }
+        
+        /* Ensure profile badges maintain circular shape */
+        #profile-badge-container-dynamic button,
+        .profile-badge-container button,
+        [id*="profile-badge-container"] button,
+        [class*="profile-badge-container"] button {
+            border-radius: 50% !important;
+            overflow: hidden;
+        }
+        
         body {
             font-family: 'Inter', sans-serif;
             background-image: linear-gradient(to bottom right, #fdfae8, #e6f4ea);
@@ -354,8 +378,7 @@
             <div class="image-preview-container">
                 <img id="profilePicturePreview" 
                      src="" 
-                     alt="Profile Picture"
-                     data-use-avatar="true">
+                     alt="Profile Picture">
                 <label for="profilePictureInput" class="edit-picture-hover-overlay" title="Change profile picture">
                         <i class="fas fa-camera"></i>
                         <span>Change<br>Photo</span>
@@ -371,20 +394,15 @@
                 <p id="displayEmail" class="profile-info-text">
                         <strong>Email:</strong> <span>Loading...</span>
                 </p>
+                <p id="displayUsername" class="profile-info-text">
+                        <strong>Username:</strong> <span>Loading...</span>
+                </p>
             </div>
         </div>
 
         <hr /> 
 
         <form id="profileForm" class="space-y-6 mt-6"> 
-            <div>
-                <label for="username" class="form-label">Username</label>
-                <div class="input-icon-wrapper">
-                    <input type="text" id="username" name="username" class="form-input" value="current_username">
-                    <span class="input-icon"><i class="fas fa-pencil-alt"></i></span>
-                </div>
-            </div>
-
             <div>
                 <label for="currentPassword" class="form-label">Current Password</label>
                 <div class="input-icon-wrapper">
@@ -735,19 +753,16 @@
         // Setup image error handler after the function is defined
         if (profilePicturePreview) {
             profilePicturePreview.onerror = function() {
-                if (!this.getAttribute('data-error-handled')) {
-                    this.setAttribute('data-error-handled', 'true');
-                    const name = userData?.first_name || userData?.username || 'User';
-                    this.src = generateInitialAvatar(name);
-                }
+                console.log("Profile picture failed to load, using initials avatar");
+                this.src = generatePlaceholderAvatar();
             };
         }
         
         const profilePictureInput = document.getElementById('profilePictureInput'); 
         const profileForm = document.getElementById('profileForm');
-        const usernameInput = document.getElementById('username');
         const displayUserId = document.getElementById('displayUserId').querySelector('span'); 
         const displayEmail = document.getElementById('displayEmail').querySelector('span'); 
+        const displayUsername = document.getElementById('displayUsername').querySelector('span'); 
         const currentPasswordInput = document.getElementById('currentPassword');
         const newPasswordInput = document.getElementById('newPassword');
         const confirmPasswordInput = document.getElementById('confirmPassword');
@@ -769,30 +784,41 @@
 
         // --- Helper Functions ---
         
-        // Generate an initial-based avatar for the user
-        function generateInitialAvatar(name) {
-            name = name || 'User';
-            const initial = name.charAt(0).toUpperCase();
+        // Generate an initials-based avatar similar to navbar
+        function generatePlaceholderAvatar() {
+            // Get user data from current context
+            const user = userData;
             
-            // Generate a consistent color based on the name
-            const colors = [
-                '#1abc9c', '#2ecc71', '#3498db', '#9b59b6', '#34495e',
-                '#16a085', '#27ae60', '#2980b9', '#8e44ad', '#2c3e50',
-                '#f1c40f', '#e67e22', '#e74c3c', '#95a5a6', '#f39c12',
-                '#d35400', '#c0392b', '#bdc3c7', '#7f8c8d'
-            ];
-            
-            // Hash the name to get a consistent color
-            let hash = 0;
-            for (let i = 0; i < name.length; i++) {
-                hash = name.charCodeAt(i) + ((hash << 5) - hash);
+            // Generate initials following navbar pattern
+            let initials = '';
+            if (user?.first_name && user?.last_name) {
+                initials = user.first_name.charAt(0) + user.last_name.charAt(0);
+            } else if (user?.first_name) {
+                initials = user.first_name.charAt(0);
+            } else if (user?.username) {
+                initials = user.username.charAt(0);
+            } else {
+                initials = 'U';
             }
             
-            const colorIndex = Math.abs(hash) % colors.length;
-            const bgColor = colors[colorIndex];
+            // Create colored background with initials
+            const canvas = document.createElement('canvas');
+            canvas.width = 150;
+            canvas.height = 150;
+            const ctx = canvas.getContext('2d');
             
-            // Create SVG
-            return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 150 150'%3E%3Ccircle cx='75' cy='75' r='75' fill='${encodeURIComponent(bgColor)}'/%3E%3Ctext x='50%25' y='50%25' dy='.1em' font-size='75' font-weight='bold' text-anchor='middle' dominant-baseline='middle' font-family='Arial' fill='%23FFFFFF'%3E${initial}%3C/text%3E%3C/svg%3E`;
+            // Fill with green background (matching navbar)
+            ctx.fillStyle = '#006A4E'; // var(--theme-green-dark)
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Add text
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 64px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(initials.toUpperCase(), canvas.width/2, canvas.height/2);
+            
+            return canvas.toDataURL('image/png');
         }
 
         // --- API Functions ---
@@ -838,6 +864,7 @@
                 
                 // Fetch user profile
                 const userId = userInfo.id || '';
+                console.log(`Fetching profile for user ${userId}`);
                 const response = await fetch(`${API_ENDPOINTS.profile}?userId=${userId}`, {
                     method: 'GET',
                     headers: {
@@ -863,6 +890,15 @@
                 }
                 
                 const data = await response.json();
+                console.log("User profile data from API:", data);
+                
+                // If we have a profilePictureUrl in data, log it
+                if (data.profilePictureUrl) {
+                    console.log("API returned profile picture URL:", data.profilePictureUrl);
+                } else {
+                    console.log("API did not return a profile picture URL");
+                }
+                
                 return data;
             } catch (error) {
                 console.error('Error fetching user profile:', error);
@@ -881,52 +917,6 @@
                 return null;
             } finally {
                 setLoading(false);
-            }
-        }
-        
-        // Update profile information
-        async function updateUserProfile(formData) {
-            if (!checkAuthentication()) return;
-            
-            // Get the token directly from sessionStorage
-            let userInfo;
-            try {
-                userInfo = JSON.parse(sessionStorage.getItem('userInfo'));
-                if (!userInfo || !userInfo.token || !userInfo.isLoggedIn) {
-                    throw new Error('Invalid or missing user authentication data');
-                }
-            } catch (error) {
-                console.error('Error parsing session user data:', error);
-                showMessage('Authentication error. Please log in again.', 'error');
-                return null;
-            }
-            
-            try {
-                setLoading(true);
-                // Include userId in the URL
-                const userId = userInfo.id || '';
-                const response = await fetch(`${API_ENDPOINTS.updateProfile}?userId=${userId}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Authorization': `Bearer ${userInfo.token}`
-                        // Content-Type is not set because FormData sets it automatically with boundary
-                    },
-                    body: formData
-                });
-                
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.message || `Failed to update profile: ${response.status}`);
-                }
-                
-                const data = await response.json();
-                setLoading(false);
-                return data;
-            } catch (error) {
-                console.error('Error updating profile:', error);
-                showMessage(error.message || 'Failed to update profile. Please try again.', 'error');
-                setLoading(false);
-                return null;
             }
         }
         
@@ -996,34 +986,155 @@
             }
             
             const formData = new FormData();
-            formData.append('profilePicture', imageBlob, 'profile.webp');
+            // Use PNG instead of WebP for better compatibility
+            const imageTypeToUse = 'image/png';
+            let imageToUpload;
             
             try {
-                setLoading(true);
-                // Include userId in the URL
-                const userId = userInfo.id || '';
-                const response = await fetch(`${API_ENDPOINTS.uploadProfilePicture}?userId=${userId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${userInfo.token}`
-                        // Content-Type is set automatically by FormData
-                    },
-                    body: formData
-                });
+                // Try to convert to the desired format first
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = CROPPED_IMAGE_SIZE;
+                tempCanvas.height = CROPPED_IMAGE_SIZE;
+                const ctx = tempCanvas.getContext('2d');
                 
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.message || `Failed to upload picture: ${response.status}`);
+                // Create an image from the dataURL
+                const img = new Image();
+                img.onload = function() {
+                    // Draw the image on the canvas
+                    ctx.drawImage(img, 0, 0, CROPPED_IMAGE_SIZE, CROPPED_IMAGE_SIZE);
+                    // Convert to the target format
+                    try {
+                        const formattedDataUrl = tempCanvas.toDataURL(imageTypeToUse, 0.9);
+                        imageToUpload = dataURLtoBlob(formattedDataUrl);
+                        formData.append('profilePicture', imageToUpload, `profile-image.${imageTypeToUse.split('/')[1]}`);
+                        
+                        // Continue with upload after format conversion
+                        performUpload();
+                    } catch(err) {
+                        console.error("Format conversion error:", err);
+                        // Fallback to original blob
+                        formData.append('profilePicture', imageBlob, 'profile-image.png');
+                        performUpload();
+                    }
+                };
+                img.onerror = function() {
+                    console.error("Error loading image for conversion");
+                    formData.append('profilePicture', imageBlob, 'profile-image.png');
+                    performUpload();
+                };
+                img.src = newProfilePicDataUrl;
+            } catch(convErr) {
+                console.error("Error in conversion setup:", convErr);
+                formData.append('profilePicture', imageBlob, 'profile-image.png');
+                performUpload();
+            }
+            
+            async function performUpload() {
+                console.log("Uploading profile picture, blob size:", formData.get('profilePicture').size);
+                
+                try {
+                    // Get the token directly from sessionStorage
+                    let userInfo = JSON.parse(sessionStorage.getItem('userInfo'));
+                    if (!userInfo || !userInfo.token) {
+                        throw new Error("Authentication required");
+                    }
+                    
+                    const userId = userInfo.id || '';
+                    const response = await fetch(`${API_ENDPOINTS.uploadProfilePicture}?userId=${userId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${userInfo.token}`
+                        },
+                        body: formData
+                    });
+                    
+                    if (!response.ok) {
+                        const responseText = await response.text();
+                        console.error("Error response:", responseText);
+                        throw new Error(responseText || `Upload failed with status: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    console.log("Profile picture upload response:", data);
+                    
+                    // Simple approach - directly use the URL from the server
+                    if (data.pictureUrl) {
+                        // Ensure URL has leading slash
+                        const pictureUrl = data.pictureUrl.startsWith('/') ? data.pictureUrl : '/' + data.pictureUrl;
+                        console.log("Setting profile picture to:", pictureUrl);
+                        
+                        // Clear any previous onerror handlers
+                        profilePicturePreview.onerror = function() {
+                            console.error("Failed to load profile picture from provided URL:", pictureUrl);
+                            this.src = generatePlaceholderAvatar();
+                        };
+                        
+                        // Set the image source directly
+                        profilePicturePreview.src = pictureUrl;
+                        
+                        // Update the userData object with the new profile picture URL
+                        if (userData) {
+                            userData.profilePictureUrl = pictureUrl;
+                            userData.profile_picture = pictureUrl;  // Add both versions of the field
+                            console.log("Updated userData with new picture URL:", pictureUrl);
+                        }
+                        
+                        showMessage('Profile picture updated successfully!', 'success');
+                        newProfilePicDataUrl = null;
+                        
+                        // Update the session storage with new profile picture URL
+                        try {
+                            const userInfo = JSON.parse(sessionStorage.getItem('userInfo'));
+                            if (userInfo) {
+                                userInfo.profilePictureUrl = pictureUrl;
+                                userInfo.profile_picture = pictureUrl;
+                                sessionStorage.setItem('userInfo', JSON.stringify(userInfo));
+                                console.log("Updated session storage with new profile picture URL");
+                                
+                                // Force circular shape with inline styles to override any other CSS
+                                const allBadges = document.querySelectorAll('#profile-badge-button, #profile-badge-button img');
+                                allBadges.forEach(el => {
+                                    el.style.borderRadius = '50% !important';
+                                });
+                                
+                                // Force navbar to refresh with updated profile picture
+                                if (window.NavbarModule && typeof window.NavbarModule.init === 'function') {
+                                    console.log("Refreshing navbar with new profile picture");
+                                    
+                                    // Clear any existing profile badge to force recreation
+                                    const profileBadge = document.getElementById('profile-badge-container-dynamic');
+                                    if (profileBadge) {
+                                        profileBadge.remove();
+                                        console.log("Removed existing profile badge to force recreation");
+                                    }
+                                    
+                                    // Additionally ensure the profile picture URL is updated in the user data
+                                    try {
+                                        if (window.NavbarModule.updateProfileInfo) {
+                                            window.NavbarModule.updateProfileInfo(userInfo);
+                                        }
+                                    } catch (e) {
+                                        console.error("Error updating profile info:", e);
+                                    }
+                                    
+                                    setTimeout(() => window.NavbarModule.init(), 100);
+                                }
+                            }
+                        } catch (e) {
+                            console.error("Error updating session storage:", e);
+                        }
+                        
+                        // Don't reload user data immediately, which could override the image
+                        return;
+                    } else {
+                        throw new Error("No picture URL in response");
+                    }
+                    
+                } catch (uploadError) {
+                    console.error('Error uploading profile picture:', uploadError);
+                    showMessage(`Upload failed: ${uploadError.message}`, 'error');
+                    setLoading(false);
                 }
-                
-                const data = await response.json();
-                setLoading(false);
-                return data.pictureUrl; // Return the URL of the uploaded picture
-            } catch (error) {
-                console.error('Error uploading profile picture:', error);
-                showMessage(error.message || 'Failed to upload profile picture. Please try again.', 'error');
-                setLoading(false);
-                return null;
             }
         }
         
@@ -1045,20 +1156,41 @@
             const data = await fetchUserProfile();
             if (!data) return;
             
+            console.log("loadUserData received data:", JSON.stringify(data));
+            
             userData = data;
-            usernameInput.value = data.username || '';
             displayUserId.textContent = data.id || 'N/A';
             displayEmail.textContent = data.email || 'N/A';
+            displayUsername.textContent = data.username || 'N/A';
+            
+            // Check for profile picture URL (handle different field name possibilities)
+            const profilePicUrl = data.profilePictureUrl || data.profile_picture || null;
             
             // Set profile picture if available or use initial-based avatar
-            if (data.profilePictureUrl) {
-                profilePicturePreview.src = data.profilePictureUrl;
+            if (profilePicUrl) {
+                console.log("User has profile picture URL:", profilePicUrl);
+                
+                // Simple approach using the URL directly from the server
+                profilePicturePreview.onerror = function() {
+                    console.error("Failed to load profile picture, using initials avatar");
+                    this.src = generatePlaceholderAvatar();
+                };
+                
+                // Log network attempt
+                console.log("Attempting to load profile picture from server URL");
+                
+                // Ensure URL has leading slash if needed
+                const finalUrl = profilePicUrl.startsWith('/') ? profilePicUrl : '/' + profilePicUrl;
+                console.log("Using final profile picture URL:", finalUrl);
+                
+                // Set image with simple path
+                profilePicturePreview.src = finalUrl;
+                
+                // Store the URL in userData for consistency
+                userData.profilePictureUrl = finalUrl;
             } else {
-                // Generate initial-based avatar from user's name or username
-                const name = data.first_name || data.username || 'User';
-                const initialAvatar = generateInitialAvatar(name);
-                profilePicturePreview.src = initialAvatar;
-                console.log("Using generated avatar for user:", name);
+                console.log("No profile picture URL, generating avatar");
+                profilePicturePreview.src = generatePlaceholderAvatar();
             }
             
             // Reset form fields
@@ -1196,73 +1328,65 @@
             event.preventDefault(); 
             if (isLoading) return;
             
-            const newUsername = usernameInput.value.trim();
             const currentPassword = currentPasswordInput.value; 
             const newPassword = newPasswordInput.value;
             const confirmPassword = confirmPasswordInput.value;
 
             // Validation
-            if (!newUsername) { showMessage('Username cannot be empty.', 'error'); usernameInput.focus(); return; }
-            if (newUsername.length < 3) { showMessage('Username must be at least 3 characters.', 'error'); usernameInput.focus(); return; }
-            if (newUsername.length > 50) { showMessage('Username cannot exceed 50 characters.', 'error'); usernameInput.focus(); return; }
-
-            const isChangingPassword = newPasswordFieldsContainer.classList.contains('visible') && (newPassword || confirmPassword);
+            const isChangingPassword = currentPassword && (newPassword || confirmPassword);
             
             if (isChangingPassword) {
-                if (!currentPassword) { showMessage('Please enter current password to change it.', 'error'); currentPasswordInput.focus(); return; }
-                if (newPassword.length < 8) { showMessage('New password must be at least 8 characters.', 'error'); newPasswordInput.focus(); return; }
-                if (newPassword !== confirmPassword) { showMessage('New passwords do not match.', 'error'); confirmPasswordInput.focus(); return; }
+                if (!currentPassword) { 
+                    showMessage('Please enter current password to change it.', 'error'); 
+                    currentPasswordInput.focus(); 
+                    return; 
+                }
+                if (newPassword.length < 8) { 
+                    showMessage('New password must be at least 8 characters.', 'error'); 
+                    newPasswordInput.focus(); 
+                    return; 
+                }
+                if (newPassword !== confirmPassword) { 
+                    showMessage('New passwords do not match.', 'error'); 
+                    confirmPasswordInput.focus(); 
+                    return; 
+                }
+            } else if (!newProfilePicDataUrl) {
+                showMessage('No changes to save.', 'error');
+                return;
             }
 
             try {
                 // Handle profile picture upload first if needed
-                let newPictureUrl = null;
                 if (newProfilePicDataUrl) {
                     const imageBlob = dataURLtoBlob(newProfilePicDataUrl);
                     if (imageBlob) {
-                        newPictureUrl = await uploadProfilePicture(imageBlob);
-                        if (!newPictureUrl) {
-                            // Failed to upload picture but continue with other updates
-                            showMessage('Profile picture upload failed, but continuing with other updates', 'error');
-                        }
+                        console.log("Uploading new profile picture...");
+                        await uploadProfilePicture(imageBlob);
+                        // Don't reload user data after picture upload, the picture is already displayed
+                        newProfilePicDataUrl = null; // Clear the data URL after upload
                     }
                 }
 
-                // Update profile information
-            const formData = new FormData();
-            formData.append('username', newUsername);
-                if (newPictureUrl) {
-                    formData.append('profilePictureUrl', newPictureUrl);
-                }
-
-                const profileUpdateResult = await updateUserProfile(formData);
-                if (!profileUpdateResult) {
-                    showMessage('Failed to update profile information', 'error');
-                    return;
-                }
-
                 // Update password if needed
-                let passwordUpdateSuccess = true;
-            if (isChangingPassword) {
-                    passwordUpdateSuccess = await updateUserPassword(currentPassword, newPassword);
-                }
-
-                // Final result
-                if (profileUpdateResult && passwordUpdateSuccess) {
-                    showMessage('Profile updated successfully!', 'success');
+                if (isChangingPassword) {
+                    console.log("Updating password...");
+                    const passwordUpdateSuccess = await updateUserPassword(currentPassword, newPassword);
                     
-                    // Refresh user data
-                    await loadUserData();
+                    if (passwordUpdateSuccess) {
+                        showMessage('Password updated successfully!', 'success');
                     
-                    // Reset password fields
-                    currentPasswordInput.value = ''; 
-                    newPasswordInput.value = '';
-                    confirmPasswordInput.value = '';
-                    newPasswordFieldsContainer.classList.remove('visible'); 
-                    newProfilePicDataUrl = null;
-                } else if (profileUpdateResult) {
-                    showMessage('Profile information updated, but password change failed', 'error');
+                        // Reset password fields
+                        currentPasswordInput.value = ''; 
+                        newPasswordInput.value = '';
+                        confirmPasswordInput.value = '';
+                        newPasswordFieldsContainer.classList.remove('visible'); 
+                        
+                        // Since we changed password, refresh user data
+                        await loadUserData();
+                    }
                 }
+                
             } catch (error) {
                 console.error('Error during profile update:', error);
                 showMessage('An error occurred while updating profile', 'error');
@@ -1291,13 +1415,13 @@
                 };
                 
                 // Pre-populate form with session data while we fetch from API
-                usernameInput.value = sessionUserInfo.username || '';
                 displayUserId.textContent = sessionUserInfo.id || 'N/A';
                 displayEmail.textContent = sessionUserInfo.email || 'N/A';
+                displayUsername.textContent = sessionUserInfo.username || 'N/A';
                 
                 // Generate initial avatar based on name from session
                 const name = sessionUserInfo.first_name || sessionUserInfo.username || 'User';
-                profilePicturePreview.src = generateInitialAvatar(name);
+                profilePicturePreview.src = generatePlaceholderAvatar();
                 console.log("Initial avatar generated for:", name);
             } catch (error) {
                 console.error('Error reading session data', error);
@@ -1311,3 +1435,4 @@
     </script>
 </body>
 </html>
+

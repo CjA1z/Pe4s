@@ -109,9 +109,19 @@ export async function fetchDocuments(request: Request): Promise<Response> {
     const size = parseInt(url.searchParams.get("size") || "10");
     const category = url.searchParams.get("category");
     const search = url.searchParams.get("search");
+    const keyword = url.searchParams.get("keyword");
     const sort = url.searchParams.get("sort") || "latest";
+    // Get doc_types parameter to support showing both single and compiled documents
+    const docTypes = url.searchParams.get("doc_types") || "all";
     
-    console.log(`Fetching documents with page=${page}, size=${size}, category=${category}, sort=${sort}`);
+    // Add debug logging for multiple categories
+    if (category && category.includes(',')) {
+      console.log(`Multiple categories detected: ${category}`);
+      const categories = category.split(',').map(c => c.trim());
+      console.log(`Parsed categories: [${categories.join(', ')}]`);
+    }
+    
+    console.log(`Fetching documents with page=${page}, size=${size}, category=${category}, sort=${sort}, keyword=${keyword}, doc_types=${docTypes}`);
     
     // ADDITIONAL DEBUGGING: Check if database client is available
     if (!client) {
@@ -167,11 +177,18 @@ export async function fetchDocuments(request: Request): Promise<Response> {
       limit: size,
       category,
       search,
+      keyword,
       sort: sortField,
-      order
+      order,
+      docTypes: docTypes // Pass doc_types parameter to service layer
     });
     
     console.log(`Documents fetched: ${result.documents.length} documents found`);
+    
+    // Debug log to check document types
+    const compiledDocs = result.documents.filter(doc => doc.is_compiled === true);
+    const singleDocs = result.documents.filter(doc => !doc.is_compiled);
+    console.log(`Document types breakdown: ${compiledDocs.length} compiled, ${singleDocs.length} single`);
     
     // Check if we received fewer documents than expected
     if (result.documents.length === 0 && result.totalCount > 0) {
@@ -183,7 +200,7 @@ export async function fetchDocuments(request: Request): Promise<Response> {
       ...result,
       _debug: {
         requestParams: {
-          page, size, category, sort
+          page, size, category, sort, keyword, docTypes
         },
         timestamp: new Date().toISOString(),
         source: "documentController.ts"

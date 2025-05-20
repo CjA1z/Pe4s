@@ -3,6 +3,7 @@ let currentPage = 1;
 let currentCategoryFilter = null;
 let currentSort = 'latest';
 let currentSearchQuery = '';
+let currentKeyword = '';
 let visibleEntriesCount = 0;
 
 /**
@@ -38,6 +39,31 @@ function filterByCategory(categoryName) {
         document.querySelectorAll('.category-card').forEach(btn => {
             btn.classList.toggle('active', btn.getAttribute('data-category') === categoryName);
         });
+    }
+    
+    currentPage = 1; // Reset to first page when changing filters
+    
+    // Load documents with the updated filter
+    if (window.documentList && window.documentList.loadDocuments) {
+        window.documentList.loadDocuments(1, true);
+    }
+}
+
+/**
+ * Filter documents by keyword
+ * @param {string} keyword - Keyword to filter by
+ */
+function filterByKeyword(keyword) {
+    console.log(`Filtering by keyword: ${keyword}`);
+    
+    // Update the current keyword
+    currentKeyword = keyword;
+    
+    // Update the search input to show the keyword
+    const searchInput = document.getElementById('search-documents');
+    if (searchInput) {
+        searchInput.value = keyword;
+        currentSearchQuery = keyword;
     }
     
     currentPage = 1; // Reset to first page when changing filters
@@ -298,56 +324,70 @@ function updateFilterIndicator() {
 }
 
 /**
- * Initialize filters and pagination when document list page loads
+ * Initialize filters, pagination, and check for URL parameters
  */
 function initializeFiltersAndPagination() {
-    console.log('INIT DEBUG: Initializing document filters and pagination');
+    console.log('Initializing filters and pagination');
     
     // Set up category filters
     setupCategoryFilters();
     
-    // Load categories from the API
-    loadCategories();
-    
-    // Set up sort order dropdown
+    // Set up sort order
     setupSortOrder();
     
-    // Set up pagination controls
+    // Set up pagination
     setupPaginationControls();
     
-    // Set up search functionality
+    // Set up search input
     setupSearchInput();
     
-    console.log('INIT DEBUG: Filters and pagination initialized successfully');
-    
-    // Make global access object available
-    console.log('INIT DEBUG: Creating window.documentFilters global object');
+    // Make functions available globally for external components
     window.documentFilters = {
-        initializeFiltersAndPagination,
-        updatePagination,
         setCurrentPage,
+        setVisibleEntriesCount,
         getCurrentCategoryFilter,
         getCurrentSortOrder,
-        getCurrentPage,
         getCurrentSearchQuery,
-        setVisibleEntriesCount,
-        resetFilters,
-        updateFilterIndicator
+        getCurrentKeyword,
+        updatePagination,
+        filterByKeyword
     };
     
-    console.log('INIT DEBUG: window.documentFilters created:', window.documentFilters);
+    // Check for URL parameters
+    const url = new URL(window.location.href);
+    
+    // Check for keyword parameter
+    const keyword = url.searchParams.get('keyword');
+    if (keyword) {
+        console.log(`Found keyword parameter in URL: ${keyword}`);
+        currentKeyword = keyword;
+        // Set the search query to the keyword to display matching documents
+        currentSearchQuery = keyword;
+        
+        // Update the search input to show the keyword
+        const searchInput = document.getElementById('search-documents');
+        if (searchInput) {
+            searchInput.value = keyword;
+        }
+    }
+    
+    // Load categories
+    loadCategories();
+    
+    console.log('Filters and pagination initialized');
 }
 
 /**
- * Set the current page
- * @param {number} page - Page number
+ * Update the page number for pagination
+ * @param {number} page - New page number
  */
 function setCurrentPage(page) {
+    console.log(`Setting current page to ${page}`);
     currentPage = page;
 }
 
 /**
- * Set the visible entries count
+ * Update the number of visible entries for pagination info
  * @param {number} count - Number of visible entries
  */
 function setVisibleEntriesCount(count) {
@@ -364,16 +404,16 @@ function getCurrentCategoryFilter() {
 }
 
 /**
- * Get the current sort order from the UI
+ * Get the current sort order
  * @returns {string} Current sort order
  */
 function getCurrentSortOrder() {
-    const sortOrderSelect = document.getElementById('sort-order');
-    return sortOrderSelect ? sortOrderSelect.value : 'latest';
+    const sortSelect = document.getElementById('sort-order');
+    return sortSelect ? sortSelect.value : currentSort;
 }
 
 /**
- * Get the current page
+ * Get the current page number
  * @returns {number} Current page number
  */
 function getCurrentPage() {
@@ -381,7 +421,15 @@ function getCurrentPage() {
 }
 
 /**
- * Setup search input handler
+ * Get the current keyword filter
+ * @returns {string} Current keyword filter
+ */
+function getCurrentKeyword() {
+    return currentKeyword;
+}
+
+/**
+ * Set up search input event listeners
  */
 function setupSearchInput() {
     const searchInput = document.getElementById('search-documents');
@@ -418,7 +466,7 @@ function setupSearchInput() {
 }
 
 /**
- * Get current search query
+ * Get the current search query
  * @returns {string} Current search query
  */
 function getCurrentSearchQuery() {
@@ -474,6 +522,7 @@ if (!window.documentFilters) {
         getCurrentSortOrder,
         getCurrentPage,
         getCurrentSearchQuery,
+        getCurrentKeyword,
         updatePagination,
         updateFilterIndicator,
         resetFilters

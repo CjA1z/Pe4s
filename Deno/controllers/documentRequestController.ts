@@ -1,7 +1,7 @@
 import { RouterContext } from "../deps.ts";
 import { DocumentRequestModel, DocumentRequest } from "../models/documentRequestModel.ts";
 import { DocumentModel } from "../models/documentModel.ts";
-import { sendRequestConfirmationEmail, sendApprovedRequestEmail } from "../services/emailService.ts";
+import { sendRequestConfirmationEmail, sendApprovedRequestEmail, sendRejectedRequestEmail } from "../services/emailService.ts";
 import { client } from "../db/denopost_conn.ts";
 
 export class DocumentRequestController {
@@ -256,7 +256,8 @@ export class DocumentRequestController {
                 return;
             }
 
-            const request = await this.documentRequestModel.getById(parseInt(requestId));
+            const requestIdNum = parseInt(requestId);
+            const request = await this.documentRequestModel.getById(requestIdNum);
             if (!request) {
                 ctx.response.status = 404;
                 ctx.response.body = { error: "Request not found" };
@@ -264,7 +265,7 @@ export class DocumentRequestController {
             }
 
             const result = await this.documentRequestModel.updateStatus(
-                parseInt(requestId),
+                requestIdNum,
                 status,
                 reviewedBy,
                 reviewNotes
@@ -286,7 +287,16 @@ export class DocumentRequestController {
             if (status === 'approved') {
                 try {
                     // Fetch the associated document to get the file path
-                    const document = await DocumentModel.getById(request.document_id);
+                    // Ensure document_id is a number - convert if it's not, or use 0 as a safe default
+                    let documentId = 0;
+                    if (typeof request.document_id === 'number') {
+                        documentId = request.document_id;
+                    } else if (request.document_id) {
+                        const parsedId = parseInt(String(request.document_id));
+                        if (!isNaN(parsedId)) documentId = parsedId;
+                    }
+                    
+                    const document = await DocumentModel.getById(documentId);
                     
                     if (!document) {
                         console.error(`Document not found: ${request.document_id}`);
@@ -341,6 +351,11 @@ export class DocumentRequestController {
                     const title = document.title || "Requested Document";
                     const requestIdString = request.id ? request.id.toString() : "unknown";
                     
+                    // Convert keywords from array to string if needed
+                    const keywordsStr = document.keywords ? 
+                        (Array.isArray(document.keywords) ? document.keywords.join(', ') : document.keywords) : 
+                        null;
+                    
                     await sendApprovedRequestEmail(
                         request.email,
                         request.full_name,
@@ -349,7 +364,7 @@ export class DocumentRequestController {
                         requestIdString,
                         document.author,
                         document.category,
-                        document.keywords
+                        keywordsStr
                     );
 
                     ctx.response.status = 200;
@@ -363,6 +378,46 @@ export class DocumentRequestController {
                     ctx.response.body = { 
                         success: true, 
                         emailError: "Failed to send notification email: " + (error.message || "Unknown error") 
+                    };
+                }
+            } else if (status === 'rejected') {
+                try {
+                    // Fetch the associated document to get the title
+                    // Ensure document_id is a number - convert if it's not, or use 0 as a safe default
+                    let documentId = 0;
+                    if (typeof request.document_id === 'number') {
+                        documentId = request.document_id;
+                    } else if (request.document_id) {
+                        const parsedId = parseInt(String(request.document_id));
+                        if (!isNaN(parsedId)) documentId = parsedId;
+                    }
+                    
+                    const document = await DocumentModel.getById(documentId);
+                    const title = document ? document.title : "Requested Document";
+                    const requestIdString = request.id ? request.id.toString() : "unknown";
+                    
+                    console.log(`[DOC REQUEST] Sending rejection email for request ID: ${requestIdString}`);
+                    
+                    // Send rejection email with the rejection reason from reviewNotes
+                    await sendRejectedRequestEmail(
+                        request.email,
+                        request.full_name,
+                        title,
+                        reviewNotes || "Your request has been rejected by an administrator.",
+                        requestIdString
+                    );
+                    
+                    ctx.response.status = 200;
+                    ctx.response.body = { 
+                        success: true,
+                        emailSent: true
+                    };
+                } catch (error: any) {
+                    console.error("Error sending rejection email:", error);
+                    ctx.response.status = 200; // Still return 200 as the status update was successful
+                    ctx.response.body = { 
+                        success: true, 
+                        emailError: "Failed to send rejection notification email: " + (error.message || "Unknown error") 
                     };
                 }
             } else {

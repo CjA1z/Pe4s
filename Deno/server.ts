@@ -52,6 +52,8 @@ import { getCompiledDocument } from "./api/compiledDocument.ts";
 import { handleGetUserProfileForNavbar } from "./api/user.ts"; // Import user profile handler
 import { handleLogout } from "./routes/logout.ts"; // Import logout handler
 import { handleLibraryRequest } from "./api/userLibrary.ts"; // Import user library handler
+import { handleUserPasswordUpdate } from "./api/userPassword.ts"; // Import user password handler
+import { handleUserProfilePictureUpload } from "./api/userProfilePicture.ts"; // Import user profile picture handler
 // Import the document view controller
 // TODO: Fix DocumentViewController implementation
 // import { DocumentViewController } from "./controllers/documentViewController.ts";
@@ -197,7 +199,8 @@ app.use(async (ctx, next) => {
 app.use(async (ctx, next) => {
   // Check if the request is for a profile picture (handle both relative and absolute paths)
   if (ctx.request.url.pathname.match(/\/storage\/authors\/profile-pictures\//) || 
-      ctx.request.url.pathname.match(/\/C:\/Users\/.*\/storage\/authors\/profile-pictures\//)) {
+      ctx.request.url.pathname.match(/\/storage\/users\/profile-picture\//) ||
+      ctx.request.url.pathname.match(/\/C:\/Users\/.*\/storage\/(authors\/profile-pictures|users\/profile-picture)\//)) {
     try {
       // Get the workspace root directory (parent of Deno directory)
       const workspaceRoot = Deno.cwd().replace(/[\\/]Deno$/, '');
@@ -210,10 +213,15 @@ app.use(async (ctx, next) => {
         throw new Error("Could not extract filename from path");
       }
       
-      // Create the correct path directly
-      const correctPath = `storage/authors/profile-pictures/${filename}`;
-      
-      console.log(`Serving profile picture: ${filename} from path: ${correctPath}`);
+      // Determine which path to use based on the URL pattern
+      let correctPath;
+      if (ctx.request.url.pathname.includes('users/profile-picture')) {
+        correctPath = `storage/users/profile-picture/${filename}`;
+        console.log(`Serving user profile picture: ${filename} from path: ${correctPath}`);
+      } else {
+        correctPath = `storage/authors/profile-pictures/${filename}`;
+        console.log(`Serving author profile picture: ${filename} from path: ${correctPath}`);
+      }
       
       await ctx.send({
         root: workspaceRoot,
@@ -1248,6 +1256,60 @@ async function startServer() {
     app.use(reportsRoutes.routes());
     app.use(reportsRoutes.allowedMethods());
     
+    // Custom 404 handler - must be added last in the middleware chain
+    app.use(async (ctx) => {
+      // This middleware will only be reached if no other middleware handled the request
+      console.log(`[404] Not Found: ${ctx.request.method} ${ctx.request.url.pathname}`);
+      
+      try {
+        // Set status to 404
+        ctx.response.status = 404;
+        
+        // Check if the request accepts HTML
+        const acceptHeader = ctx.request.headers.get("accept") || "";
+        
+        if (acceptHeader.includes("text/html")) {
+          // For HTML requests, serve the custom 404 page
+          // Use normalized path to handle case-sensitivity across environments
+          const customErrorPath = `${Deno.cwd()}/Public/pages/miscellaneous/404.html`;
+          try {
+            // Normalize the path to handle different file systems
+            console.log(`[404] Attempting to read file from: ${customErrorPath}`);
+            const content = await Deno.readTextFile(customErrorPath);
+            ctx.response.type = "text/html";
+            ctx.response.body = content;
+          } catch (e: unknown) {
+            // Try alternative path with lowercase
+            try {
+              const lowerCasePath = `${Deno.cwd()}/public/pages/miscellaneous/404.html`;
+              console.log(`[404] First attempt failed, trying: ${lowerCasePath}`);
+              const content = await Deno.readTextFile(lowerCasePath);
+              ctx.response.type = "text/html";
+              ctx.response.body = content;
+            } catch (innerE: unknown) {
+              console.error(`Failed to read 404.html: ${e instanceof Error ? e.message : String(e)}`);
+              console.error(`Also failed with lowercase path: ${innerE instanceof Error ? innerE.message : String(innerE)}`);
+              // Fallback to simple text response if file can't be read
+              ctx.response.type = "text/plain";
+              ctx.response.body = "404 - Page Not Found";
+            }
+          }
+        } else {
+          // For API requests, return JSON
+          ctx.response.type = "application/json";
+          ctx.response.body = { 
+            error: "Not Found", 
+            message: "The requested resource could not be found",
+            path: ctx.request.url.pathname 
+          };
+        }
+      } catch (err: unknown) {
+        console.error(`Error in 404 handler: ${err instanceof Error ? err.message : String(err)}`);
+        ctx.response.status = 500;
+        ctx.response.body = "Internal Server Error";
+      }
+    });
+    
     // Start the server
     console.log(`🌐 Server running on http://localhost:${PORT}`);
     await app.listen({ port: Number(PORT) });
@@ -1673,6 +1735,77 @@ router.get("/api/user/profile", async (ctx) => {
   ctx.response.body = await response.json();
   
   console.log(`[SERVER] User profile request processed, status: ${response.status}`);
+});
+
+// Register user password update endpoint
+router.put("/api/user/profile/password", async (ctx) => {
+  try {
+    console.log(`[SERVER] Processing password update request`);
+    
+    // Convert Oak request to standard Request
+    const headers = new Headers(ctx.request.headers);
+    
+    // Create body from the request
+    let body = null;
+    if (ctx.request.hasBody) {
+      const reqBody = ctx.request.body({ type: "json" });
+      body = await reqBody.value;
+    }
+    
+    // Create a Request object
+    const request = new Request(ctx.request.url.toString(), {
+      method: "PUT",
+      headers: headers,
+      body: body ? JSON.stringify(body) : undefined
+    });
+    
+    // Process through the API handler
+    const response = await handleUserPasswordUpdate(request);
+    
+    // Set status and headers
+    ctx.response.status = response.status;
+    for (const [key, value] of response.headers.entries()) {
+      ctx.response.headers.set(key, value);
+    }
+    
+    // Set body
+    if (response.status !== 204) {
+      const responseBody = await response.text();
+      try {
+        // Try to parse as JSON first
+        const jsonBody = JSON.parse(responseBody);
+        ctx.response.body = jsonBody;
+      } catch {
+        // If not JSON, use as is
+        ctx.response.body = responseBody;
+      }
+    }
+  } catch (error) {
+    console.error(`[SERVER] Error handling password update request:`, error);
+    ctx.response.status = 500;
+    ctx.response.body = {
+      error: "Internal server error processing password update",
+      details: error instanceof Error ? error.message : String(error)
+    };
+  }
+});
+
+// Register profile picture upload endpoint
+router.post("/api/user/profile/picture", async (ctx) => {
+  try {
+    console.log(`[SERVER] Processing profile picture upload request`);
+    
+    // Directly call the handler with the context
+    await handleUserProfilePictureUpload(ctx);
+    
+  } catch (error) {
+    console.error(`[SERVER] Error handling profile picture upload:`, error);
+    ctx.response.status = 500;
+    ctx.response.body = {
+      error: "Internal server error processing profile picture upload",
+      details: error instanceof Error ? error.message : String(error)
+    };
+  }
 });
 
 // Register logout endpoint 

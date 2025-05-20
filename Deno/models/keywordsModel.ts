@@ -123,4 +123,36 @@ export class KeywordsModel {
       return [];
     }
   }
+
+  /**
+   * Get all keywords with document counts
+   * 
+   * @param limit Maximum number of keywords to return (default: 100)
+   * @returns Array of keywords with document counts
+   */
+  static async getKeywordsWithCounts(limit = 100): Promise<TrendingKeyword[]> {
+    try {
+      // Ensure limit is reasonable
+      const effectiveLimit = Math.min(limit, 1000);
+      
+      const result = await client.queryObject(`
+        SELECT ra.name as keyword, COUNT(DISTINCT dra.document_id) as count
+        FROM research_agenda ra
+        LEFT JOIN document_research_agenda dra ON ra.id = dra.research_agenda_id
+        WHERE ra.name IS NOT NULL
+        GROUP BY ra.name
+        ORDER BY count DESC, ra.name ASC
+        LIMIT $1
+      `, [effectiveLimit]);
+      
+      // Extract keywords with counts from the result
+      return (result.rows as any[]).map(row => ({
+        keyword: row.keyword,
+        count: parseInt(row.count.toString())
+      }));
+    } catch (error) {
+      console.error("Error getting keywords with counts:", error);
+      return [];
+    }
+  }
 } 

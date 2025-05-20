@@ -282,7 +282,7 @@
                         <div class="footer-logo-container">
                             <img
                                 id="footerPeASLogo"
-                                src="https://placehold.co/200x80/006A4E/FFFFFF?text=PeAS+Logo"
+                                src="/../Components/images/peas_logo.png"
                                 alt="PeAS Logo"
                                 onerror="this.onerror=null; this.src='https://placehold.co/200x80/cccccc/ffffff?text=Logo+Error';">
                         </div>
@@ -305,7 +305,9 @@
             if (yearElement) { yearElement.textContent = new Date().getFullYear(); }
 
             const homeButton = document.querySelector('.notfound-actions .btn-primary');
-            if (homeButton) { homeButton.addEventListener('click', (e) => { e.preventDefault(); alert('Imagine you are being redirected to the Homepage!'); }); }
+            // Remove the event listener that prevents navigation and shows an alert
+            // The button will now use its href="/" to navigate to the homepage
+
             const contactButton = document.querySelector('.notfound-actions .btn-secondary');
             if (contactButton) { contactButton.addEventListener('click', (e) => { e.preventDefault(); alert('Imagine you are being redirected to the Contact Page!'); }); }
 

@@ -380,10 +380,13 @@ window.NavbarModule = (function() {
                     last_name: dbUserData.last_name || userInfo.last_name || '',
                     email: dbUserData.email || userInfo.email || '',
                     display_name: dbUserData.first_name || userInfo.first_name || userInfo.id,
-                    // Add other fields as needed
+                    // Add profile picture URL from database
+                    profile_picture: dbUserData.profile_picture || null,
+                    profilePictureUrl: dbUserData.profilePictureUrl || dbUserData.profile_picture || null
                 };
                 
                 console.log('Updated user info with DB data:', updatedUserInfo);
+                console.log('Profile picture URL available:', updatedUserInfo.profile_picture || updatedUserInfo.profilePictureUrl || 'None');
                 
                 // Update the session storage
                 sessionStorage.setItem('userInfo', JSON.stringify(updatedUserInfo));
@@ -509,6 +512,9 @@ window.NavbarModule = (function() {
     function initializeNavbarFunctionality(userInfo) {
         console.log('Initializing navbar functionality with user info:', userInfo);
         
+        // Add debug code to check for profile picture availability
+        debugProfilePictureAvailability(userInfo);
+        
         try {
             // Specifically initialize the profile badge for logged in users
             if (userInfo && isUserLoggedIn(userInfo)) {
@@ -521,6 +527,8 @@ window.NavbarModule = (function() {
                             if (dbUserInfo) {
                                 // Re-initialize with the fresh data
                                 userInfo = dbUserInfo;
+                                // Debug profile picture after fetching
+                                debugProfilePictureAvailability(dbUserInfo);
                             }
                             // Continue with UI initialization
                             initializeUserInterface(userInfo);
@@ -548,9 +556,43 @@ window.NavbarModule = (function() {
             
             // Set up search button
             setupSearch();
-                    } catch (error) {
+        } catch (error) {
             console.error('Error in initializeNavbarFunctionality:', error);
         }
+    }
+
+    // Debug helper function to check profile picture
+    function debugProfilePictureAvailability(userInfo) {
+        if (!userInfo) return;
+        
+        console.log('------ PROFILE PICTURE DEBUG ------');
+        const profilePictureUrl = userInfo.profile_picture || userInfo.profilePictureUrl || null;
+        console.log('Profile picture URL available:', profilePictureUrl ? 'YES' : 'NO');
+        
+        if (profilePictureUrl) {
+            console.log('URL:', profilePictureUrl);
+            
+            // Test image loading
+            const testImg = new Image();
+            testImg.onload = function() {
+                console.log('✅ Profile picture loaded successfully!');
+                console.log('Image dimensions:', this.width, 'x', this.height);
+            };
+            testImg.onerror = function() {
+                console.error('❌ Failed to load profile picture!');
+                console.log('URL that failed:', this.src);
+                console.log('Try opening this URL directly in a new tab to diagnose.');
+            };
+            
+            // Set the source to test loading
+            testImg.src = profilePictureUrl.startsWith('/') ? profilePictureUrl : `/${profilePictureUrl}`;
+        }
+        
+        // Check if profile badge already exists
+        const profileBadgeButton = document.getElementById('profile-badge-button');
+        console.log('Profile badge button exists in DOM:', profileBadgeButton ? 'YES' : 'NO');
+        
+        console.log('-----------------------------------');
     }
 
     // Helper function to initialize the UI after getting user data
@@ -895,32 +937,146 @@ window.NavbarModule = (function() {
         
         console.log('Updating profile info with user data:', userInfo);
         
-        // Update profile initials
-        const profileInitialsElements = document.querySelectorAll('.profile-initials-text');
-        if (profileInitialsElements.length > 0) {
-            let initials = '';
-            
-            // Try to generate initials from available name fields
-            if (userInfo.first_name && userInfo.last_name) {
-                initials = userInfo.first_name.charAt(0) + userInfo.last_name.charAt(0);
-            } else if (userInfo.first_name) {
-                initials = userInfo.first_name.charAt(0) + (userInfo.middle_name ? userInfo.middle_name.charAt(0) : '');
-            } else if (userInfo.username) {
-                const parts = userInfo.username.split(' ');
-                if (parts.length > 1) {
-                    initials = parts[0].charAt(0) + parts[parts.length-1].charAt(0);
-                } else {
-                    initials = userInfo.username.substring(0, 2);
+        // Check if we have a profile picture URL
+        const profilePictureUrl = userInfo.profile_picture || userInfo.profilePictureUrl || null;
+        console.log('Profile picture URL found:', profilePictureUrl);
+        
+        // Update profile badge with profile picture if available
+        if (profilePictureUrl) {
+            const updateProfilePicture = () => {
+                const profileBadgeButton = document.getElementById('profile-badge-button');
+                if (profileBadgeButton) {
+                    console.log("Found profile-badge-button, adding profile picture");
+                    
+                    // Preserve classes before clearing content
+                    const buttonClasses = profileBadgeButton.className;
+                    
+                    // Clear any existing content
+                    profileBadgeButton.innerHTML = '';
+                    
+                    // Make sure we preserve all styling classes
+                    profileBadgeButton.className = buttonClasses;
+                    
+                    // Ensure the button is circular
+                    profileBadgeButton.style.borderRadius = '50%';
+                    
+                    // Create and add an image element
+                    const imgElement = document.createElement('img');
+                    imgElement.src = profilePictureUrl.startsWith('/') ? profilePictureUrl : `/${profilePictureUrl}`;
+                    imgElement.className = 'w-full h-full object-cover';
+                    imgElement.alt = 'Profile';
+                    
+                    // Ensure the image is circular
+                    imgElement.style.borderRadius = '50%';
+                    
+                    // Add error handler to fall back to initials if image fails to load
+                    imgElement.onerror = function() {
+                        console.error("Failed to load profile picture in navbar, falling back to initials");
+                        this.style.display = 'none';
+                        
+                        // Generate initials
+                        let initials = generateInitials(userInfo);
+                        
+                        // Create initials element
+                        const initialsSpan = document.createElement('span');
+                        initialsSpan.className = 'text-white font-medium';
+                        initialsSpan.textContent = initials;
+                        profileBadgeButton.appendChild(initialsSpan);
+                        
+                        // Ensure button retains its styling
+                        profileBadgeButton.className = buttonClasses;
+                        profileBadgeButton.style.borderRadius = '50%';
+                    };
+                    
+                    // Add the image to the button
+                    profileBadgeButton.appendChild(imgElement);
+                    console.log("Added profile picture to navbar badge");
+                    return true;
                 }
-            } else {
-                initials = 'U';
+                return false;
+            };
+            
+            // Try immediately first
+            if (!updateProfilePicture()) {
+                console.log("Profile badge button not found, setting up observer");
+                // Set up an observer to wait for the button to be created
+                const observer = new MutationObserver((mutations, obs) => {
+                    const profileBadgeButton = document.getElementById('profile-badge-button');
+                    if (profileBadgeButton) {
+                        console.log("Observer found profile-badge-button");
+                        updateProfilePicture();
+                        obs.disconnect(); // Stop observing once we've found it
+                    }
+                });
+                
+                // Start observing the document with the configured parameters
+                observer.observe(document.body, { childList: true, subtree: true });
+                
+                // Set a timeout to stop the observer after 5 seconds to prevent memory leaks
+                setTimeout(() => {
+                    observer.disconnect();
+                    console.log("Profile badge button observer timed out");
+                }, 5000);
             }
             
+            // Also update mobile profile section if it exists
+            const updateMobileProfilePic = () => {
+                const mobileProfileImg = document.querySelector('#mobile-menu .rounded-full img');
+                if (mobileProfileImg) {
+                    mobileProfileImg.src = profilePictureUrl.startsWith('/') ? profilePictureUrl : `/${profilePictureUrl}`;
+                    console.log("Updated mobile profile picture");
+                    return true;
+                }
+                return false;
+            };
+            
+            // Try to update mobile profile picture
+            if (!updateMobileProfilePic()) {
+                // Set up an observer for mobile profile
+                const mobileObserver = new MutationObserver((mutations, obs) => {
+                    if (updateMobileProfilePic()) {
+                        obs.disconnect();
+                    }
+                });
+                
+                mobileObserver.observe(document.body, { childList: true, subtree: true });
+                
+                // Set a timeout to stop the observer
+                setTimeout(() => {
+                    mobileObserver.disconnect();
+                }, 5000);
+            }
+        }
+        
+        // Helper function to generate initials
+        function generateInitials(user) {
+            if (user.first_name && user.last_name) {
+                return (user.first_name.charAt(0) + user.last_name.charAt(0)).toUpperCase();
+            } else if (user.first_name) {
+                return (user.first_name.charAt(0) + (user.middle_name ? user.middle_name.charAt(0) : '')).toUpperCase();
+            } else if (user.username) {
+                const parts = user.username.split(' ');
+                if (parts.length > 1) {
+                    return (parts[0].charAt(0) + parts[parts.length-1].charAt(0)).toUpperCase();
+                } else {
+                    return user.username.substring(0, 2).toUpperCase();
+                }
+            } else {
+                return 'U';
+            }
+        }
+        
+        // Update profile initials if no profile picture or as fallback
+        const profileInitialsElements = document.querySelectorAll('.profile-initials-text');
+        if (profileInitialsElements.length > 0) {
+            const initials = generateInitials(userInfo);
+            
             profileInitialsElements.forEach(element => {
-                element.textContent = initials.toUpperCase();
+                element.textContent = initials;
             });
         }
         
+        // Continue with other profile updates
         // Update user name
         const userNameElement = document.getElementById('user-name-part');
         const greetingElement = document.getElementById('greeting-part');
@@ -939,6 +1095,33 @@ window.NavbarModule = (function() {
                 userNameElement.textContent = 'User';
             }
             console.log('Updated user name element with:', userNameElement.textContent);
+        } else {
+            // Set up observer for user name element
+            const nameObserver = new MutationObserver((mutations, obs) => {
+                const userNameElement = document.getElementById('user-name-part');
+                if (userNameElement) {
+                    if (userInfo.display_name) {
+                        userNameElement.textContent = userInfo.display_name;
+                    } else if (userInfo.first_name) {
+                        userNameElement.textContent = userInfo.first_name;
+                    } else if (userInfo.username) {
+                        userNameElement.textContent = userInfo.username;
+                    } else if (userInfo.name) {
+                        userNameElement.textContent = userInfo.name;
+                    } else {
+                        userNameElement.textContent = 'User';
+                    }
+                    console.log('Observer updated user name element with:', userNameElement.textContent);
+                    obs.disconnect();
+                }
+            });
+            
+            nameObserver.observe(document.body, { childList: true, subtree: true });
+            
+            // Set a timeout to stop the observer
+            setTimeout(() => {
+                nameObserver.disconnect();
+            }, 5000);
         }
         
         if (greetingElement) {

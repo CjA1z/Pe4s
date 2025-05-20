@@ -697,11 +697,19 @@
             width: 150px;
             height: 180px;
             justify-content: center;
+            overflow: hidden;
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, background-color 0.2s ease-out, border-color 0.2s ease;
         }
-        .author-profile-card:hover {
+        .author-profile-card:hover, .author-profile-card:focus-visible {
             transform: translateY(-5px) scale(1.03);
             box-shadow: var(--card-hover-shadow);
             border-color: var(--theme-gold-darker);
+            outline: none;
+        }
+        .author-profile-card:focus-visible {
+            box-shadow: 0 0 0 2px var(--theme-gold), var(--card-hover-shadow);
         }
         .author-avatar-placeholder {
             width: 60px;
@@ -717,21 +725,50 @@
             flex-shrink: 0;
             margin-bottom: 5px;
         }
+        .author-info {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-height: 70px;
+            overflow: hidden;
+        }
         .author-info .author-name {
             font-size: 1em;
             font-weight: 600;
             color: var(--primary-text-color);
             margin-bottom: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+            line-height: 1.2;
+            height: auto;
+            min-height: 1.2em;
+        }
+        .author-info .author-name a {
+            color: inherit;
+            text-decoration: none;
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .author-info .author-name a:hover {
+            color: var(--link-hover-color);
+            text-decoration: underline;
         }
         .author-info .author-doc-count {
             font-size: 0.8em;
             color: var(--secondary-text-color);
             margin-bottom: 4px;
+            line-height: 1.2;
+            margin-top: 2px;
         }
         .author-info .author-view-link {
             font-size: 0.75em;
             color: var(--link-color);
             text-decoration: none;
+            margin-top: auto;
+            padding-top: 3px;
         }
         .author-info .author-view-link:hover {
             text-decoration: underline;
@@ -884,8 +921,10 @@
             .filters-header-sidebar { flex-direction: row; align-items: center; }
             .category-filter-tile { min-width: calc(33.33% - 7px); max-width: calc(33.33% - 7px); }
             .author-card-grid-container { justify-content: center; }
-            .author-profile-card { width: calc(50% - 10px); height: auto; min-height: 160px; }
+            .author-profile-card { width: calc(50% - 10px); height: auto; min-height: 160px; padding: 12px 10px; }
             .keyword-result-pill-container { justify-content: center; }
+            .author-avatar-placeholder { width: 50px; height: 50px; font-size: 1.3em; margin-bottom: 8px; }
+            .author-info { max-height: 90px; }
         }
         @media (max-width: 600px) {
             .search-bar-results-page input[type="search"] { padding: 10px 15px; font-size: 14px; }
@@ -900,7 +939,43 @@
             .category-tile-name { font-size: 0.65rem;}
             .category-tile-count { font-size: 0.55rem; }
             .filter-group label, .filter-group .filter-label { font-size: 0.8em; }
-            .author-profile-card { width: calc(100% - 10px); }
+            .author-profile-card { width: calc(100% - 10px); min-height: 140px; flex-direction: row; text-align: left; align-items: center; justify-content: flex-start; gap: 15px; padding: 12px 15px; }
+            .author-info { align-items: flex-start; text-align: left; }
+            .author-info .author-name { text-align: left; }
+            .author-avatar-placeholder { margin-bottom: 0; }
+        }
+
+        /* Document type indicators */
+        .document-type-indicator {
+            display: inline-block;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 8px;
+            vertical-align: middle;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .document-type-indicator.compiled {
+            background-color: var(--theme-gold);
+            color: var(--theme-green-darker-text);
+        }
+
+        .document-type-indicator.single {
+            background-color: var(--theme-green-dark);
+            color: white;
+        }
+
+        .compiled-document .result-title {
+            border-left: 3px solid var(--theme-gold);
+            padding-left: 8px;
+        }
+
+        .single-document .result-title {
+            border-left: 3px solid var(--theme-green-dark);
+            padding-left: 8px;
         }
     </style>
 </head>
@@ -1037,32 +1112,19 @@
     </div>
 
     <script>
+        // Global variables for filtering and pagination
+        let currentPage = 1;
+        let currentCategoryFilter = null;
+        let currentSort = 'latest';
+        let currentSearchQuery = '';
+        let currentKeyword = '';
+        let isPageChange = false; // Flag to track if we're changing pages
+        let visibleEntriesCount = 0;
+
         // Mock data representing search results
-        const mockResultsData = [
-            // MODIFIED: Removed "Article" category items
-            { id: 3, resultType: 'document', title: "Sustainable Urban Development: A Thesis", url: "https://www.example.net/blog/sustainable-cities", snippet: "Discussing new approaches to creating sustainable and resilient urban environments for the future.", date: "2024-05-01", category: "Thesis", author: "Jane Jacobs Jr.", tags: ["sustainability", "urban planning", "cities", "environment"], relevanceScore: 0.85 },
-            { id: 4, resultType: 'document', title: "Advanced Techniques in Machine Learning - A Dissertation", url: "https://www.example.edu/ml-techniques", snippet: "A deep dive into cutting-edge machine learning algorithms and their applications.", date: "2023-11-15", category: "Dissertation", author: "Dr. Alan Turing", tags: ["machine learning", "AI", "algorithms", "deep learning"], relevanceScore: 0.95 },
-            { id: 5, resultType: 'document', title: "Beginner's Guide to Quantum Computing - Confluence Proceedings", url: "https://www.example.com/guides/quantum", snippet: "An accessible introduction to the principles of quantum computing and its potential.", date: "2024-03-13", category: "Confluence", author: "Dr. Ada Lovelace", tags: ["quantum computing", "guide", "physics", "technology"], relevanceScore: 0.77 },
-            { id: 6, resultType: 'document', title: "The Synergy of Art and Science - Conference Paper", url: "https://www.example.com/synergy-art-sci", snippet: "Exploring interdisciplinary connections and collaborative potential between artistic and scientific domains.", date: "2024-02-28", category: "Synergy", author: "Leonardo da Vinci II", tags: ["interdisciplinary", "art", "science", "collaboration"], relevanceScore: 0.82 },
-            { id: 7, resultType: 'document', title: "Ethical Considerations in AI Development - A Thesis", url: "https://www.example.net/ai-ethics-thesis", snippet: "An in-depth analysis of the ethical challenges posed by advancing artificial intelligence technologies.", date: "2023-09-05", category: "Thesis", author: "Dr. Rachel Carson", tags: ["AI", "ethics", "philosophy", "technology"], relevanceScore: 0.90 },
-
-            // Authors
-            { id: 101, resultType: 'author', title: "Dr. Ada Lovelace", url: "#author-ada", documentCount: 2, relevanceScore: 0.9 }, // Note: Ada Lovelace now has 1 doc in this set
-            { id: 102, resultType: 'author', title: "Prof. Edward Tufte", url: "#author-tufte", documentCount: 0, relevanceScore: 0.85 }, // No docs for Tufte in this set
-            { id: 103, resultType: 'author', title: "Jane Jacobs Jr.", url: "#author-jacobs", documentCount: 1, relevanceScore: 0.8 },
-            { id: 104, resultType: 'author', title: "Dr. Alan Turing", url: "#author-turing", documentCount: 1, relevanceScore: 0.93 },
-            { id: 105, resultType: 'author', title: "Dr. Rachel Carson", url: "#author-carson", documentCount: 1, relevanceScore: 0.81 },
-            { id: 106, resultType: 'author', title: "Leonardo da Vinci II", url: "#author-leo", documentCount: 1, relevanceScore: 0.79 },
-
-
-            // Keywords (formerly Tags) - MODIFIED resultType
-            { id: 201, resultType: 'keyword', title: "AI", url: "#tag-ai", documentCount: 3, relevanceScore: 0.95 },
-            { id: 202, resultType: 'keyword', title: "Research", url: "#tag-research", documentCount: 2, relevanceScore: 0.90 },
-            { id: 203, resultType: 'keyword', title: "Sustainability", url: "#tag-sustainability", documentCount: 2, relevanceScore: 0.88 },
-            { id: 204, resultType: 'keyword', title: "Data Visualization", url: "#tag-dataviz", documentCount: 1, relevanceScore: 0.87 },
-            { id: 205, resultType: 'keyword', title: "Machine Learning", url: "#tag-ml", documentCount: 1, relevanceScore: 0.94 },
-            { id: 206, resultType: 'keyword', title: "Ethics", url: "#tag-ethics", documentCount: 1, relevanceScore: 0.89 }
-        ];
+        // const mockResultsData = [
+        //     ... (removed)
+        // ];
 
         // API endpoints - align with navbar
         const API = {
@@ -1070,6 +1132,8 @@
             categories: '/api/categories',
             keywords: '/api/keywords',
             trendingKeywords: '/api/trending-keywords',
+            keywordsWithCounts: '/api/keywords-with-counts',  // Add the new endpoint
+            authors: '/api/authors/all',  // Updated to match navbar implementation
         };
 
         // Flag to enable/disable features that depend on missing APIs
@@ -1082,7 +1146,6 @@
         
         let currentResultsData = [];
         const RESULTS_PER_PAGE = 5;
-        let currentPage = 1;
         let currentFilteredResultsMasterList = [];
         const PREDEFINED_CATEGORIES = ["Thesis", "Dissertation", "Confluence", "Synergy"];
 
@@ -1137,46 +1200,133 @@
             try {
                 const searchResults = [];
                 
-                // Since only the main documents API works, just use that
+                // Detailed logging of current page and API params
+                console.log(`Making API request with: page=${currentPage}, size=${RESULTS_PER_PAGE}`);
+                
+                // Fetch documents
                 const documents = await fetchDocuments(API.documents, query, filters).catch(err => {
                     console.error("Error fetching documents:", err);
                     return [];
                 });
                 
+                // More detailed logging for document types
+                const compiledDocs = documents.filter(d => d.is_compiled === true);
+                const singleDocs = documents.filter(d => d.is_compiled !== true);
+                console.log(`API returned ${documents ? documents.length : 0} total documents:`, 
+                           `${compiledDocs.length} compiled, ${singleDocs.length} single`);
+                
+                // Log document categories for debugging
+                const categoryBreakdown = {};
+                documents.forEach(doc => {
+                    const category = doc.category || 'Unknown';
+                    categoryBreakdown[category] = (categoryBreakdown[category] || 0) + 1;
+                });
+                console.log('Category breakdown:', categoryBreakdown);
+                
                 // Add documents to search results
                 if (documents && documents.length > 0) {
                     searchResults.push(...documents);
                 }
-                
-                // Only try to get keywords if there's an actual search query
-                if (query && currentPage === 1) {
-                    try {
-                        // Extract keywords from documents since we don't have a keywords API
-                        const keywords = extractKeywordsFromDocuments(documents, query);
-                        if (keywords.length > 0) {
-                            searchResults.push(...keywords);
-                        }
-                        
-                        // Extract authors from documents since we don't have an authors API
-                        const authors = extractAuthorsFromDocuments(documents, query);
-                        if (authors.length > 0) {
-                            searchResults.push(...authors);
-                        }
-                    } catch (e) {
-                        console.error("Error extracting supplemental data:", e);
+
+                // Try to fetch authors from API, fall back to extraction from documents if API fails
+                let authors = [];
+                try {
+                    const authorsResponse = await fetchData(API.authors);
+                    if (authorsResponse && authorsResponse.authors && Array.isArray(authorsResponse.authors)) {
+                        // Process authors the same way navbar does
+                        authors = authorsResponse.authors.map((author, idx) => ({
+                            id: author.id || (2000 + idx),
+                            resultType: 'author',
+                            title: author.full_name || author.name,
+                            url: `/pages/authorprofile.html?id=${author.id}`,
+                            documentCount: author.worksCount || author.document_count || 0,
+                            relevanceScore: 0.8
+                        }));
+                        console.log("Successfully fetched authors from API:", authors.length);
                     }
+                } catch (e) {
+                    console.warn("API endpoint for authors not available, extracting from documents instead");
+                    authors = extractAuthorsFromDocuments(documents, query);
+                    console.log("Extracted authors from documents:", authors.length);
                 }
                 
-                // Fallback to mock data if no results found
+                if (authors.length > 0) {
+                    searchResults.push(...authors);
+                }
+
+                // Try to fetch keywords from API, fall back to extraction from documents if API fails
+                let keywords = [];
+
+                // Try different keyword API endpoints in order of preference
+                try {
+                    // 1. First try keywords-with-counts endpoint
+                    const keywordsWithCountsResponse = await fetchData(API.keywordsWithCounts);
+                    if (keywordsWithCountsResponse && keywordsWithCountsResponse.keywords_with_counts && 
+                        keywordsWithCountsResponse.keywords_with_counts.length > 0) {
+                        
+                        keywords = keywordsWithCountsResponse.keywords_with_counts.map((keyword, idx) => ({
+                            id: 1000 + idx,
+                            resultType: 'keyword',
+                            title: keyword.keyword,
+                            url: `/search?q=${encodeURIComponent(keyword.keyword)}&keyword=${encodeURIComponent(keyword.keyword)}`,
+                            documentCount: keyword.count || 0,
+                            relevanceScore: 0.7
+                        }));
+                        console.log("Successfully fetched keywords with document counts:", keywords.length);
+                    }
+                    
+                    // 2. If first endpoint failed, try trending-keywords
+                    if (keywords.length === 0) {
+                        const trendingData = await fetchData(API.trendingKeywords);
+                        if (trendingData && trendingData.keywords && trendingData.keywords.length > 0) {
+                            keywords = trendingData.keywords.map((keyword, idx) => ({
+                                id: 1000 + idx,
+                                resultType: 'keyword',
+                                title: keyword.name || keyword,
+                                url: `/search?q=${encodeURIComponent(keyword.name || keyword)}`,
+                                documentCount: keyword.document_count || keyword.count || 0,
+                                relevanceScore: 0.7
+                            }));
+                            console.log("Successfully fetched trending keywords:", keywords.length);
+                        }
+                    }
+                    
+                    // 3. If both previous endpoints failed, try regular keywords endpoint
+                    if (keywords.length === 0) {
+                        const keywordsResponse = await fetchData(API.keywords);
+                        if (keywordsResponse && Array.isArray(keywordsResponse)) {
+                            keywords = keywordsResponse.map((keyword, idx) => ({
+                                id: 1000 + idx,
+                                resultType: 'keyword',
+                                title: keyword.name || keyword,
+                                url: `/search?q=${encodeURIComponent(keyword.name || keyword)}`,
+                                documentCount: keyword.document_count || keyword.count || 0,
+                                relevanceScore: 0.7
+                            }));
+                            console.log("Successfully fetched regular keywords:", keywords.length);
+                        }
+                    }
+                } catch (e) {
+                    // 4. If all API attempts fail, extract from documents
+                    console.warn("API endpoints for keywords not available, extracting from documents instead:", e);
+                    keywords = extractKeywordsFromDocuments(documents, query);
+                    console.log("Extracted keywords from documents:", keywords.length);
+                }
+
+                if (keywords.length > 0) {
+                    searchResults.push(...keywords);
+                }
+                
+                // If no results found, return empty array
                 if (searchResults.length === 0) {
-                    console.log("No results found from APIs, using mock data as fallback");
-                    return mockResultsData;
+                    console.log("No results found from APIs or extraction.");
+                    return [];
                 }
                 
                 return searchResults;
             } catch (error) {
                 console.error('Error performing search:', error);
-                return mockResultsData; // Fallback to mock data in case of error
+                return []; // Fallback to empty array in case of error
             }
         }
 
@@ -1200,7 +1350,7 @@
                     }
                 }
                 
-                if (authorName && (!query || authorName.toLowerCase().includes(query.toLowerCase()))) {
+                if (authorName) {
                     if (!authorMap.has(authorName)) {
                         authorMap.set(authorName, {
                             count: 1,
@@ -1236,7 +1386,7 @@
                 const tags = doc.keywords || doc.tags || [];
                 if (Array.isArray(tags)) {
                     tags.forEach(tag => {
-                        if (tag && (!query || tag.toLowerCase().includes(query.toLowerCase()))) {
+                        if (tag) {
                             if (!keywordMap.has(tag)) {
                                 keywordMap.set(tag, {
                                     count: 1,
@@ -1267,26 +1417,37 @@
          */
         async function fetchDocuments(endpoint, query, filters) {
             try {
-                // Build document search URL with filters
+                // Build document search URL with filters - exactly as navbar does
                 const documentUrl = new URL(endpoint, window.location.origin);
                 if (query) documentUrl.searchParams.append('search', query);
+                
+                // Log current page for debugging
+                console.log(`Current page being requested: ${currentPage}`);
+                
+                // Request both single and compiled documents - just like navbar
+                documentUrl.searchParams.append('doc_types', 'all');
                 
                 // Store selected categories for client-side filtering - MATCHES NAVBAR EXACTLY
                 const selectedCategories = filters.category && filters.category.length > 0 
                     ? filters.category.map(cat => cat.toUpperCase()) 
                     : [];
                 
+                console.log("Selected categories for filtering:", selectedCategories);
+                
                 // For backward compatibility, just fetch all documents without category filter
                 // if multiple categories are selected - we'll filter on client side
+                // THIS IS EXACTLY HOW NAVBAR DOES IT
                 if (selectedCategories.length === 1) {
                     // Apply single category filter directly - this should work with existing API
                     documentUrl.searchParams.append('category', selectedCategories[0]);
                     // Also try document_type as an alternative parameter name
                     documentUrl.searchParams.append('document_type', selectedCategories[0]);
                 } else if (selectedCategories.length > 1) {
-                    // For multiple categories, we'll fetch more documents and filter client-side
-                    // The limit needs to be higher to ensure we get enough results after filtering
-                    documentUrl.searchParams.set('limit', '50');
+                    // For multiple categories, combine them into a comma-separated list
+                    documentUrl.searchParams.append('category', selectedCategories.join(','));
+                    
+                    // Also send as document_type for backward compatibility
+                    documentUrl.searchParams.append('document_type', selectedCategories.join(','));
                 }
                 
                 // Add other filters
@@ -1297,8 +1458,9 @@
                 if (filters.yearTo) documentUrl.searchParams.append('year_to', filters.yearTo);
                 
                 // Handle pagination
-                documentUrl.searchParams.append('page', currentPage.toString());
-                documentUrl.searchParams.append('limit', RESULTS_PER_PAGE.toString());
+                documentUrl.searchParams.set('page', currentPage.toString());
+                documentUrl.searchParams.set('limit', RESULTS_PER_PAGE.toString());
+                documentUrl.searchParams.set('size', RESULTS_PER_PAGE.toString()); // Add 'size' param as backup
                 
                 // Sort parameter
                 if (filters.sort) {
@@ -1308,17 +1470,24 @@
                     documentUrl.searchParams.append('sort', sortParam);
                 }
                 
-                console.log(`Fetching documents from ${endpoint}:`, documentUrl.toString());
+                console.log(`Fetching documents from ${endpoint} with page ${currentPage}:`, documentUrl.toString());
                 
                 // Fetch documents
                 const documentsResponse = await fetchData(documentUrl.toString());
+                console.log("API response structure:", {
+                    hasDocuments: documentsResponse && !!documentsResponse.documents,
+                    documentCount: documentsResponse?.documents?.length || 0,
+                    totalCount: documentsResponse?.totalCount || documentsResponse?._debug?.totalCount,
+                    totalPages: documentsResponse?.totalPages || documentsResponse?._debug?.totalPages,
+                    currentPage: documentsResponse?.currentPage || documentsResponse?._debug?.currentPage
+                });
                 if (documentsResponse && documentsResponse.documents) {
                     let documents = documentsResponse.documents;
                     
-                    // Apply client-side filtering for multiple categories if needed
+                    // Apply client-side filtering for multiple categories if needed - EXACTLY LIKE NAVBAR
                     if (selectedCategories.length > 1 && documents.length > 0) {
                         documents = documents.filter(doc => {
-                            // Get document's category/type and normalize for comparison
+                            // Get document's category/type and normalize for comparison - MATCHES NAVBAR
                             const documentType = doc.document_type || doc.category || '';
                             const normalizedType = documentType.toUpperCase();
                             
@@ -1331,7 +1500,7 @@
                     
                     // Transform document data to match our expected format
                     const processedDocuments = documents.map(doc => {
-                        // Determine document type
+                        // Determine document type using exact navbar logic
                         let category = doc.document_type || doc.category || "";
                         if (category) {
                             // Ensure proper capitalization to match our categories
@@ -1343,16 +1512,34 @@
                         // Extract author info properly
                         let authorName = "Unknown";
                         if (doc.authors) {
-                            if (Array.isArray(doc.authors)) {
-                                authorName = doc.authors.length > 0 ? doc.authors[0].name : "Unknown";
+                            if (Array.isArray(doc.authors) && doc.authors.length > 0) {
+                                if (typeof doc.authors[0] === 'object') {
+                                    // Handle case where authors are objects with name or full_name property
+                                    authorName = doc.authors[0].full_name || doc.authors[0].name || "Unknown";
+                                } else {
+                                    // Handle case where authors are strings
+                                    authorName = doc.authors[0];
+                                }
                             } else if (typeof doc.authors === 'string') {
                                 authorName = doc.authors;
                             } else if (doc.authors.name) {
                                 authorName = doc.authors.name;
+                            } else if (doc.authors.full_name) {
+                                authorName = doc.authors.full_name;
                             }
                         } else if (doc.author) {
-                            authorName = typeof doc.author === 'string' ? doc.author : doc.author.name || "Unknown";
+                            if (typeof doc.author === 'object') {
+                                authorName = doc.author.full_name || doc.author.name || "Unknown";
+                            } else {
+                                authorName = doc.author;
+                            }
                         }
+                        
+                        // For debugging the author extraction
+                        console.log(`Document ${doc.id} author data:`, {
+                            raw_authors: doc.authors,
+                            extracted_author: authorName
+                        });
                         
                         // Extract keywords/tags
                         const tags = doc.keywords || doc.tags || [];
@@ -1360,12 +1547,19 @@
                         // Build proper URL - match the navbar's approach
                         const isCompiled = doc.is_compiled === true || 
                                         doc.document_type?.toLowerCase() === 'compiled' || 
+                                        doc.doc_source === 'compiled' ||
                                         doc.child_count > 0;
                         
-                        // Use the same URL format as the navbar
-                        const documentUrl = isCompiled 
-                            ? `/pages/user-compiled.html?id=${doc.id}` 
-                            : `/pages/user-single.html?id=${doc.id}`;
+                        // Check if user is logged in
+                        const isLoggedIn = document.cookie.includes('session=') || localStorage.getItem('user') || sessionStorage.getItem('user');
+                        
+                        // Use the appropriate URL format based on login status and document type
+                        let documentUrl;
+                        if (isCompiled) {
+                            documentUrl = isLoggedIn ? `/pages/user-compiled.html?id=${doc.id}` : `/pages/guest-compiled.html?id=${doc.id}`;
+                        } else {
+                            documentUrl = isLoggedIn ? `/pages/user-single.html?id=${doc.id}` : `/pages/guest-single.html?id=${doc.id}`;
+                        }
                         
                         return {
                             id: doc.id,
@@ -1382,21 +1576,47 @@
                         };
                     });
                     
-                    // Count the documents by category
+                    // Count the documents by category using exact navbar approach
                     const categoryCounts = {};
+                    PREDEFINED_CATEGORIES.forEach(category => {
+                        categoryCounts[category] = 0; // Initialize with zeros like navbar does
+                    });
+                    
                     processedDocuments.forEach(doc => {
-                        if (doc.category) {
-                            categoryCounts[doc.category] = (categoryCounts[doc.category] || 0) + 1;
+                        if (doc.category && categoryCounts[doc.category] !== undefined) {
+                            categoryCounts[doc.category]++;
                         }
                     });
                     
                     // Update our category counts with the latest data from this search
                     updateCategoryTilesWithCounts(categoryCounts);
                     
+                    // Log document type information for each document to debug display issues
+                    console.log("Document information details:");
+                    processedDocuments.slice(0, 3).forEach((doc, index) => {
+                        console.log(`Document ${index} (ID ${doc.id}):`, {
+                            title: doc.title?.substring(0, 30),
+                            is_compiled: doc.is_compiled,
+                            document_type: doc.document_type,
+                            child_count: doc.child_count,
+                            category: doc.category
+                        });
+                    });
+                    
                     // Log the types of documents found
                     console.log(`From ${endpoint}: Found ${processedDocuments.length} documents:`, 
                               `Compiled: ${processedDocuments.filter(d => d.is_compiled).length}`,
                               `Non-compiled: ${processedDocuments.filter(d => !d.is_compiled).length}`);
+                    
+                    // Log the actual raw data for first few documents to check if is_compiled flag is set
+                    if (documents.length > 0) {
+                        console.log("Sample document raw data:", documents.slice(0, 2).map(d => ({
+                            id: d.id,
+                            title: d.title.substring(0, 30),
+                            is_compiled: d.is_compiled,
+                            document_type: d.document_type || d.category
+                        })));
+                    }
                     
                     return processedDocuments;
                 } else {
@@ -1435,6 +1655,8 @@
             const urlParams = new URLSearchParams(window.location.search);
             let initialFullQuery = urlParams.get('q') || "";
             let displayedSearchTerm = "";
+            // Also extract keyword parameter here
+            const keywordParam = urlParams.get('keyword');
 
             const resultsListContainer = document.getElementById('searchResultsList');
             const searchQueryTermDisplay = document.getElementById('search-query-term-display');
@@ -1475,31 +1697,54 @@
                 // Show loading state
                 filterAuthorEl.innerHTML = '<option value="all">Loading authors...</option>';
                 
-                // Extract authors from documents
-                fetchData(`${API.documents}?limit=100`)
-                    .then(data => {
-                        if (data && data.documents && Array.isArray(data.documents)) {
-                            // Extract unique authors from documents
-                            const authorSet = new Set();
-                            data.documents.forEach(doc => {
-                                if (doc.author) authorSet.add(doc.author);
-                                if (doc.authors) {
-                                    if (Array.isArray(doc.authors)) {
-                                        doc.authors.forEach(author => {
-                                            if (author && author.name) authorSet.add(author.name);
-                                        });
-                                    } else if (typeof doc.authors === 'string') {
-                                        authorSet.add(doc.authors);
-                                    }
+                // Fetch authors using the same endpoint as the navbar
+                fetchData(API.authors)
+                    .then(authorResponse => {
+                        if (authorResponse && authorResponse.authors && Array.isArray(authorResponse.authors)) {
+                            // Process authors
+                            const authors = [];
+                            authorResponse.authors.forEach(author => {
+                                if (author.full_name) {
+                                    authors.push(author.full_name);
                                 }
                             });
-                            return Array.from(authorSet);
+                            return authors;
                         }
-                        throw new Error('No document data available');
+                        throw new Error('No author data available or invalid format');
+                    })
+                    .catch(error => {
+                        console.error('Error loading authors from API:', error);
+                        // Fallback to extracting from documents
+                        return fetchData(`${API.documents}?limit=100`)
+                            .then(data => {
+                                if (data && data.documents && Array.isArray(data.documents)) {
+                                    // Extract unique authors from documents
+                                    const authorSet = new Set();
+                                    data.documents.forEach(doc => {
+                                        if (doc.author) authorSet.add(doc.author);
+                                        if (doc.authors) {
+                                            if (Array.isArray(doc.authors)) {
+                                                doc.authors.forEach(author => {
+                                                    if (author && author.name) authorSet.add(author.name);
+                                                    if (author && author.full_name) authorSet.add(author.full_name);
+                                                });
+                                            } else if (typeof doc.authors === 'string') {
+                                                authorSet.add(doc.authors);
+                                            }
+                                        }
+                                    });
+                                    return Array.from(authorSet);
+                                }
+                                return [];
+                            })
+                            .catch(err => {
+                                console.error('Error extracting authors from documents:', err);
+                                return [];
+                            });
                     })
                     .then(authors => {
                         // Reset and populate authors dropdown
-                filterAuthorEl.innerHTML = '<option value="all">All Authors</option>';
+                        filterAuthorEl.innerHTML = '<option value="all">All Authors</option>';
                         
                         // Sort authors by name
                         authors.sort((a, b) => a.localeCompare(b));
@@ -1511,25 +1756,7 @@
                             option.textContent = authorName;
                             filterAuthorEl.appendChild(option);
                         });
-                    })
-                    .catch(error => {
-                        console.error('Error loading authors:', error);
-                        // Fallback to mock data authors
-                        filterAuthorEl.innerHTML = '<option value="all">All Authors</option>';
-                        
-                        const uniqueAuthors = [...new Set(
-                            mockResultsData
-                                .filter(item => item.resultType === 'document' && item.author)
-                                .map(item => item.author)
-                        )].sort();
-                        
-                        uniqueAuthors.forEach(author => {
-                    const option = document.createElement('option');
-                    option.value = author;
-                    option.textContent = author;
-                    filterAuthorEl.appendChild(option);
-                        });
-                });
+                    });
             }
 
             // Update populateCategoryTiles function to use actual category counts
@@ -1538,12 +1765,12 @@
                 
                 // First try to get actual counts from API
                 if (Object.keys(categoryCountsFromAPI).length === 0) {
-                    // Use estimated counts initially
-                PREDEFINED_CATEGORIES.forEach(categoryName => {
-                    const count = mockResultsData.filter(item => item.resultType === 'document' && item.category === categoryName).length;
-                    const tile = createCategoryTile(categoryName, count, toggleAllCategoriesSwitch.checked); 
-                    categoryTileFilterContainer.appendChild(tile);
-                });
+                    // Use estimated counts initially (set to 0)
+                    PREDEFINED_CATEGORIES.forEach(categoryName => {
+                        const count = 0;
+                        const tile = createCategoryTile(categoryName, count, toggleAllCategoriesSwitch.checked); 
+                        categoryTileFilterContainer.appendChild(tile);
+                    });
                     
                     // Then fetch real counts in the background
                     fetchCategoryCounts();
@@ -1560,14 +1787,18 @@
             }
 
             /**
-             * Fetches category counts data similar to the navbar implementation
+             * Fetches category counts data exactly like the navbar implementation
              */
             async function fetchCategoryCounts() {
                 try {
-                    // Get all documents and count by category - exactly like the navbar does
-                    const documentResponse = await fetchData(`${API.documents}?limit=100`);
+                    // Get all documents and count by category - exactly match navbar implementation
+                    const documentUrl = new URL(API.documents, window.location.origin);
+                    documentUrl.searchParams.append('doc_types', 'all'); // Explicitly request all document types
+                    documentUrl.searchParams.append('limit', '100'); // Request more documents for accurate counting
                     
-                    // Process categories and count documents by type
+                    const documentResponse = await fetchData(documentUrl.toString());
+                    
+                    // Process categories and count documents by type - exactly as navbar does
                     const categoryCounts = {};
                     PREDEFINED_CATEGORIES.forEach(category => {
                         categoryCounts[category] = 0; // Initialize with zeros
@@ -1578,16 +1809,15 @@
                     
                     if (documentResponse && documentResponse.documents) {
                         documentResponse.documents.forEach(doc => {
-                            // Count by document type
+                            // Count by document type - exact same logic as navbar
                             if (doc.document_type) {
-                                // Capitalize first letter to match our category format (Thesis, Dissertation, etc)
                                 const docType = doc.document_type.charAt(0).toUpperCase() + doc.document_type.slice(1).toLowerCase();
                                 if (categoryCounts[docType] !== undefined) {
                                     categoryCounts[docType]++;
                                     totalDocuments++;
                                 }
                             } else if (doc.category) {
-                                // Alternative field name
+                                // Alternative field name - included for backward compatibility
                                 const docType = doc.category.charAt(0).toUpperCase() + doc.category.slice(1).toLowerCase();
                                 if (categoryCounts[docType] !== undefined) {
                                     categoryCounts[docType]++;
@@ -1658,8 +1888,14 @@
                 const clickedTile = event.currentTarget;
                 const isActive = clickedTile.classList.toggle('active');
                 clickedTile.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+                
+                // Update "All Categories" toggle state based on whether all tiles are now selected
                 updateToggleAllCategoriesSwitchState(); 
+                
+                // Reset to page 1 when changing filters
                 currentPage = 1;
+                
+                // Apply the filters with the new category selection
                 applyFiltersAndSearch();
             }
 
@@ -1710,29 +1946,27 @@
                 
                 const documentsAreSelectedOrImplied = showAllTypes || selectedSpecificTypes.includes('document');
                 if (documentsAreSelectedOrImplied) {
-                     const documentsInView = resultsToDisplay.filter(r => r.resultType === 'document');
-                     itemsForPaginationCount = documentsInView.length; 
-                     
-                     const startIndex = (currentPage - 1) * RESULTS_PER_PAGE;
-                     const endIndex = startIndex + RESULTS_PER_PAGE;
+                    const documentsInView = resultsToDisplay.filter(r => r.resultType === 'document');
+                    itemsForPaginationCount = documentsInView.length; 
+                    
+                    const startIndex = (currentPage - 1) * RESULTS_PER_PAGE;
+                    const endIndex = startIndex + RESULTS_PER_PAGE;
 
-                     if(showAllTypes){
+                    if(showAllTypes){
                         const paginatedDocs = documentsInView.slice(startIndex, endIndex);
                         const otherTypes = resultsToDisplay.filter(r => r.resultType !== 'document');
                         paginatedItems = [...paginatedDocs, ...otherTypes];
-                     } else { 
+                    } else { 
                         paginatedItems = resultsToDisplay.filter(r => r.resultType === 'document').slice(startIndex, endIndex);
                         const otherSelectedTypes = resultsToDisplay.filter(r => r.resultType !== 'document' && selectedSpecificTypes.includes(r.resultType));
                         paginatedItems = [...paginatedItems, ...otherSelectedTypes];
-                     }
-
+                    }
                 } else if (selectedSpecificTypes.length > 0) { 
                     itemsForPaginationCount = resultsToDisplay.length; 
                     const startIndex = (currentPage - 1) * RESULTS_PER_PAGE;
                     const endIndex = startIndex + RESULTS_PER_PAGE;
                     paginatedItems = resultsToDisplay.slice(startIndex, endIndex);
                 }
-
 
                 if (resultsToDisplay.length === 0) {
                     const noResultsEl = document.createElement('p');
@@ -1742,42 +1976,61 @@
                     resultsListContainer.appendChild(noResultsEl);
                     anime({ targets: noResultsEl, opacity: 1, translateY: [20, 0], duration: 500, easing: 'easeOutQuad' });
                 } else {
-                    const grouped = { document: [], author: [], keyword: [] }; // MODIFIED: tag to keyword
+                    const grouped = { document: [], author: [], keyword: [] };
                     paginatedItems.forEach(item => { if (grouped[item.resultType]) grouped[item.resultType].push(item); });
 
                     const elementsToAnimateIn = [];
 
+                    // Always show documents first if they exist
                     if (grouped.document.length > 0) {
                         const heading = document.createElement('h2');
-                        heading.className = 'results-category-heading'; heading.textContent = 'Documents';
-                        resultsListContainer.appendChild(heading); elementsToAnimateIn.push(heading);
-                        grouped.document.forEach(result => { const el = createResultItemElement(result); resultsListContainer.appendChild(el); elementsToAnimateIn.push(el); });
+                        heading.className = 'results-category-heading';
+                        heading.textContent = 'Documents';
+                        resultsListContainer.appendChild(heading);
+                        elementsToAnimateIn.push(heading);
+                        grouped.document.forEach(result => {
+                            const el = createResultItemElement(result);
+                            resultsListContainer.appendChild(el);
+                            elementsToAnimateIn.push(el);
+                        });
                     }
+
+                    // Then show authors if they exist
                     if (grouped.author.length > 0) {
                         const heading = document.createElement('h2');
-                        heading.className = 'results-category-heading'; heading.textContent = 'Authors';
-                        resultsListContainer.appendChild(heading); elementsToAnimateIn.push(heading);
+                        heading.className = 'results-category-heading';
+                        heading.textContent = 'Authors';
+                        resultsListContainer.appendChild(heading);
+                        elementsToAnimateIn.push(heading);
                         const authorCardContainer = document.createElement('div');
                         authorCardContainer.className = 'author-card-grid-container';
                         grouped.author.forEach(result => authorCardContainer.appendChild(createResultItemElement(result)));
-                        resultsListContainer.appendChild(authorCardContainer); elementsToAnimateIn.push(authorCardContainer);
+                        resultsListContainer.appendChild(authorCardContainer);
+                        elementsToAnimateIn.push(authorCardContainer);
                     }
-                    if (grouped.keyword && grouped.keyword.length > 0) { // MODIFIED: tag to keyword
+
+                    // Finally show keywords if they exist
+                    if (grouped.keyword && grouped.keyword.length > 0) {
                         const heading = document.createElement('h2');
-                        heading.className = 'results-category-heading'; heading.textContent = 'Keywords'; // MODIFIED: Text
-                        resultsListContainer.appendChild(heading); elementsToAnimateIn.push(heading);
-                        const keywordPillContainer = document.createElement('div'); // MODIFIED: Variable name
+                        heading.className = 'results-category-heading';
+                        heading.textContent = 'Keywords';
+                        resultsListContainer.appendChild(heading);
+                        elementsToAnimateIn.push(heading);
+                        const keywordPillContainer = document.createElement('div');
                         keywordPillContainer.className = 'keyword-result-pill-container';
-                        grouped.keyword.forEach(result => keywordPillContainer.appendChild(createResultItemElement(result))); // MODIFIED: tag to keyword
-                        resultsListContainer.appendChild(keywordPillContainer); elementsToAnimateIn.push(keywordPillContainer);
+                        grouped.keyword.forEach(result => keywordPillContainer.appendChild(createResultItemElement(result)));
+                        resultsListContainer.appendChild(keywordPillContainer);
+                        elementsToAnimateIn.push(keywordPillContainer);
                     }
                     
                     if (elementsToAnimateIn.length === 0 && resultsToDisplay.length > 0) { 
                     } else if (resultsListContainer.innerHTML === '') { 
-                         const noResultsEl = document.createElement('p');
-                         noResultsEl.className = 'no-results'; noResultsEl.textContent = 'No results for this selection or page.';
-                         noResultsEl.style.opacity = 0; resultsListContainer.appendChild(noResultsEl);
-                         elementsToAnimateIn.push(noResultsEl);
+                        const noResultsEl = document.createElement('p');
+                        noResultsEl.className = 'no-results';
+                        noResultsEl.textContent = 'No results for this selection or page.';
+                        noResultsEl.style.opacity = 0;
+                        resultsListContainer.appendChild(noResultsEl);
+                        elementsToAnimateIn.push(noResultsEl);
                     }
                     
                     elementsToAnimateIn.forEach(el => {
@@ -1796,6 +2049,7 @@
                         delay: anime.stagger(100, { start: 50 }), 
                         easing: 'spring(1, 70, 15, 0)', 
                     });
+
                     const gridContainers = resultsListContainer.querySelectorAll('.author-card-grid-container, .keyword-result-pill-container');
                     gridContainers.forEach(container => {
                         anime({
@@ -1838,24 +2092,99 @@
                     // Remove target="_blank" for document links to prevent opening in new tab
                     const isInternalPage = result.url && (
                         result.url.includes('guest-single.html') || 
-                        result.url.includes('guest-compiled.html') || 
-                        result.url.includes('user-single.html') || 
-                        result.url.includes('user-compiled.html')
+                        result.url.includes('guest-compiled.html') 
                     );
                     const targetAttr = isInternalPage ? '' : 'target="_blank"';
-                    itemHTML = `<h3 class="result-title"><a href="${result.url || '#'}" id="result-title-${result.id}" ${targetAttr} rel="noopener noreferrer">${result.title}</a></h3><div class="result-metadata">${result.category ? `<span>${categoryIconSVG}${result.category}</span>` : ''}${result.author ? `<span>${authorIconSVG}By ${result.author}</span>` : ''}${result.date ? `<span>${dateIconSVG}${publicationYear}</span>` : ''}</div><p class="result-snippet">${result.snippet}</p>`;
+                    
+                    // Add compiled indicator for compiled documents
+                    let compiledIndicator = '';
+                    // Make sure we detect compiled documents correctly using all available signals
+                    if (result.is_compiled === true || result.document_type?.toLowerCase() === 'compiled' || result.child_count > 0) {
+                        compiledIndicator = `<span class="document-type-indicator compiled">Compiled</span>`;
+                        itemEl.classList.add('compiled-document');
+                    } else {
+                        compiledIndicator = `<span class="document-type-indicator single">Single</span>`;
+                        itemEl.classList.add('single-document');
+                    }
+
+                    // Ensure author is displayed correctly
+                    const authorDisplay = result.author && result.author !== "Unknown" 
+                        ? `<span>${authorIconSVG}By ${result.author}</span>` 
+                        : '';
+                    
+                    itemHTML = `<h3 class="result-title"><a href="${result.url || '#'}" id="result-title-${result.id}" ${targetAttr} rel="noopener noreferrer">${result.title}</a> ${compiledIndicator}</h3><div class="result-metadata">${result.category ? `<span>${categoryIconSVG}${result.category}</span>` : ''}${authorDisplay}${result.date ? `<span>${dateIconSVG}${publicationYear}</span>` : ''}</div><p class="result-snippet">${result.snippet}</p>`;
                 } else if (result.resultType === 'author') {
                     itemEl.className = 'author-profile-card';
+                    const truncatedTitle = truncateText(result.title, 25); // Truncate author name if too long
                     const initials = result.title.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
-                    itemHTML = `<div class="author-avatar-placeholder">${initials}</div><div class="author-info"><h3 class="author-name"><a href="${result.url || '#'}" target="_blank" rel="noopener noreferrer">${result.title}</a></h3><p class="author-doc-count">${result.documentCount} document${result.documentCount !== 1 ? 's' : ''}</p><a href="${result.url || '#'}" class="author-view-link" target="_blank" rel="noopener noreferrer">View works &rarr;</a></div>`;
+                    
+                    // Set full name as a title attribute to show on hover
+                    itemEl.setAttribute('title', result.title);
+                    
+                    // Make the entire card navigable
+                    itemEl.setAttribute('role', 'button');
+                    itemEl.setAttribute('tabindex', '0');
+                    itemEl.dataset.authorUrl = result.url || '#';
+                    itemEl.style.cursor = 'pointer';
+                    
+                    // Remove target="_blank" to keep navigation in same tab
+                    itemHTML = `<div class="author-avatar-placeholder">${initials}</div><div class="author-info"><h3 class="author-name"><a href="${result.url || '#'}" title="${result.title}" rel="noopener noreferrer">${truncatedTitle}</a></h3><p class="author-doc-count">${result.documentCount} document${result.documentCount !== 1 ? 's' : ''}</p><a href="${result.url || '#'}" class="author-view-link" rel="noopener noreferrer">View works &rarr;</a></div>`;
                 } else if (result.resultType === 'keyword') { // MODIFIED: 'tag' to 'keyword'
-                    itemEl.href = result.url || '#'; 
                     itemEl.className = 'keyword-result-pill'; 
-                    itemEl.setAttribute('target', '_blank'); 
+                    
+                    // Create URL to filter documents by this keyword
+                    const keywordFilterUrl = new URL(window.location.pathname, window.location.origin);
+                    keywordFilterUrl.searchParams.set('keyword', result.title);
+                    keywordFilterUrl.searchParams.set('doc_types', 'all');  // Show all document types
+                    
+                    // Set link attributes
+                    itemEl.href = keywordFilterUrl.toString(); 
                     itemEl.setAttribute('rel', 'noopener noreferrer');
+                    
+                    // Add click handler to prevent default action and filter documents directly
+                    itemEl.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        
+                        // Update the filter Tags input with this keyword
+                        if (filterTagsInput) {
+                            filterTagsInput.value = result.title;
+                            filterTagsInput.classList.add('filter-active');
+                        }
+                        
+                        // Reset page to 1 and apply the keyword filter
+                        currentPage = 1;
+                        toggleAllResultTypes.checked = true;
+                        updateAllTypesToggleState();
+                        applyFiltersAndSearch();
+                        
+                        // Update displayed search term to show we're filtering by this keyword
+                        searchQueryTermDisplay.textContent = `Documents with keyword: ${result.title}`;
+                    });
+                    
                     itemHTML = `<span class="keyword-pill-name">${result.title}</span><span class="keyword-pill-count">${result.documentCount}</span>`;
                 }
                 itemEl.innerHTML = itemHTML;
+                
+                // Add click event listener for author cards
+                if (result.resultType === 'author') {
+                    itemEl.addEventListener('click', function(event) {
+                        // Prevent default if clicked on the card itself (not on links)
+                        const isLink = event.target.tagName === 'A' || event.target.closest('a');
+                        if (!isLink) {
+                            event.preventDefault();
+                            window.location.href = this.dataset.authorUrl;
+                        }
+                    });
+                    
+                    // Also add keyboard navigation support
+                    itemEl.addEventListener('keydown', function(event) {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            window.location.href = this.dataset.authorUrl;
+                        }
+                    });
+                }
+                
                 return itemEl;
             }
 
@@ -1868,8 +2197,11 @@
                 endOfResultsEl.style.opacity = 0;
                 endOfResultsEl.style.display = 'none';
 
-
-                const totalPages = Math.ceil(totalItems / RESULTS_PER_PAGE);
+                // Use API-provided total pages if available
+                const totalPages = Math.max(1, Math.ceil(totalItems / RESULTS_PER_PAGE));
+                
+                console.log(`Rendering pagination: totalItems=${totalItems}, totalPages=${totalPages}, currentPage=${currentPage}`);
+                
                 if (totalPages <= 1 && totalItems > 0) { 
                      paginationContainerEl.style.display = 'none';
                      endOfResultsEl.style.display = 'block';
@@ -1882,7 +2214,6 @@
 
                 paginationContainerEl.style.display = 'block';
                 anime({ targets: paginationContainerEl, opacity: 1, duration: 500, easing: 'easeOutQuad' });
-
 
                 const prevLink = document.createElement('a'); prevLink.href = '#'; prevLink.innerHTML = '&laquo; Previous'; prevLink.setAttribute('aria-label', 'Previous page');
                 if (currentPage === 1) { prevLink.classList.add('disabled'); prevLink.setAttribute('aria-disabled', 'true'); }
@@ -1905,9 +2236,29 @@
 
             function createPageLink(pageNumber) {
                 const pageLink = document.createElement(pageNumber === currentPage ? 'span' : 'a');
-                pageLink.href = '#'; pageLink.textContent = pageNumber; pageLink.classList.add('page-number');
-                if (pageNumber === currentPage) { pageLink.classList.add('current'); pageLink.setAttribute('aria-current', 'page'); }
-                else { pageLink.setAttribute('aria-label', `Go to page ${pageNumber}`); pageLink.addEventListener('click', (e) => { e.preventDefault(); currentPage = pageNumber; applyFiltersAndSearch(); }); }
+                pageLink.href = '#'; 
+                pageLink.textContent = pageNumber; 
+                pageLink.classList.add('page-number');
+                if (pageNumber === currentPage) { 
+                    pageLink.classList.add('current'); 
+                    pageLink.setAttribute('aria-current', 'page'); 
+                }
+                else { 
+                    pageLink.setAttribute('aria-label', `Go to page ${pageNumber}`); 
+                    pageLink.addEventListener('click', function(e) { 
+                        e.preventDefault(); 
+                        currentPage = pageNumber;
+                        console.log("Changing to page:", currentPage);
+                        
+                        // When changing pages, don't re-fetch all results, just render the appropriate page
+                        renderNewResults();
+                        
+                        // Scroll to top of results
+                        if (resultsListContainer) {
+                            resultsListContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                    }); 
+                }
                 return pageLink;
             }
 
@@ -1963,6 +2314,13 @@
                 let typeFilterAppliedFromUrl = false;
                 let categoryFilterAppliedFromUrl = false;
                 let yearFilterAppliedFromUrl = false;
+
+                // Check for direct keyword parameter from URL - using global urlParams
+                if (keywordParam) {
+                    filterTagsInput.value = keywordParam;
+                    filterTagsInput.classList.add('filter-active');
+                    console.log(`Found keyword parameter in URL: ${keywordParam}`);
+                }
 
                 const authorRegex = /author:"([^"]+)"/gi; let match = authorRegex.exec(remainingQuery);
                 if (match && match[1]) { const authorName = match[1]; const authorOption = Array.from(filterAuthorEl.options).find(opt => opt.value.toLowerCase() === authorName.toLowerCase()); if (authorOption) filterAuthorEl.value = authorOption.value; remainingQuery = remainingQuery.replace(match[0], '').trim(); }
@@ -2060,6 +2418,14 @@
 
             function applyFiltersAndSearch() {
                 const generalQuery = displayedSearchTerm.toLowerCase();
+
+                // Clear the previous results when changing pages
+                currentFilteredResultsMasterList = [];
+
+                // Scroll back to results section when paginating
+                if (resultsListContainer) {
+                    resultsListContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
 
                 // Collect all filter values
                 const selectedAuthor = filterAuthorEl.value !== 'all' ? filterAuthorEl.value : null;
@@ -2290,27 +2656,45 @@
             // Initial setup calls
             populateAuthorFilter(); 
             populateCategoryTiles(); 
-            parseAndUpdateFiltersFromQuery(decodeURIComponent(initialFullQuery.replace(/\+/g, ' '))); 
-            
+
+            // Set up all filters from URL parameters and query string
+            parseAndUpdateFiltersFromQuery(decodeURIComponent(initialFullQuery.replace(/\+/g, ' ')));
+
+            // Update display text for keyword filtering
+            if (keywordParam) {
+                searchQueryTermDisplay.textContent = `Documents with keyword: ${keywordParam}`;
+                document.title = `Documents with keyword: ${keywordParam}`;
+            }
+
             updateToggleAllCategoriesSwitchState(); 
             updateAllTypesToggleState(); 
 
-
             initializeLayout(); 
             window.addEventListener('resize', debounce(initializeLayout, 200)); 
-            applyFiltersAndSearch(); 
+            applyFiltersAndSearch();
         });
 
-        // Add function to update category counts based on search results
+        // Add function to update category counts based on search results - following navbar implementation
         function updateCategoryCountsFromResults(results) {
             if (!Array.isArray(results)) return;
             
-            // Count documents by category
+            // Count documents by category - using same approach as navbar
             const categoryCounts = {};
+            PREDEFINED_CATEGORIES.forEach(category => {
+                categoryCounts[category] = 0; // Initialize with zeros like navbar does
+            });
+            
+            // Count document types using the exact same logic as the navbar
             results.filter(item => item.resultType === 'document')
                 .forEach(doc => {
-                    const category = doc.category || 'Unknown';
-                    categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+                    // Extract document type - matching navbar logic
+                    if (doc.category) {
+                        // Normalize document type exactly like navbar does
+                        const docType = doc.category.charAt(0).toUpperCase() + doc.category.slice(1).toLowerCase();
+                        if (categoryCounts[docType] !== undefined) {
+                            categoryCounts[docType]++;
+                        }
+                    }
                 });
             
             console.log("Updated category counts from search results:", categoryCounts);
@@ -2333,6 +2717,12 @@
             
             // Update stored counts
             categoryCountsFromAPI = {...categoryCountsFromAPI, ...categoryCounts};
+        }
+
+        // Helper function to truncate text with ellipsis
+        function truncateText(text, maxLength = 20) {
+            if (!text || text.length <= maxLength) return text;
+            return text.substring(0, maxLength) + '...';
         }
     </script>
 

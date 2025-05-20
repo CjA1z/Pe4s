@@ -63,4 +63,35 @@ router.get("/api/trending-keywords", async (ctx) => {
   }
 });
 
+/**
+ * Get all keywords with document counts
+ * GET /api/keywords-with-counts
+ * Optional query parameters:
+ * - limit: maximum number of keywords to return (default: 100)
+ */
+router.get("/api/keywords-with-counts", async (ctx) => {
+  try {
+    // Extract query parameters
+    const url = new URL(ctx.request.url);
+    const limitParam = url.searchParams.get("limit");
+    const limit = limitParam ? parseInt(limitParam) : 100;
+    
+    // Get keywords with document counts
+    const keywordsWithCounts = await KeywordsModel.getKeywordsWithCounts(limit);
+    
+    ctx.response.status = 200;
+    ctx.response.body = {
+      keywords: keywordsWithCounts.map(k => k.keyword),
+      keywords_with_counts: keywordsWithCounts,
+      total_count: keywordsWithCounts.length
+    };
+    ctx.response.headers.set("Content-Type", "application/json");
+  } catch (error) {
+    console.error("Error in /api/keywords-with-counts endpoint:", error);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Internal server error" };
+    ctx.response.headers.set("Content-Type", "application/json");
+  }
+});
+
 export default router; 

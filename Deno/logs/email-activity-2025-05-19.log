@@ -1,0 +1,8 @@
+{"timestamp":"2025-05-19T08:04:16.753Z","action":"DOCUMENT_REQUEST_CONFIRMATION","recipient":"krezcalvski@gmail.com","recipient_name":"juan dela cruz","document":"sample thesis","request_id":"REQ-82"}
+{"timestamp":"2025-05-19T08:04:21.322Z","action":"REQUEST_CONFIRMATION_SENT_SUCCESS","recipient":"krezcalvski@gmail.com","recipient_name":"juan dela cruz","document":"sample thesis","request_id":"REQ-82"}
+{"timestamp":"2025-05-19T08:04:38.926Z","action":"DOCUMENT_APPROVAL_START","recipient":"krezcalvski@gmail.com","documentTitle":"sample thesis","documentPath":"/storage/thesis/1747277698026_5952.pdf","childDocumentCount":0}
+{"timestamp":"2025-05-19T08:04:40.937Z","action":"DOCUMENT_APPROVAL_START","recipient":"krezcalvski@gmail.com","documentTitle":"sample thesis","documentPath":"C:\\Users\\Cj\\Documents\\main-cap\\sPeAS\\storage\\thesis\\1747277698026_5952.pdf","childDocumentCount":0}
+{"timestamp":"2025-05-19T22:15:06.257Z","action":"DOCUMENT_REQUEST_CONFIRMATION","recipient":"frozenskill2212003@gmail.com","recipient_name":"cj asd","document":"CONFLUENCE Vol. 13 (2017-2018)","request_id":"REQ-83"}
+{"timestamp":"2025-05-19T22:15:10.366Z","action":"REQUEST_CONFIRMATION_SENT_SUCCESS","recipient":"frozenskill2212003@gmail.com","recipient_name":"cj asd","document":"CONFLUENCE Vol. 13 (2017-2018)","request_id":"REQ-83"}
+{"timestamp":"2025-05-19T22:16:34.381Z","action":"DOCUMENT_REQUEST_REJECTION","recipient":"frozenskill2212003@gmail.com","recipient_name":"cj asd","document":"Requested Document","reason":"Invalid Justification","request_id":"83"}
+{"timestamp":"2025-05-19T22:16:36.398Z","action":"DOCUMENT_REQUEST_REJECTION_SUCCESS","recipient":"frozenskill2212003@gmail.com","subject":"Your request for \"Requested Document\" has been rejected"}
