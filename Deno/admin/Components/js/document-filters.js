@@ -349,6 +349,7 @@ function initializeFiltersAndPagination() {
         getCurrentSortOrder,
         getCurrentSearchQuery,
         getCurrentKeyword,
+        getCurrentPage,
         updatePagination,
         filterByKeyword
     };

@@ -1051,7 +1051,41 @@ window.documentEdit = {
                     console.log('Read document button clicked');
                     const docId = document.getElementById('edit-single-document-id').value;
                     console.log('Document ID for PDF viewer:', docId);
-                    self.showPdfViewer(docId);
+                    
+                    // Directly fetch the document file path and open it
+                    fetch(`/api/documents/${docId}`)
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`Error fetching document: ${response.status}`);
+                            }
+                            return response.json();
+                        })
+                        .then(document => {
+                            if (document && document.file_path) {
+                                // Format the file path for direct access
+                                let pdfPath = document.file_path;
+                                
+                                // If the path doesn't start with http or /, add the leading /
+                                if (!pdfPath.startsWith('http') && !pdfPath.startsWith('/')) {
+                                    pdfPath = '/' + pdfPath;
+                                }
+                                
+                                // If the path is relative (starts with /), prepend the current origin
+                                if (pdfPath.startsWith('/')) {
+                                    pdfPath = window.location.origin + pdfPath;
+                                }
+                                
+                                console.log(`Opening document with path: ${pdfPath}`);
+                                window.open(pdfPath, '_blank');
+                            } else {
+                                console.error('No file path found for document', docId);
+                                alert('Document file not found.');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error opening document:', error);
+                            alert(`Error opening document: ${error.message}`);
+                        });
                 };
                 
                 // Store reference to listener for future removal
@@ -1176,7 +1210,7 @@ window.documentEdit = {
                     const tryNextEndpoint = (index = 0) => {
                         if (index >= endpoints.length) {
                             console.error('Failed to fetch document data from any endpoint');
-                            self.showPdfViewer(docId);
+                            alert('Could not find the document file. Please try again later.');
                             return;
                         }
                         
@@ -1186,38 +1220,48 @@ window.documentEdit = {
                         fetch(endpoint)
                         .then(response => {
                             if (!response.ok) {
-                                    console.warn(`Error fetching from ${endpoint}: ${response.status}`);
+                                console.warn(`Error fetching from ${endpoint}: ${response.status}`);
                                 throw new Error(`Error fetching document: ${response.status}`);
                             }
                             return response.json();
                         })
                         .then(document => {
+                            let filePath = null;
+                            
+                            // Check for foreword first (compiled document case)
                             if (document && document.foreword) {
-                                    console.log(`Opening foreword file: ${document.foreword}`);
-                                // Ensure we have a fully qualified URL by adding protocol and host if missing
-                                let forewordPath = document.foreword;
-                                
+                                console.log(`Found foreword file: ${document.foreword}`);
+                                filePath = document.foreword;
+                            } 
+                            // Otherwise check for regular file path
+                            else if (document && document.file_path) {
+                                console.log(`Found file path: ${document.file_path}`);
+                                filePath = document.file_path;
+                            }
+                            
+                            if (filePath) {
+                                // Format the file path for direct access
                                 // If the path doesn't start with http or /, add the leading /
-                                if (!forewordPath.startsWith('http') && !forewordPath.startsWith('/')) {
-                                    forewordPath = '/' + forewordPath;
+                                if (!filePath.startsWith('http') && !filePath.startsWith('/')) {
+                                    filePath = '/' + filePath;
                                 }
                                 
                                 // If the path is relative (starts with /), prepend the current origin
-                                if (forewordPath.startsWith('/')) {
-                                    forewordPath = window.location.origin + forewordPath;
+                                if (filePath.startsWith('/')) {
+                                    filePath = window.location.origin + filePath;
                                 }
                                 
-                                // Open in new tab
-                                window.open(forewordPath, '_blank');
+                                console.log(`Opening document with path: ${filePath}`);
+                                window.open(filePath, '_blank');
                             } else {
-                                    console.log('No foreword file found, falling back to document PDF');
-                    self.showPdfViewer(docId);
+                                console.error('No file path found in document data');
+                                alert('Document file not found. Please ensure the document has a file attached.');
                             }
                         })
                         .catch(error => {
-                                console.warn(`Error with endpoint ${endpoint}:`, error);
-                                // Try the next endpoint
-                                tryNextEndpoint(index + 1);
+                            console.warn(`Error with endpoint ${endpoint}:`, error);
+                            // Try the next endpoint
+                            tryNextEndpoint(index + 1);
                         });
                     };
                     
@@ -2385,7 +2429,47 @@ window.documentEdit = {
     
     // Show PDF viewer
     showPdfViewer: function(documentId) {
-        // ... existing code ...
+        if (!documentId) {
+            console.error('No document ID provided to showPdfViewer');
+            return;
+        }
+        
+        console.log(`Opening document ID ${documentId} in new tab`);
+        
+        // Fetch the document to get the file path
+        fetch(`/api/documents/${documentId}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Error fetching document: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(document => {
+                if (document && document.file_path) {
+                    // Format the file path for direct access
+                    let pdfPath = document.file_path;
+                    
+                    // If the path doesn't start with http or /, add the leading /
+                    if (!pdfPath.startsWith('http') && !pdfPath.startsWith('/')) {
+                        pdfPath = '/' + pdfPath;
+                    }
+                    
+                    // If the path is relative (starts with /), prepend the current origin
+                    if (pdfPath.startsWith('/')) {
+                        pdfPath = window.location.origin + pdfPath;
+                    }
+                    
+                    console.log(`Opening document with path: ${pdfPath}`);
+                    window.open(pdfPath, '_blank');
+                } else {
+                    console.error('No file path found for document', documentId);
+                    alert('Document file not found.');
+                }
+            })
+            .catch(error => {
+                console.error('Error opening document:', error);
+                alert(`Error opening document: ${error.message}`);
+            });
     },
     
     // Show success message
