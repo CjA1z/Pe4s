@@ -9,6 +9,7 @@ interface FileUploadOptions {
   originalPath?: string;
   documentType?: string;
   category?: string;
+  title?: string;
 }
 
 interface FileResponse {
@@ -82,12 +83,30 @@ export async function saveFile(
   const category = options.category;
   
   try {
-    // Create appropriate directory structure
-    const targetDir = await createDocumentTypeDirectory(documentType, category);
+    // Normalize storage path to use forward slashes and no trailing slashes
+    storagePath = storagePath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
     
-    // Generate timestamp for unique filename
-    const timestamp = Date.now();
+    // Create the target directory path - ensure we don't duplicate the workspace root
+    const targetDir = storagePath.startsWith(workspaceRoot) 
+      ? storagePath 
+      : join(workspaceRoot, storagePath).replace(/\\/g, '/');
     
+    // Ensure the directory exists
+    try {
+      await ensureDir(targetDir);
+      console.log("[UPLOAD_DEBUG] - Directory ensured:", targetDir);
+      
+      // Verify directory was created
+      const dirInfo = await Deno.stat(targetDir);
+      if (!dirInfo.isDirectory) {
+        throw new Error("Failed to create directory - path exists but is not a directory");
+      }
+    } catch (dirError) {
+      const errorMessage = dirError instanceof Error ? dirError.message : String(dirError);
+      console.error("[UPLOAD_DEBUG] Failed to create directory:", errorMessage);
+      throw new Error(`Failed to create directory: ${errorMessage}`);
+    }
+
     // Get original filename or generate one
     let originalName = "";
     if (typeof file === "object" && "name" in file) {
@@ -96,216 +115,95 @@ export async function saveFile(
       originalName = options.originalName;
     }
     
-    // Generate unique filename
-    let fileExtension = (originalName || "unknown.pdf").split(".").pop() || "pdf";
-    
-    // Detect file type and ensure proper extension for known types
-    const fileType = (typeof file === "object" && "type" in file && file.type) ? file.type : "";
-    if (fileType.includes("pdf") || originalName.toLowerCase().endsWith(".pdf")) {
-      fileExtension = "pdf";
-    } else if (fileType.includes("word") || originalName.toLowerCase().match(/\.(docx?|rtf)$/)) {
-      fileExtension = originalName.toLowerCase().endsWith(".docx") ? "docx" : originalName.toLowerCase().endsWith(".doc") ? "doc" : "rtf";
-    } else if (fileType.includes("image/") || originalName.toLowerCase().match(/\.(jpg|jpeg|png|gif|bmp|svg)$/i)) {
-      fileExtension = originalName.toLowerCase().split('.').pop() || "jpg";
-    } else {
-      // Default to PDF for document management system
-      fileExtension = "pdf";
+    // Determine file extension
+    let fileExtension = "pdf"; // Default to PDF
+    if (originalName && originalName.includes('.')) {
+      const ext = originalName.split('.').pop()?.toLowerCase() || "pdf";
+      // Only allow specific file extensions
+      if (['pdf', 'doc', 'docx', 'rtf'].includes(ext)) {
+        fileExtension = ext;
+      }
+    } else if (typeof file === "object" && "type" in file) {
+      const mimeType = (file as FileWithContent).type;
+      if (mimeType) {
+        if (mimeType.includes('pdf')) {
+          fileExtension = 'pdf';
+        } else if (mimeType.includes('msword')) {
+          fileExtension = 'doc';
+        } else if (mimeType.includes('wordprocessingml')) {
+          fileExtension = 'docx';
+        }
+      }
     }
     
-    const uniqueFilename = `${timestamp}_${Math.floor(Math.random() * 10000)}.${fileExtension}`;
-    
-    // Construct full file path using path.join and normalize to forward slashes
-    const filePath = join(targetDir, uniqueFilename).replace(/\\/g, '/');
+    // Create filename based on title if available
+    let finalFilename: string;
+    if (options.title) {
+      // Convert title to a URL-friendly format
+      const safeTitle = options.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric chars with hyphens
+        .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+      
+      finalFilename = `${safeTitle}.${fileExtension}`;
+      
+      // If a file with this name already exists, add a number suffix
+      let counter = 1;
+      let testPath = join(targetDir, finalFilename).replace(/\\/g, '/');
+      while (await Deno.stat(testPath).catch(() => false)) {
+        finalFilename = `${safeTitle}-${counter}.${fileExtension}`;
+        testPath = join(targetDir, finalFilename).replace(/\\/g, '/');
+        counter++;
+      }
+    } else {
+      // Use timestamp if no title is provided
+      const timestamp = Date.now();
+      finalFilename = `${timestamp}.${fileExtension}`;
+    }
     
     console.log("[UPLOAD_DEBUG] - Original filename:", originalName);
+    console.log("[UPLOAD_DEBUG] - Final filename:", finalFilename);
     console.log("[UPLOAD_DEBUG] - Storage path:", storagePath);
     console.log("[UPLOAD_DEBUG] - Target directory:", targetDir);
+    
+    // Construct full file path
+    const filePath = join(targetDir, finalFilename).replace(/\\/g, '/');
     console.log("[UPLOAD_DEBUG] - File path:", filePath);
-    console.log("[UPLOAD_DEBUG] - Options:", JSON.stringify(options));
     
-    // Normalize storage path to use forward slashes and no leading/trailing slashes
-    storagePath = storagePath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-    
-    // Make sure the storage path is relative to the workspace root, not the Deno directory
-    // If storagePath doesn't start with the workspace root, prepend it
-    const fullStoragePath = storagePath.startsWith(workspaceRoot) 
-      ? storagePath 
-      : join(workspaceRoot, storagePath).replace(/\\/g, '/');
-    
-    // Ensure the directory exists
-    await ensureDir(fullStoragePath);
-    console.log("[UPLOAD_DEBUG] - Directory ensured:", fullStoragePath);
-    
-    let finalFilename: string;
-    if (options.keepOriginalName && options.originalName) {
-      // For replacements, use the original name
-      finalFilename = options.originalName;
-      console.log("[UPLOAD_DEBUG] - Using original filename for replacement:", finalFilename);
-    } else {
-      // Create a unique filename based on timestamp and original filename
-      finalFilename = uniqueFilename;
-      console.log("[UPLOAD_DEBUG] - Generated unique filename:", finalFilename);
-    }
-    
-    // Create the full path using forward slashes
-    const fullFilePath = join(fullStoragePath, finalFilename).replace(/\\/g, '/');
-    console.log("[UPLOAD_DEBUG] - Full file path:", fullFilePath);
-    
-    // If this is a replacement, try to delete both the original path and the new path
-    if (options.keepOriginalName && options.originalPath) {
-      try {
-        // Try to delete file at original path - make sure this is relative to workspace root
-        let normalizedOriginalPath = options.originalPath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-
-        console.log("[UPLOAD_DEBUG] - Original path before normalization:", options.originalPath);
-        console.log("[UPLOAD_DEBUG] - Normalized path:", normalizedOriginalPath);
-        console.log("[UPLOAD_DEBUG] - Workspace root:", workspaceRoot);
-        
-        // Handle absolute paths that start with protocol or drive letter
-        if (normalizedOriginalPath.startsWith('http:') || normalizedOriginalPath.startsWith('https:')) {
-          // Extract just the path portion for URLs
-          try {
-            const url = new URL(normalizedOriginalPath);
-            normalizedOriginalPath = url.pathname.replace(/^\/+/, '');
-            console.log("[UPLOAD_DEBUG] - Extracted pathname from URL:", normalizedOriginalPath);
-          } catch (urlError) {
-            console.warn("[UPLOAD_DEBUG] - Failed to parse URL:", urlError);
-          }
-        } else if (normalizedOriginalPath.match(/^[A-Za-z]:\//)) {
-          // For Windows paths, extract the path relative to storage directory
-          const parts = normalizedOriginalPath.split('/');
-          const storageIndex = parts.findIndex(part => part === 'storage');
-          if (storageIndex !== -1) {
-            normalizedOriginalPath = parts.slice(storageIndex).join('/');
-            console.log("[UPLOAD_DEBUG] - Extracted storage path from absolute path:", normalizedOriginalPath);
-          } else {
-            console.warn("[UPLOAD_DEBUG] - Could not find 'storage' in path:", normalizedOriginalPath);
-          }
-        }
-        
-        // If the original path doesn't start with the workspace root, prepend it
-        if (!normalizedOriginalPath.startsWith(workspaceRoot)) {
-          normalizedOriginalPath = join(workspaceRoot, normalizedOriginalPath).replace(/\\/g, '/');
-        }
-        
-        console.log("[UPLOAD_DEBUG] - Final path for original file removal:", normalizedOriginalPath);
-        
-        const originalExists = await Deno.stat(normalizedOriginalPath).catch((err) => {
-          console.warn("[UPLOAD_DEBUG] - Could not stat original file:", err.message);
-          return false;
-        });
-        
-        if (originalExists) {
-          await Deno.remove(normalizedOriginalPath);
-          console.log("[UPLOAD_DEBUG] - Successfully removed original file");
-        } else {
-          console.log("[UPLOAD_DEBUG] - Original file not found at:", normalizedOriginalPath);
-        }
-        
-        // Also try to delete at the new path if it's different
-        if (normalizedOriginalPath !== fullFilePath) {
-          console.log("[UPLOAD_DEBUG] - Checking new path:", fullFilePath);
-          const newExists = await Deno.stat(fullFilePath).catch(() => false);
-          if (newExists) {
-            await Deno.remove(fullFilePath);
-            console.log("[UPLOAD_DEBUG] - Successfully removed file at new path");
-          }
-        }
-      } catch (error: unknown) {
-        // Log error but continue with upload
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        console.warn("[UPLOAD_DEBUG] - Error during file cleanup:", errorMsg);
-        console.warn("[UPLOAD_DEBUG] - Will continue with upload despite cleanup error");
-      }
-    }
-
-    // Get the file content - enhanced to handle more formats
+    // Get the file content
     let fileContent: Uint8Array;
     const fileObj = file as FileWithContent;
-    console.log("[UPLOAD_DEBUG] - Processing file content. Available properties:", Object.keys(fileObj));
-
+    
     if (fileObj.content) {
-      console.log("[UPLOAD_DEBUG] - Using direct content");
       fileContent = fileObj.content;
     } else if (fileObj.bytes) {
-      console.log("[UPLOAD_DEBUG] - Using bytes property");
       fileContent = fileObj.bytes;
     } else if (fileObj.path) {
-      console.log("[UPLOAD_DEBUG] - Reading from temporary path:", fileObj.path);
-      try {
-        fileContent = await Deno.readFile(fileObj.path);
-        console.log("[UPLOAD_DEBUG] - Successfully read file from temporary path");
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.error("[UPLOAD_DEBUG] - Error reading from temporary path:", message);
-        throw new Error(`Could not read temporary file: ${message}`);
-      }
+      fileContent = await Deno.readFile(fileObj.path);
     } else if (fileObj.arrayBuffer) {
-      console.log("[UPLOAD_DEBUG] - Using arrayBuffer method");
-      try {
-        const buffer = await fileObj.arrayBuffer();
-        fileContent = new Uint8Array(buffer);
-        console.log("[UPLOAD_DEBUG] - Successfully converted arrayBuffer to Uint8Array");
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.error("[UPLOAD_DEBUG] - Error processing array buffer:", message);
-        throw new Error(`Could not process file buffer: ${message}`);
-      }
+      const buffer = await fileObj.arrayBuffer();
+      fileContent = new Uint8Array(buffer);
     } else if (file instanceof Uint8Array || file instanceof ArrayBuffer) {
-      console.log("[UPLOAD_DEBUG] - Using direct binary data");
       fileContent = file instanceof ArrayBuffer ? new Uint8Array(file) : file;
-    } else if (typeof file === 'string' && file.startsWith('data:')) {
-      console.log("[UPLOAD_DEBUG] - Processing data URI");
-      try {
-        const base64String = file.split(',')[1];
-        fileContent = Uint8Array.from(atob(base64String), c => c.charCodeAt(0));
-        console.log("[UPLOAD_DEBUG] - Successfully processed data URI");
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.error("[UPLOAD_DEBUG] - Error processing data URI:", message);
-        throw new Error(`Invalid data URI format: ${message}`);
-      }
     } else {
-      console.error("[UPLOAD_DEBUG] - Unsupported file format. File object:", file);
-      throw new Error("Unsupported file object format. File must contain a path, arrayBuffer method, content, or bytes property.");
+      throw new Error("Unsupported file format");
     }
     
-    if (!fileContent || fileContent.length === 0) {
-      console.error("[UPLOAD_DEBUG] - File content is empty");
-      throw new Error("File content is empty");
-    }
-    
-    console.log("[UPLOAD_DEBUG] - Writing file to disk at:", fullFilePath);
-    // Write the file to disk
-    await Deno.writeFile(fullFilePath, fileContent);
+    // Write the file
+    await Deno.writeFile(filePath, fileContent);
     console.log("[UPLOAD_DEBUG] - File successfully written to disk");
     
     // Get file size
-    let fileSize = 0;
-    try {
-      const fileInfo = await Deno.stat(fullFilePath);
-      fileSize = fileInfo.size;
-      console.log("[UPLOAD_DEBUG] - File size:", fileSize, "bytes");
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.warn("[UPLOAD_DEBUG] - Warning: Could not get file size:", message);
-    }
+    const fileInfo = await Deno.stat(filePath);
+    const fileSize = fileInfo.size;
     
-    // For the response, return the path relative to workspace root for API consistency
-    // This ensures the file can be accessed via the correct URL
-    const relativePath = fullFilePath.startsWith(workspaceRoot)
-      ? fullFilePath.substring(workspaceRoot.length).replace(/^[\\/]+/, '')
-      : fullFilePath;
-    
-    // Return file information without creating a database record
-    const response = {
-      path: relativePath,
+    // Return file information
+    return {
+      path: storagePath + '/' + finalFilename,
       name: finalFilename,
       size: fileSize,
       type: (file as FileWithContent).type || getMimeTypeFromExtension(extname(finalFilename))
     };
-    console.log("[UPLOAD_DEBUG] - Returning response:", response);
-    return response;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("[UPLOAD_DEBUG] - Error in saveFile:", message);

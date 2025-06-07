@@ -385,6 +385,8 @@ async function handleSingleDocumentSubmit(e) {
         // Add document type and category information
         fileData.append('document_type', documentType.toUpperCase());
         fileData.append('category', categoryValue);
+        // Add title for file naming
+        fileData.append('title', formData.get('title'));
         
         console.log('Uploading single document file:', file.name, 'Size:', file.size, 'bytes', 'Path:', storagePath);
         
@@ -500,29 +502,6 @@ async function handleSingleDocumentSubmit(e) {
             file_type: fileResult.fileType || 'application/octet-stream',
             document_id: documentId
         };
-        
-        // Save file record to database
-        // REMOVED: No longer creating separate file records
-        // We now rely entirely on the documents.file_path field
-        // try {
-        //     const fileRecordResponse = await fetch('/api/files', {
-        //         method: 'POST',
-        //         headers: {
-        //             'Content-Type': 'application/json'
-        //         },
-        //         body: JSON.stringify(fileRecord)
-        //     });
-        //     
-        //     if (!fileRecordResponse.ok) {
-        //         const errorData = await fileRecordResponse.json();
-        //         console.warn('Warning: Failed to create file record:', errorData.error || 'Unknown error');
-        //     } else {
-        //         console.log('File record created successfully');
-        //     }
-        // } catch (fileRecordError) {
-        //     console.warn('Warning: Error creating file record:', fileRecordError);
-        //     // Continue even if file record creation fails
-        // }
         
         // Save author information
         if (formData.get('author')) {
@@ -852,16 +831,20 @@ async function handleCompiledDocumentSubmit(e) {
             
             try {
                 // Create a specific path for foreword files with their own subfolder
-                const baseStoragePath = compiledStoragePath;
-                const forewordPath = `${baseStoragePath}forewords/`;
-            console.log(`Using foreword storage path: ${forewordPath}`);
-            
-            const forewordFormData = new FormData();
+                const forewordPath = `storage/${validStorageType}/forewords/`;
+                console.log(`Using foreword storage path: ${forewordPath}`);
+                
+                // Generate a title for the foreword file
+                const volumeNumber = formData.get('volume') || '';
+                const forewordTitle = `Foreword ${documentType} ${volumeNumber}`.trim();
+                
+                const forewordFormData = new FormData();
                 forewordFormData.append('file', forewordFile);
-            forewordFormData.append('storagePath', forewordPath);
+                forewordFormData.append('storagePath', forewordPath);
                 forewordFormData.append('document_type', documentType.toUpperCase());
                 forewordFormData.append('category', category);
                 forewordFormData.append('is_foreword', 'true'); // Flag to indicate this is a foreword file
+                forewordFormData.append('title', forewordTitle); // Add the generated title
                 
                 // First ensure the directory exists using direct API call
                 console.log(`Ensuring foreword directory exists: ${forewordPath}`);
@@ -1038,6 +1021,8 @@ async function handleCompiledDocumentSubmit(e) {
             studyFormData.append('file', file);
             studyFormData.append('storagePath', compiledStoragePath);
             studyFormData.append('document_type', documentType);
+            // Add title for file naming
+            studyFormData.append('title', titleInput.value);
             
             // Upload the study file
             const studyFileResponse = await fetch('/api/upload', {

@@ -5,6 +5,23 @@ import { Context } from "../deps.ts";
 import { saveFile } from "../services/uploadService.ts";
 import { extractPdfMetadata } from "../services/pdfService.ts";
 
+interface FormDataFile {
+  name?: string;
+  filename?: string;
+  content?: Uint8Array;
+  contentType?: string;
+  size?: number;
+}
+
+interface FormDataFields {
+  [key: string]: string | FormDataFile;
+}
+
+interface FormDataResult {
+  files?: FormDataFile[];
+  fields: FormDataFields;
+}
+
 /**
  * Handle file upload request
  * @param ctx The Oak context
@@ -27,24 +44,24 @@ export async function handleFileUpload(ctx: Context): Promise<void> {
     const data = await form.read({ 
       maxFileSize: 500_000_000, // 500MB limit
       maxSize: 550_000_000 // 550MB total form limit
-    });
+    }) as FormDataResult;
     
     // Get file from form data
-    let file = data.files?.[0];
+    let file: FormDataFile = data.files?.[0] || {};
     
-    if (!file) {
+    if (!file.name && !file.filename) {
       // Look for the file in a field named "file" if no files array is found
       for (const [key, value] of Object.entries(data.fields)) {
         if (key === "file" && value) {
           // If the value is a file-like object
-          if (typeof value === "object" && (value.name || value.filename)) {
-            file = value;
+          if (typeof value === "object" && ("name" in value || "filename" in value)) {
+            file = value as FormDataFile;
             break;
           }
         }
       }
       
-      if (!file) {
+      if (!file.name && !file.filename) {
         ctx.response.status = 400;
         ctx.response.body = { error: "No file provided in the request" };
         return;
@@ -65,14 +82,17 @@ export async function handleFileUpload(ctx: Context): Promise<void> {
     }
     
     // Get storage path from form data or original path for replacements
-    let storagePath = data.fields.storagePath;
+    let storagePath = data.fields.storagePath as string;
     const isReplacement = data.fields.is_replacement === "true";
-    const originalName = data.fields.original_name;
-    let originalPath = data.fields.original_path;
+    const originalName = data.fields.original_name as string;
+    let originalPath = data.fields.original_path as string;
     
     // Get document type and category information
-    const documentType = data.fields.document_type || "GENERAL";
-    const category = data.fields.category;
+    const documentType = (data.fields.document_type as string) || "GENERAL";
+    const category = data.fields.category as string;
+    
+    // Get title from form data
+    const title = data.fields.title as string;
     
     // Validate document type only for document uploads
     const validDocumentTypes = ["THESIS", "DISSERTATION", "CONFLUENCE", "SYNERGY", "HELLO"];
@@ -88,6 +108,7 @@ export async function handleFileUpload(ctx: Context): Promise<void> {
     console.log("- Is replacement:", isReplacement);
     console.log("- Original name:", originalName);
     console.log("- Original path:", originalPath);
+    console.log("- Title:", title);
     
     // Normalize path separators to forward slashes and remove leading/trailing slashes
     if (originalPath) {
@@ -121,46 +142,55 @@ export async function handleFileUpload(ctx: Context): Promise<void> {
     // Clean up the path for safety
     storagePath = storagePath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
     
+    // Get the workspace root directory (parent of Deno directory)
+    const workspaceRoot = Deno.cwd().replace(/[\\/]Deno$/, '');
+    console.log("[UPLOAD_DEBUG] Workspace root:", workspaceRoot);
+    
     // Handle foreword files specially - ensure they go to a forewords subfolder
     if (isForewordUpload) {
-       console.log("[UPLOAD_DEBUG] Detected foreword file upload");
-       
-       // Extract document type from path or from form data
-       const pathParts = storagePath.split('/');
-       let docType = 'hello'; // Default
-       
-       // Try to get document type from path
-       if (pathParts.length > 1) {
-           docType = pathParts[1].toLowerCase();
-       }
-       
-       // Override with document_type from form data if available
-       if (data.fields.document_type) {
-           docType = data.fields.document_type.toString().toLowerCase();
-       }
-       
-       // Handle various document types - ensure they're valid
-       const validDocTypes = ['thesis', 'dissertation', 'confluence', 'synergy', 'hello'];
-       if (!validDocTypes.includes(docType)) {
-           docType = 'hello';
-       }
-       
-       // Ensure the path correctly includes the document type and forewords subfolder
-       if (storagePath.includes('forewords')) {
-           // Path already includes forewords subfolder, verify its structure
-           const forewordDirIndex = storagePath.indexOf('forewords');
-           const beforeForewordDir = storagePath.substring(0, forewordDirIndex);
-           
-           if (!beforeForewordDir.includes(docType)) {
-               // Needs correcting - rebuild the path
-               storagePath = `storage/${docType}/forewords`;
-           }
-       } else {
-           // Build the proper foreword path
-           storagePath = `storage/${docType}/forewords`;
-       }
-       
-       console.log("[UPLOAD_DEBUG] Final foreword directory path:", storagePath);
+        console.log("[UPLOAD_DEBUG] Detected foreword file upload");
+        
+        // Extract document type from path or from form data
+        const pathParts = (storagePath || "").split('/');
+        let docType = 'hello'; // Default
+        
+        // Try to get document type from path
+        if (pathParts.length > 1) {
+            docType = pathParts[1].toLowerCase();
+        }
+        
+        // Override with document_type from form data if available
+        if (data.fields.document_type) {
+            docType = (data.fields.document_type as string).toLowerCase();
+        }
+        
+        // Handle various document types - ensure they're valid
+        const validDocTypes = ['thesis', 'dissertation', 'confluence', 'synergy', 'hello'];
+        if (!validDocTypes.includes(docType)) {
+            docType = 'hello';
+        }
+        
+        // Always use the standardized foreword path structure with trailing slash
+        storagePath = `storage/${docType}/forewords/`;
+        console.log("[UPLOAD_DEBUG] Final foreword directory path:", storagePath);
+        
+        // Ensure the foreword directory exists
+        try {
+            const fullPath = join(workspaceRoot, storagePath);
+            console.log("[UPLOAD_DEBUG] Creating foreword directory at:", fullPath);
+            await Deno.mkdir(fullPath, { recursive: true });
+            
+            // Verify directory was created
+            const dirInfo = await Deno.stat(fullPath);
+            if (!dirInfo.isDirectory) {
+                throw new Error("Failed to create foreword directory - path exists but is not a directory");
+            }
+            console.log("[UPLOAD_DEBUG] Successfully created/verified foreword directory");
+        } catch (dirError) {
+            const errorMessage = dirError instanceof Error ? dirError.message : String(dirError);
+            console.error("[UPLOAD_DEBUG] Failed to create foreword directory:", errorMessage);
+            throw new Error(`Failed to create foreword directory: ${errorMessage}`);
+        }
     }
     
     // Ensure storage path is at workspace level
@@ -171,34 +201,16 @@ export async function handleFileUpload(ctx: Context): Promise<void> {
     
     console.log("[UPLOAD_DEBUG] Final storage path:", storagePath);
     
-    // Get the workspace root directory (parent of Deno directory)
-    const workspaceRoot = Deno.cwd().replace(/[\\/]Deno$/, '');
-    
-    console.log("[UPLOAD_DEBUG] Workspace root:", workspaceRoot);
-    
-    // Ensure foreword directories exist if this is a foreword upload
-    if (isForewordUpload) {
-        // Ensure the directory exists
-        try {
-            const fullPath = join(workspaceRoot, storagePath);
-            await Deno.mkdir(fullPath, { recursive: true });
-            console.log("[UPLOAD_DEBUG] Created or verified foreword directory:", fullPath);
-        } catch (dirError) {
-            console.warn("[UPLOAD_DEBUG] Directory creation warning:", dirError instanceof Error ? dirError.message : String(dirError));
-            // Continue with upload attempt
-        }
-    }
-    
     // Save file with replacement options if needed
-    const saveOptions = isReplacement && originalName ? {
-      keepOriginalName: true,
-      originalName: originalName,
-      originalPath: originalPath, // Pass the full original path to the upload service
+    const saveOptions = {
+      ...(isReplacement && originalName ? {
+        keepOriginalName: true,
+        originalName: originalName,
+        originalPath: originalPath, // Pass the full original path to the upload service
+      } : {}),
       documentType,
-      category
-    } : {
-      documentType,
-      category
+      category,
+      title // Add the title to the save options
     };
     
     console.log("[UPLOAD_DEBUG] Saving file with options:", saveOptions);
