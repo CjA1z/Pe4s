@@ -3,6 +3,18 @@
 import { ensureDir, extname, join } from "../deps.ts";
 import { createFile } from "../controllers/fileController.ts";
 
+export interface FileWithContent {
+  name: string;
+  filename?: string;
+  type: string;
+  content?: Uint8Array;
+  bytes?: Uint8Array;
+  path?: string;
+  arrayBuffer?: () => Promise<ArrayBuffer>;
+  size: number;
+  shouldMove?: boolean;
+}
+
 interface FileUploadOptions {
   keepOriginalName?: boolean;
   originalName?: string;
@@ -17,15 +29,6 @@ interface FileResponse {
   name: string;
   size: number;
   type: string;
-}
-
-interface FileWithContent {
-  name?: string;
-  content?: Uint8Array;
-  bytes?: Uint8Array;
-  path?: string;
-  arrayBuffer?: () => Promise<ArrayBuffer>;
-  type?: string;
 }
 
 /**
@@ -106,7 +109,7 @@ export async function saveFile(
       console.error("[UPLOAD_DEBUG] Failed to create directory:", errorMessage);
       throw new Error(`Failed to create directory: ${errorMessage}`);
     }
-
+    
     // Get original filename or generate one
     let originalName = "";
     if (typeof file === "object" && "name" in file) {
@@ -170,28 +173,40 @@ export async function saveFile(
     const filePath = join(targetDir, finalFilename).replace(/\\/g, '/');
     console.log("[UPLOAD_DEBUG] - File path:", filePath);
     
-    // Get the file content
-    let fileContent: Uint8Array;
+    // Get the file content or move the file
+    let fileContent: Uint8Array | undefined;
     const fileObj = file as FileWithContent;
     
+    if (fileObj.shouldMove && fileObj.path) {
+      // Move the file instead of copying it
+      try {
+        await Deno.rename(fileObj.path, filePath);
+        console.log("[UPLOAD_DEBUG] - File successfully moved to final location");
+      } catch (moveError) {
+        console.error("[UPLOAD_DEBUG] - Error moving file:", moveError);
+        throw new Error("Failed to move file to final location");
+      }
+    } else {
+      // Get file content as before for non-moved files
     if (fileObj.content) {
       fileContent = fileObj.content;
     } else if (fileObj.bytes) {
       fileContent = fileObj.bytes;
     } else if (fileObj.path) {
-      fileContent = await Deno.readFile(fileObj.path);
+        fileContent = await Deno.readFile(fileObj.path);
     } else if (fileObj.arrayBuffer) {
-      const buffer = await fileObj.arrayBuffer();
-      fileContent = new Uint8Array(buffer);
+        const buffer = await fileObj.arrayBuffer();
+        fileContent = new Uint8Array(buffer);
     } else if (file instanceof Uint8Array || file instanceof ArrayBuffer) {
       fileContent = file instanceof ArrayBuffer ? new Uint8Array(file) : file;
-    } else {
-      throw new Error("Unsupported file format");
+      } else {
+        throw new Error("Unsupported file format");
+      }
+      
+      // Write the file for non-moved files
+      await Deno.writeFile(filePath, fileContent);
+      console.log("[UPLOAD_DEBUG] - File successfully written to disk");
     }
-    
-    // Write the file
-    await Deno.writeFile(filePath, fileContent);
-    console.log("[UPLOAD_DEBUG] - File successfully written to disk");
     
     // Get file size
     const fileInfo = await Deno.stat(filePath);

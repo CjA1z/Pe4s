@@ -2,15 +2,16 @@
 
 import { join } from "../deps.ts";
 import { Context } from "../deps.ts";
-import { saveFile } from "../services/uploadService.ts";
+import { saveFile, FileWithContent } from "../services/uploadService.ts";
 import { extractPdfMetadata } from "../services/pdfService.ts";
+import { PreUploadManager } from "../services/preUploadService.ts";
 
 interface FormDataFile {
   name?: string;
   filename?: string;
   content?: Uint8Array;
   contentType?: string;
-  size?: number;
+  size: number;
 }
 
 interface FormDataFields {
@@ -21,6 +22,9 @@ interface FormDataResult {
   files?: FormDataFile[];
   fields: FormDataFields;
 }
+
+// Get the singleton instance of PreUploadManager
+const preUploadManager = PreUploadManager.getInstance();
 
 /**
  * Handle file upload request
@@ -42,61 +46,63 @@ export async function handleFileUpload(ctx: Context): Promise<void> {
     // Get form data
     const form = await ctx.request.body({ type: "form-data" }).value;
     const data = await form.read({ 
-      maxFileSize: 500_000_000, // 500MB limit
       maxSize: 550_000_000 // 550MB total form limit
-    }) as FormDataResult;
+    });
     
-    // Get file from form data
-    let file: FormDataFile = data.files?.[0] || {};
-    
-    if (!file.name && !file.filename) {
-      // Look for the file in a field named "file" if no files array is found
-      for (const [key, value] of Object.entries(data.fields)) {
-        if (key === "file" && value) {
-          // If the value is a file-like object
-          if (typeof value === "object" && ("name" in value || "filename" in value)) {
-            file = value as FormDataFile;
-            break;
-          }
-        }
+    // Check if this is a pre-uploaded file
+    const preparedFileId = data.fields.preparedFileId;
+    let file: FileWithContent;
+
+    if (preparedFileId) {
+      // Get the prepared file
+      const preparedFile = preUploadManager.getPreparedFile(preparedFileId);
+      if (!preparedFile) {
+        ctx.response.status = 400;
+        ctx.response.body = { error: "Prepared file not found. Please try uploading again." };
+        return;
       }
-      
-      if (!file.name && !file.filename) {
+
+      // Instead of reading the file again, just pass the temp path and move flag
+      const tempPath = `temp/pre-upload/${preparedFileId}`;
+      file = {
+        name: preparedFile.fileName,
+        type: preparedFile.fileType,
+        path: tempPath,
+        size: preparedFile.fileSize,
+        shouldMove: true // Flag to indicate we should move instead of copy
+      };
+    } else {
+      // Get file from form data as usual
+      const formFile = data.files?.[0] as FormDataFile | undefined;
+      if (!formFile) {
         ctx.response.status = 400;
         ctx.response.body = { error: "No file provided in the request" };
         return;
       }
-    }
-    
-    // Check if file has required properties
-    if (!file.name && !file.filename) {
-      file.name = "unnamed_file";
-    }
 
-    // Check if this is a profile picture upload
-    const isProfilePicture = data.fields.is_profile_picture === "true";
-    
-    if (isProfilePicture) {
-      // Handle profile picture upload
-      return await handleProfilePictureUpload(file, ctx);
+      // Convert FormDataFile to FileWithContent
+      file = {
+        name: formFile.filename || formFile.name || "unnamed_file",
+        type: formFile.contentType || "application/octet-stream",
+        content: formFile.content,
+        size: formFile.size,
+        shouldMove: false
+      };
     }
     
-    // Get storage path from form data or original path for replacements
-    let storagePath = data.fields.storagePath as string;
-    const isReplacement = data.fields.is_replacement === "true";
-    const originalName = data.fields.original_name as string;
-    let originalPath = data.fields.original_path as string;
+    // Get document type and category from form data
+    const documentType = data.fields.document_type?.toString().toUpperCase() || "HELLO";
+    const category = data.fields.category?.toString() || "";
     
-    // Get document type and category information
-    const documentType = (data.fields.document_type as string) || "GENERAL";
-    const category = data.fields.category as string;
+    // Determine storage path based on document type
+    const storagePath = `storage/${documentType.toLowerCase()}`;
     
     // Get title from form data
-    const title = data.fields.title as string;
+    const title = data.fields.title?.toString() || "";
     
     // Validate document type only for document uploads
     const validDocumentTypes = ["THESIS", "DISSERTATION", "CONFLUENCE", "SYNERGY", "HELLO"];
-    if (!validDocumentTypes.includes(documentType.toUpperCase())) {
+    if (!validDocumentTypes.includes(documentType)) {
       ctx.response.status = 400;
       ctx.response.body = { error: `Invalid document type. Must be one of: ${validDocumentTypes.join(", ")}` };
       return;
@@ -105,15 +111,16 @@ export async function handleFileUpload(ctx: Context): Promise<void> {
     console.log("[UPLOAD_DEBUG] Request details:");
     console.log("- File name:", file.name || file.filename);
     console.log("- File size:", file.size, "bytes");
-    console.log("- Is replacement:", isReplacement);
-    console.log("- Original name:", originalName);
-    console.log("- Original path:", originalPath);
+    console.log("- Document type:", documentType);
+    console.log("- Category:", category);
     console.log("- Title:", title);
     
-    // Normalize path separators to forward slashes and remove leading/trailing slashes
-    if (originalPath) {
-      originalPath = originalPath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-    }
+    // Clean up the path for safety
+    let cleanedStoragePath = storagePath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+    
+    // Get the workspace root directory (parent of Deno directory)
+    const workspaceRoot = Deno.cwd().replace(/[\\/]Deno$/, '');
+    console.log("[UPLOAD_DEBUG] Workspace root:", workspaceRoot);
     
     // Special handling for foreword files
     const isFileNameForeword = file && 
@@ -126,97 +133,40 @@ export async function handleFileUpload(ctx: Context): Promise<void> {
     
     console.log(`[UPLOAD_DEBUG] File appears to be foreword? ${isForewordUpload ? 'YES' : 'NO'}`);
     
-    // Extract storage path from original path if available
-    if (originalPath && originalPath.includes('/')) {
-      const lastSlashIndex = originalPath.lastIndexOf('/');
-        storagePath = originalPath.substring(0, lastSlashIndex);
-        console.log("[UPLOAD_DEBUG] Using storage path from original:", storagePath);
+    // Default storage path if one is not provided
+    if (!cleanedStoragePath) {
+        cleanedStoragePath = "storage/hello";
+        console.log("[UPLOAD_DEBUG] Using default storage path:", cleanedStoragePath);
     }
     
-    // Default storage path if one is not provided
-    if (!storagePath) {
-      storagePath = "storage/hello";
-       console.log("[UPLOAD_DEBUG] Using default storage path:", storagePath);
+    // Add forewords subdirectory for foreword files
+    if (isForewordUpload) {
+        cleanedStoragePath = `${cleanedStoragePath}/forewords`;
+        console.log("[UPLOAD_DEBUG] Using foreword storage path:", cleanedStoragePath);
     }
     
     // Clean up the path for safety
-    storagePath = storagePath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-    
-    // Get the workspace root directory (parent of Deno directory)
-    const workspaceRoot = Deno.cwd().replace(/[\\/]Deno$/, '');
-    console.log("[UPLOAD_DEBUG] Workspace root:", workspaceRoot);
-    
-    // Handle foreword files specially - ensure they go to a forewords subfolder
-    if (isForewordUpload) {
-        console.log("[UPLOAD_DEBUG] Detected foreword file upload");
-        
-        // Extract document type from path or from form data
-        const pathParts = (storagePath || "").split('/');
-        let docType = 'hello'; // Default
-        
-        // Try to get document type from path
-        if (pathParts.length > 1) {
-            docType = pathParts[1].toLowerCase();
-        }
-        
-        // Override with document_type from form data if available
-        if (data.fields.document_type) {
-            docType = (data.fields.document_type as string).toLowerCase();
-        }
-        
-        // Handle various document types - ensure they're valid
-        const validDocTypes = ['thesis', 'dissertation', 'confluence', 'synergy', 'hello'];
-        if (!validDocTypes.includes(docType)) {
-            docType = 'hello';
-        }
-        
-        // Always use the standardized foreword path structure with trailing slash
-        storagePath = `storage/${docType}/forewords/`;
-        console.log("[UPLOAD_DEBUG] Final foreword directory path:", storagePath);
-        
-        // Ensure the foreword directory exists
-        try {
-            const fullPath = join(workspaceRoot, storagePath);
-            console.log("[UPLOAD_DEBUG] Creating foreword directory at:", fullPath);
-            await Deno.mkdir(fullPath, { recursive: true });
-            
-            // Verify directory was created
-            const dirInfo = await Deno.stat(fullPath);
-            if (!dirInfo.isDirectory) {
-                throw new Error("Failed to create foreword directory - path exists but is not a directory");
-            }
-            console.log("[UPLOAD_DEBUG] Successfully created/verified foreword directory");
-        } catch (dirError) {
-            const errorMessage = dirError instanceof Error ? dirError.message : String(dirError);
-            console.error("[UPLOAD_DEBUG] Failed to create foreword directory:", errorMessage);
-            throw new Error(`Failed to create foreword directory: ${errorMessage}`);
-        }
-    }
+    cleanedStoragePath = cleanedStoragePath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
     
     // Ensure storage path is at workspace level
-    if (storagePath.includes("Deno/storage")) {
-      storagePath = storagePath.replace("Deno/storage", "storage");
-      console.log("[UPLOAD_DEBUG] Fixed storage path to be at workspace level:", storagePath);
+    if (cleanedStoragePath.includes("Deno/storage")) {
+        cleanedStoragePath = cleanedStoragePath.replace("Deno/storage", "storage");
+        console.log("[UPLOAD_DEBUG] Fixed storage path to be at workspace level:", cleanedStoragePath);
     }
     
-    console.log("[UPLOAD_DEBUG] Final storage path:", storagePath);
+    console.log("[UPLOAD_DEBUG] Final storage path:", cleanedStoragePath);
     
     // Save file with replacement options if needed
     const saveOptions = {
-      ...(isReplacement && originalName ? {
-        keepOriginalName: true,
-        originalName: originalName,
-        originalPath: originalPath, // Pass the full original path to the upload service
-      } : {}),
       documentType,
       category,
-      title // Add the title to the save options
+      title
     };
     
     console.log("[UPLOAD_DEBUG] Saving file with options:", saveOptions);
     
     // Save file
-    const fileResult = await saveFile(file, storagePath, saveOptions);
+    const fileResult = await saveFile(file, cleanedStoragePath, saveOptions);
     console.log("[UPLOAD_DEBUG] File saved successfully:", fileResult);
     
     // Verify file was saved
@@ -244,21 +194,24 @@ export async function handleFileUpload(ctx: Context): Promise<void> {
       }
     }
     
+    // Clean up prepared file if it exists
+    if (preparedFileId) {
+      await preUploadManager.cleanup(preparedFileId);
+    }
+    
     // Return response with file path and metadata
     const response = {
-      message: isReplacement ? "File replaced successfully" : "File uploaded successfully",
+      message: "File uploaded successfully",
       filePath: "/" + fileResult.path.replace(/\\/g, "/"),
       originalName: fileResult.name,
       size: fileResult.size,
+      type: isPdf ? "pdf" : "other",
       metadata: metadata || null,
-      fileType: isPdf ? "pdf" : "other",
-      isReplacement: isReplacement,
       status: "success",
       timestamp: new Date().toISOString(),
       details: {
         fullPath: fileResult.path,
-        storagePath: storagePath,
-        originalFileName: file.name || file.filename,
+        storagePath: cleanedStoragePath,
         documentType: documentType
       }
     };

@@ -2,6 +2,9 @@
  * Upload Document JavaScript - Handles form submission and API integration
  */
 
+// Global variables
+const preparedFiles = new Map();
+
 document.addEventListener('DOMContentLoaded', function() {
     // Form elements
     const singleDocForm = document.getElementById('uploadSingleForm');
@@ -327,261 +330,178 @@ function updateFileSelectedUI(fileInputId, isSelected, fileName = '') {
 async function handleSingleDocumentSubmit(e) {
     e.preventDefault();
     
-    try {
-        // Show loading state
-        showLoading('Uploading document...');
-        
-        // Get form data
-        const formData = new FormData(e.target);
-        
-        // Get file
-        const fileInput = document.getElementById('single-file-upload');
-        if (fileInput.files.length === 0) {
-            showError('Please select a file to upload');
+    const form = e.target;
+    const fileInput = form.querySelector('input[type="file"]');
+    const categorySelect = form.querySelector('#single-category');
+    
+    // Debug logging
+    console.log('Form submission started');
+    console.log('File input found:', fileInput?.id);
+    console.log('Category selected:', categorySelect?.value);
+    console.log('Prepared files map:', preparedFiles);
+    console.log('Looking for prepared file with ID:', fileInput?.id);
+    
+    // Check if we have a file input
+    if (!fileInput) {
+        showError('No file input found in form');
             return;
         }
         
-        // Prepare document data
-        const categorySelect = document.getElementById('single-category');
-        const categoryValue = categorySelect.value;
+    // Get the prepared file info
+    const preparedFile = preparedFiles.get(fileInput.id);
+    console.log('Found prepared file:', preparedFile);
+    
+    if (!preparedFile || !preparedFile.fileId) {
+        showError('Please select and prepare a file first');
+        return;
+    }
         
-        // Collect selected research agenda items from the topicInput
-        // This is needed because the form doesn't have a researchAgenda field, but uses topicInput + selectedTopics
-        const selectedTopics = document.getElementById('selectedTopics');
-        const researchAgendaItems = [];
-        if (selectedTopics) {
-            selectedTopics.querySelectorAll('.selected-topic').forEach(topic => {
-                researchAgendaItems.push(topic.textContent.trim().replace('×', '').trim());
-            });
-            
-            if (researchAgendaItems.length > 0) {
-                // Add to formData for the backend
-                formData.set('researchAgenda', researchAgendaItems.join(','));
+    try {
+        showLoading('Uploading document...');
+        console.log('Starting upload with prepared file ID:', preparedFile.fileId);
+
+        // Create form data with all form fields EXCEPT the file input
+        const formData = new FormData();
+        
+        // Get all form fields except file inputs
+        const formFields = Array.from(form.elements).filter(element => 
+            element.name && 
+            element.type !== 'file' && 
+            !element.name.includes('file-upload')
+        );
+
+        // Add each form field to formData
+        formFields.forEach(field => {
+            if (field.type === 'select-multiple') {
+                // Handle multiple select
+                Array.from(field.selectedOptions).forEach(option => {
+                    formData.append(field.name, option.value);
+                });
+            } else {
+                formData.append(field.name, field.value);
             }
-        }
-        
-        // Ensure the directory exists before uploading
-        const documentType = mapCategoryToDocumentType(categoryValue);
-        // Use only the allowed directories (thesis, dissertation, confluence, synergy, hello)
-        let validStorageType = documentType.toLowerCase();
-        
-        // If documentType would create a directory we've removed, use hello instead
-        if (validStorageType !== 'thesis' && 
-            validStorageType !== 'dissertation' && 
-            validStorageType !== 'confluence' && 
-            validStorageType !== 'synergy') {
-            validStorageType = 'hello';
-        }
-        
-        const storagePath = `storage/${validStorageType}/`;
-        await ensureDirectoriesExist(storagePath);
-        
-        // First upload the file
-        const file = fileInput.files[0];
-        const fileData = new FormData();
-        fileData.append('file', file, file.name); // Add filename explicitly
-        fileData.append('storagePath', storagePath);
-        
-        // Add document type and category information
-        fileData.append('document_type', documentType.toUpperCase());
-        fileData.append('category', categoryValue);
-        // Add title for file naming
-        fileData.append('title', formData.get('title'));
-        
-        console.log('Uploading single document file:', file.name, 'Size:', file.size, 'bytes', 'Path:', storagePath);
-        
-        // Upload file first
-        const fileUploadResponse = await fetch('/api/upload', {
-            method: 'POST',
-            body: fileData
         });
         
-        if (!fileUploadResponse.ok) {
-            let errorMessage;
-            try {
-            const errorData = await fileUploadResponse.json();
-                errorMessage = errorData.error || errorData.details || 'Failed to upload file';
-            } catch (jsonError) {
-                errorMessage = `Failed to upload file: ${fileUploadResponse.status} ${fileUploadResponse.statusText}`;
-            }
-            throw new Error(errorMessage);
+        // Map category to document type
+        const category = categorySelect?.value || '';
+        const documentType = mapCategoryToDocumentType(category);
+        formData.append('document_type', documentType);
+        
+        // Add the prepared file info
+        formData.append('preparedFileId', preparedFile.fileId);
+        formData.append('fileName', preparedFile.fileName);
+        formData.append('fileSize', preparedFile.fileSize);
+        formData.append('fileType', preparedFile.fileType);
+        
+        // Debug: Log all form data
+        console.log('Form data being sent:');
+        for (let [key, value] of formData.entries()) {
+            console.log(key + ':', value);
         }
-        
-        const fileResult = await fileUploadResponse.json();
-        const filePath = fileResult.filePath;
-        
-        console.log('File upload successful:', fileResult);
-        
-        // Create publication date from month and year if both exist
-        const pubMonth = formData.get('pubMonth');
-        const pubYear = formData.get('pubYear');
-        let publicationDate = null;
-        
-        if (pubMonth && pubYear) {
-            publicationDate = `${pubYear}-${pubMonth}-01`; // Use first day of month
-        }
-        
-        // Extract abstract from the file before saving to database
-        showLoading('Extracting abstract from PDF...');
-        let abstract = '';
-        let pageCount = 0;
-        
-        // If it's a PDF file, extract the abstract properly
-        if (file.type === 'application/pdf') {
-            try {
-                abstract = await extractPDFAbstractPromise(file);
-                console.log('Abstract extracted successfully:', abstract.substring(0, 100) + '...');
-                
-                // Get page count if available from server response
-                if (fileResult.metadata && fileResult.metadata.pageCount) {
-                    pageCount = fileResult.metadata.pageCount;
-                }
-            } catch (extractionError) {
-                console.error('Error extracting abstract:', extractionError);
-                abstract = 'Failed to extract abstract from document.';
-            }
-        } else {
-            abstract = 'No abstract available for non-PDF documents.';
-        }
-        
-        // Use server-provided metadata as fallback
-        if (!abstract && fileResult.metadata && fileResult.metadata.abstract) {
-            abstract = fileResult.metadata.abstract;
-        }
-        
-        // Final fallback if extraction completely fails
-        if (!abstract || abstract.trim() === '') {
-            abstract = 'No abstract could be extracted from this document.';
-        }
-        
-        // Create document object with the actual extracted abstract
-        const documentData = {
-            title: formData.get('title'),
-            abstract: abstract,
-            publication_date: publicationDate,
-            file_path: filePath,
-            is_public: true, // Default to public
-            document_type: mapCategoryToDocumentType(categoryValue),
-            research_agenda: formData.get('researchAgenda') || null,
-            category_id: null,
-            pages: pageCount
-        };
-        
-        // Update the preview with the document data
-        updateDocumentPreview(fileResult);
-        
-        // Save document to database with the actual extracted abstract
-        showLoading('Saving document to database...');
-        const documentResponse = await fetch('/api/documents', {
+
+        // Send the form data
+        const response = await fetch('/api/upload', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Accept': 'application/json'
             },
-            body: JSON.stringify(documentData)
+            body: formData
+        });
+
+        const result = await response.json();
+        console.log('Upload response:', result);
+
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to upload document');
+        }
+
+        // Clean up the prepared file
+        console.log('Cleaning up prepared file:', preparedFile.fileId);
+        const cleanupResponse = await fetch(`/api/pre-upload/cleanup/${preparedFile.fileId}`, {
+            method: 'DELETE'
         });
         
-        if (!documentResponse.ok) {
-            let errorMessage;
-            try {
-            const errorData = await documentResponse.json();
-                errorMessage = errorData.error || 'Failed to save document';
-            } catch (jsonError) {
-                errorMessage = `Failed to save document: ${documentResponse.status} ${documentResponse.statusText}`;
-            }
-            throw new Error(errorMessage);
+        if (!cleanupResponse.ok) {
+            console.warn('Failed to cleanup prepared file:', preparedFile.fileId);
         }
-        
-        const result = await documentResponse.json();
-        const documentId = result.id;
-        
-        // Now that we have the document ID, create the file record
-        const fileRecord = {
-            file_name: fileResult.originalName,
-            file_path: filePath,
-            file_size: fileResult.size,
-            file_type: fileResult.fileType || 'application/octet-stream',
-            document_id: documentId
-        };
-        
-        // Save author information
-        if (formData.get('author')) {
-            const authors = formData.get('author').split(';').map(name => name.trim()).filter(name => name !== '');
-            
-            if (authors.length > 0) {
-                const authorData = {
-                    document_id: documentId,
-                    authors: authors
-                };
-                
-                // Send authors to the document-authors endpoint
-                const authorResponse = await fetch('/document-authors', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(authorData)
-                });
-                
-                if (!authorResponse.ok) {
-                    console.warn('Warning: Authors may not have been saved correctly');
-                }
+
+        // Remove from prepared files map
+        preparedFiles.delete(fileInput.id);
+        console.log('Removed file from prepared files map');
+
+        // Clear form and file input
+        form.reset();
+        if (fileInput) {
+            fileInput.value = '';
+            // Also clear the file name display if it exists
+            const fileNameDisplay = document.getElementById(`${fileInput.id.split('-')[0]}-fileNameDisplay`);
+            if (fileNameDisplay) {
+                fileNameDisplay.textContent = '';
             }
         }
-        
-        // Save research agenda items if provided
-        if (formData.get('researchAgenda')) {
-            const researchAgendaItems = formData.get('researchAgenda').split(',').map(item => item.trim()).filter(item => item !== '');
-            
-            if (researchAgendaItems.length > 0) {
-                // First add items to the old endpoint for backward compatibility
-                const researchAgendaData = {
-                    document_id: documentId,
-                    agenda_items: researchAgendaItems
-                };
-                
-                // Send research agenda items to the document-research-agenda endpoint
-                const researchAgendaResponse = await fetch('/document-research-agenda', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(researchAgendaData)
-                });
-                
-                if (!researchAgendaResponse.ok) {
-                    console.warn('Warning: Research agenda items may not have been saved correctly to old endpoint');
-                }
-                
-                // Now also use the new linkage endpoint that creates entries in the junction table
-                const linkResponse = await fetch('/api/document-research-agenda/link', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(researchAgendaData)
-                });
-                
-                if (!linkResponse.ok) {
-                    console.warn('Warning: Failed to link research agenda items in junction table');
-                } else {
-                    const linkResult = await linkResponse.json();
-                    console.log('Research agenda linking result:', linkResult);
-                }
-            }
+
+        // Reset any progress indicators
+        const progressIndicator = fileInput.closest('.file-input-container')?.querySelector('.progress-indicator');
+        const progressBar = progressIndicator?.querySelector('.progress-bar');
+        const progressText = progressIndicator?.querySelector('.progress-text');
+        const statusMessage = fileInput.closest('.file-input-container')?.querySelector('.status-message');
+
+        if (progressIndicator) progressIndicator.style.display = 'none';
+        if (progressBar) {
+            progressBar.style.width = '0%';
+            progressBar.textContent = '0%';
         }
-        
-        // Show success
-        showSuccess('Document uploaded successfully!', function() {
-            // Redirect back to upload document page
-            window.location.href = 'upload_document.html';
+        if (progressText) progressText.textContent = '';
+        if (statusMessage) {
+            statusMessage.textContent = '';
+            statusMessage.style.display = 'none';
+        }
+
+        // Update UI
+        hideLoading();
+        showSuccess('Document uploaded successfully', () => {
+            // Reset form and clear file inputs
+            form.reset();
+            resetFileInputs();
         });
-        
     } catch (error) {
         console.error('Upload error:', error);
-        showError(error.message || 'An error occurred during upload');
-    } finally {
         hideLoading();
+        showError(error.message || 'Failed to upload document');
     }
+}
+
+// Helper function to reset file inputs and their UI
+function resetFileInputs() {
+    // Reset all file inputs
+    const fileInputs = document.querySelectorAll('input[type="file"]');
+    fileInputs.forEach(input => {
+        input.value = '';
+        const fileNameDisplay = document.getElementById(`${input.id.split('-')[0]}-fileNameDisplay`);
+        if (fileNameDisplay) {
+            fileNameDisplay.textContent = '';
+        }
+        
+        // Reset progress indicators
+        const progressIndicator = input.closest('.file-input-container')?.querySelector('.progress-indicator');
+        const progressBar = progressIndicator?.querySelector('.progress-bar');
+        const progressText = progressIndicator?.querySelector('.progress-text');
+        const statusMessage = input.closest('.file-input-container')?.querySelector('.status-message');
+
+        if (progressIndicator) progressIndicator.style.display = 'none';
+        if (progressBar) {
+            progressBar.style.width = '0%';
+            progressBar.textContent = '0%';
+        }
+        if (progressText) progressText.textContent = '';
+        if (statusMessage) {
+            statusMessage.textContent = '';
+            statusMessage.style.display = 'none';
+        }
+    });
+    
+    // Clear prepared files map
+    preparedFiles.clear();
 }
 
 /**
@@ -831,22 +751,23 @@ async function handleCompiledDocumentSubmit(e) {
             
             try {
                 // Create a specific path for foreword files with their own subfolder
-                const forewordPath = `storage/${validStorageType}/forewords/`;
+                const baseStoragePath = `storage/${validStorageType}/`;
+                const forewordPath = `${baseStoragePath}forewords/`;
                 console.log(`Using foreword storage path: ${forewordPath}`);
                 
                 // Generate a title for the foreword file
                 const volumeNumber = formData.get('volume') || '';
                 const forewordTitle = `Foreword ${documentType} ${volumeNumber}`.trim();
-                
+            
                 const forewordFormData = new FormData();
                 forewordFormData.append('file', forewordFile);
-                forewordFormData.append('storagePath', forewordPath);
+                forewordFormData.append('storagePath', forewordPath); // Use the foreword-specific path
                 forewordFormData.append('document_type', documentType.toUpperCase());
                 forewordFormData.append('category', category);
                 forewordFormData.append('is_foreword', 'true'); // Flag to indicate this is a foreword file
                 forewordFormData.append('title', forewordTitle); // Add the generated title
                 
-                // First ensure the directory exists using direct API call
+                // First ensure the forewords directory exists using direct API call
                 console.log(`Ensuring foreword directory exists: ${forewordPath}`);
                 await fetch('/api/ensure-directory', {
                     method: 'POST',
@@ -2075,412 +1996,223 @@ document.addEventListener('DOMContentLoaded', function() {
  */
 async function handleFileSelection(event) {
     const fileInput = event.target;
-    const file = fileInput.files[0];
+    const files = fileInput.files;
     
-    if (!file) return;
+    console.log('File selection started for input:', fileInput.id);
+    console.log('Files selected:', files?.length);
     
-    // Only accept PDF files
-    if (file.type !== 'application/pdf') {
-        showError('Please select a valid PDF file.');
-        fileInput.value = '';
+    const fileNameDisplay = document.getElementById(`${fileInput.id.split('-')[0]}-fileNameDisplay`);
+    const submitButton = fileInput.closest('form').querySelector('button[type="submit"]');
+    const progressIndicator = fileInput.closest('.file-input-container').querySelector('.progress-indicator');
+    const progressBar = progressIndicator?.querySelector('.progress-bar');
+    const progressText = progressIndicator?.querySelector('.progress-text');
+    const statusMessage = fileInput.closest('.file-input-container').querySelector('.status-message');
+    
+    // Clear any existing prepared file for this input
+    if (preparedFiles.has(fileInput.id)) {
+        console.log('Clearing existing prepared file for:', fileInput.id);
+        preparedFiles.delete(fileInput.id);
+    }
+    
+    if (files.length === 0) {
+        console.log('No files selected, resetting UI');
+        if (fileNameDisplay) {
+            fileNameDisplay.textContent = '';
+        }
+        if (submitButton) {
+            submitButton.disabled = true;
+        }
+        if (progressIndicator) progressIndicator.style.display = 'none';
+        if (statusMessage) statusMessage.style.display = 'none';
         return;
     }
     
-    // Show loading indicator
-    const uploadBox = document.querySelector('.upload-box');
-    uploadBox.classList.add('loading');
+    const selectedFile = files[0];
+    console.log('Selected file details:', {
+        name: selectedFile.name,
+        size: selectedFile.size,
+        type: selectedFile.type
+    });
     
+    // Show loading state
+    console.log('Showing loading state');
+    if (fileNameDisplay) {
+        fileNameDisplay.textContent = 'Processing file...';
+    }
+    if (submitButton) {
+        submitButton.disabled = true;
+    }
+    if (progressIndicator) {
+        progressIndicator.style.display = 'block';
+        if (progressBar) {
+            progressBar.style.width = '0%';
+            progressBar.textContent = '0%';
+        }
+        if (progressText) {
+            progressText.textContent = 'Preparing file...';
+        }
+    }
+
     try {
-        // Upload file to server
+        console.log('Creating FormData for file:', selectedFile.name);
+        // Create form data for pre-upload
         const formData = new FormData();
-        formData.append('file', file);
         
-        const response = await fetch('/api/documents/upload-file', {
-            method: 'POST',
-            body: formData
-        });
+        // Add file with original name as the field name
+        formData.append('file', selectedFile, selectedFile.name);
         
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to upload file');
-        }
+        // Add metadata
+        formData.append('generatePreview', 'true');
+        formData.append('extractMetadata', 'true');
+        formData.append('originalFileName', selectedFile.name);
+        formData.append('originalFileSize', selectedFile.size.toString());
+        formData.append('originalFileType', selectedFile.type);
         
-        const data = await response.json();
-        
-        // Store file info and extract metadata
-        fileUploadResult = data;
-        
-        // Show success indicator and file name
-        uploadBox.classList.remove('loading');
-        uploadBox.classList.add('success');
-        
-        // Show file name
-        const fileIndicator = document.getElementById('file-indicator');
-        fileIndicator.textContent = file.name;
-        fileIndicator.style.display = 'block';
-        
-        // Update form with metadata if available
-        if (data.metadata) {
-            // Set abstract from PDF
-            const abstractTextarea = document.getElementById('abstract');
-            if (abstractTextarea && data.metadata.abstract) {
-                abstractTextarea.value = data.metadata.abstract;
-            }
+        // Get form data
+        const form = fileInput.closest('form');
+        if (form) {
+            // Add relevant form fields
+            const title = form.querySelector('input[name="title"]')?.value;
+            const author = form.querySelector('input[name="author"]')?.value;
+            const category = form.querySelector('select[name="category"]')?.value;
             
-            // Set extracted page count
-            const pageCount = data.metadata.pageCount || 0;
-            document.getElementById('page-count-value').textContent = pageCount;
-        }
-    } catch (error) {
-        console.error('File upload error:', error);
-        uploadBox.classList.remove('loading');
-        uploadBox.classList.add('error');
-        showError(`Upload failed: ${error.message}`);
-        
-        // Reset file input
-        fileInput.value = '';
-    }
-}
-
-/**
- * Prepares data for document creation
- * @returns {Object} Document data ready for submission
- */
-function prepareDocumentData() {
-    // Get form values
-    const title = document.getElementById('title').value;
-    const abstract = document.getElementById('abstract').value;
-    const publicationDate = document.getElementById('publication-date').value;
-    const volumeNumber = document.getElementById('volume').value;
-    const category = document.getElementById('category').value;
-    
-    // Create document data object
-    const documentData = {
-        title,
-        abstract,
-        publication_date: publicationDate,
-        volume: volumeNumber,
-        category,
-        document_type: 'research',
-        pages: 0,
-        is_public: document.getElementById('is-public').checked,
-        authors: selectedAuthors.map(author => ({ id: author.id })),
-        topics: selectedTopics.map(topic => ({ id: topic.id }))
-    };
-    
-    // Add metadata from file upload if available
-    if (fileUploadResult && fileUploadResult.metadata) {
-        documentData.pages = fileUploadResult.metadata.pageCount || 0;
-        documentData.file_path = fileUploadResult.filePath;
-    }
-    
-    return documentData;
-}
-
-// Add a function to fetch departments from the API
-async function fetchDepartments() {
-    try {
-        const response = await fetch('/api/departments');
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return await response.json();
-    } catch (error) {
-        console.error("Error fetching departments:", error);
-        return [];
-    }
-}
-
-// Populate the departmental dropdown with values from the database
-async function populateDepartmentalDropdown() {
-    const departmentalSelect = document.getElementById('compiled-departmental');
-    if (!departmentalSelect) return;
-    
-    try {
-        // Clear existing options except the first one
-        while (departmentalSelect.options.length > 1) {
-            departmentalSelect.remove(1);
-        }
-        
-        // Fetch departments from the API
-        const departments = await fetchDepartments();
-        
-        // Add each department as an option
-        departments.forEach(dept => {
-            const option = document.createElement('option');
-            option.value = dept.id; // Use the department ID as the value
-            option.textContent = `${dept.department_name} (${dept.code})`; // Show both name and code
-            departmentalSelect.appendChild(option);
-        });
-        
-        // Add an event listener to update the preview when selection changes
-        departmentalSelect.addEventListener('change', updateCompiledPreview);
-    } catch (error) {
-        console.error("Error populating departmental dropdown:", error);
-    }
-}
-
-// When compiling a Synergy document, handle the department selection
-function handleCategoryChange() {
-    const categoryInput = document.getElementById('compiled-category');
-    const issuedNoContainer = document.getElementById('compiled-issued-no-container');
-    const issuedNoInput = document.getElementById('compiled-issued-no');
-    const departmentalSelect = document.getElementById('compiled-departmental');
-    
-    if (!categoryInput || !issuedNoContainer || !issuedNoInput || !departmentalSelect) return;
-    
-    if (categoryInput.value === 'Synergy') {
-        // If Synergy is selected, show departmental dropdown and hide issued no input
-        issuedNoInput.style.display = 'none';
-        departmentalSelect.style.display = 'block';
-        
-        // Load departments if not already loaded
-        populateDepartmentalDropdown();
-        
-        // Update label
-        const label = document.getElementById('compiled-issued-no-label');
-        if (label) label.textContent = 'Department';
-    } else {
-        // For other categories, show issued no input and hide departmental dropdown
-        issuedNoInput.style.display = 'block';
-        departmentalSelect.style.display = 'none';
-        
-        // Update label
-        const label = document.getElementById('compiled-issued-no-label');
-        if (label) label.textContent = 'Issued No.';
-    }
-    
-    // Update preview
-    updateCompiledPreview();
-}
-
-// Function to get the selected department text (name and code)
-function getSelectedDepartmentText() {
-    const departmentalSelect = document.getElementById('compiled-departmental');
-    if (!departmentalSelect || departmentalSelect.selectedIndex < 0) return '';
-    
-    return departmentalSelect.options[departmentalSelect.selectedIndex].text;
-}
-
-/**
- * Adds a new research section to the compiled document form
- */
-function addResearchSection() {
-    // Find the sections container
-    const sectionsContainer = document.getElementById('research-sections-container');
-    if (!sectionsContainer) {
-        console.error('Research sections container not found');
-        return;
-    }
-    
-    // Calculate next section ID
-    const existingSections = document.querySelectorAll('.research-section');
-    const nextId = existingSections.length + 1;
-    
-    // Create new section element
-    const newSection = document.createElement('div');
-    newSection.className = 'research-section bg-primary-light border border-emerald-200 rounded-lg p-4 relative';
-    newSection.dataset.sectionId = nextId;
-    
-    // Create the inner HTML for the research section
-    newSection.innerHTML = `
-        <button type="button" class="remove-section-btn absolute top-2 right-2 text-gray-400 hover:text-red-600" title="Remove Section">
-            <i data-lucide="x-circle" class="w-5 h-5"></i>
-        </button>
-        <div class="research-header flex items-center justify-between cursor-pointer" onclick="toggleResearchSection(this)">
-            <h3 class="text-md font-semibold text-primary-dark flex items-center">
-                <i data-lucide="file-text" class="w-5 h-5 mr-2"></i> Research ${nextId}
-                <i data-lucide="chevron-down" class="toggle-icon w-5 h-5 ml-2 text-gray-500"></i>
-            </h3>
-        </div>
-        <div class="research-content space-y-4 mt-3">
-            <div>
-                <label for="study-title-${nextId}" class="block text-sm font-medium text-gray-700">Study Title <span class="text-red-500">*</span></label>
-                <input type="text" id="study-title-${nextId}" name="research[${nextId}][study_title]" 
-                    placeholder="Enter study title" class="research-title form-input study-title-input mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary sm:text-sm" required>
-            </div>
-            <div>
-                <label for="research-abstract-${nextId}" class="block text-sm font-medium text-gray-700">Abstract</label>
-                <textarea id="research-abstract-${nextId}" name="research[${nextId}][abstract]" 
-                    placeholder="Enter abstract" class="research-abstract form-textarea mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary sm:text-sm" rows="3"></textarea>
-            </div>
-            <div>
-                <label for="file-upload-${nextId}" class="block text-sm font-medium text-gray-700 mb-1">Attach File</label>
-                <div id="file-upload-container-${nextId}" class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-primary transition-colors duration-200 ease-in-out">
-                    <div class="space-y-1 text-center">
-                        <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
-                            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                        <div class="flex text-sm text-gray-600 justify-center">
-                            <label for="file-upload-${nextId}" class="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-primary-dark">
-                                <span>Upload a file</span>
-                                <input id="file-upload-${nextId}" name="research[${nextId}][file]" type="file" 
-                                    class="research-file hidden-file-input" required accept=".pdf" style="opacity: 0; position: absolute; z-index: -1;">
-                            </label>
-                            <p class="pl-1">or drag and drop</p>
-                        </div>
-                        <p class="text-xs text-gray-500">PDF up to 10MB</p>
-                        <p class="file-name-display text-sm text-gray-900 font-medium pt-2" id="file-name-${nextId}"></p>
-                    </div>
-                </div>
-                <div class="mt-2">
-                    <button type="button" class="text-xs text-primary hover:text-primary-dark" 
-                        onclick="checkFileInput(${nextId})">Check file status</button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    // Add the new section to the container
-    sectionsContainer.appendChild(newSection);
-    
-    // Initialize the icons
-    if (window.lucide) {
-        window.lucide.createIcons();
-    }
-    
-    // Add event listener for the remove button
-    const removeBtn = newSection.querySelector('.remove-section-btn');
-    if (removeBtn) {
-        removeBtn.addEventListener('click', function() {
-            newSection.remove();
-            // Update the studies list in the preview
-            updateStudiesList();
-        });
-    }
-    
-    // Add file change event listener
-    const fileInput = newSection.querySelector('input[type="file"]');
-    if (fileInput) {
-        fileInput.addEventListener('change', function(e) {
-            if (this.files.length > 0) {
-                const fileName = this.files[0].name;
-                const fileNameDisplay = newSection.querySelector('.file-name-display');
-                const fileSize = (this.files[0].size / 1024).toFixed(1);
+            if (title) formData.append('title', title);
+            if (author) formData.append('author', author);
+            if (category) {
+                formData.append('category', category);
+                formData.append('document_type', mapCategoryToDocumentType(category));
                 
+                // Handle foreword files specifically
+                if (fileInput.id === 'foreword-file-upload') {
+                    const documentType = mapCategoryToDocumentType(category);
+                    const validStorageType = documentType.toLowerCase();
+                    const forewordPath = `storage/${validStorageType}/forewords/`;
+                    formData.append('storagePath', forewordPath);
+                    formData.append('is_foreword', 'true');
+                }
+            }
+        }
+        
+        console.log('Sending pre-upload request with data:', {
+            fileName: selectedFile.name,
+            fileSize: selectedFile.size,
+            fileType: selectedFile.type,
+            category: form?.querySelector('select[name="category"]')?.value
+        });
+        
+        // Send pre-upload request with progress tracking
+        const xhr = new XMLHttpRequest();
+        xhr.upload.addEventListener('progress', (event) => {
+            if (event.lengthComputable && progressBar && progressText) {
+                const percentage = (event.loaded / event.total) * 100;
+                progressBar.style.width = `${percentage}%`;
+                progressBar.textContent = `${Math.round(percentage)}%`;
+                progressText.textContent = `Uploading: ${Math.round(percentage)}%`;
+            }
+        });
+        
+        const response = await new Promise((resolve, reject) => {
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        resolve(JSON.parse(xhr.responseText));
+                    } catch (e) {
+                        reject(new Error('Invalid server response'));
+                    }
+    } else {
+                    reject(new Error(`Upload failed: ${xhr.statusText}`));
+                }
+            };
+            xhr.onerror = () => reject(new Error('Network error occurred'));
+            xhr.open('POST', '/api/pre-upload');
+            xhr.send(formData);
+        });
+
+        console.log('Pre-upload response:', response);
+        
+        if (!response.fileId) {
+            throw new Error('No fileId received from server');
+        }
+
+        // Store the prepared file info with the correct fileId and original file info
+        const preparedFileInfo = {
+            fileId: response.fileId,
+            fileName: selectedFile.name,
+            fileSize: selectedFile.size,
+            fileType: selectedFile.type,
+            preview: response.preview,
+            metadata: response.metadata
+        };
+        
+        console.log('Storing prepared file info:', preparedFileInfo);
+        preparedFiles.set(fileInput.id, preparedFileInfo);
+
+        // Update UI for success
+        console.log('Updating UI for success');
+        if (progressText) {
+            progressText.textContent = 'File prepared successfully!';
+        }
+        if (progressBar) {
+            progressBar.style.width = '100%';
+            progressBar.textContent = '100%';
+        }
                 if (fileNameDisplay) {
-                    fileNameDisplay.innerHTML = `
-                        <div class="flex items-center">
-                            <i data-lucide="file" class="w-4 h-4 mr-1 text-primary"></i>
-                            <span class="font-medium">${fileName}</span>
-                            <span class="text-xs text-gray-500 ml-1">(${fileSize} KB)</span>
-                        </div>
-                    `;
-                    
-                    // Re-initialize Lucide icons if needed
-                    if (window.lucide) {
-                        window.lucide.createIcons();
-                    }
-                }
+            fileNameDisplay.textContent = `Ready: ${selectedFile.name}`;
+        }
+        if (statusMessage) {
+            statusMessage.textContent = `"${selectedFile.name}" has been prepared for upload.`;
+            statusMessage.style.display = 'block';
+            statusMessage.style.color = '#10B981';
+        }
+        if (submitButton) {
+            submitButton.disabled = false;
+        }
+
+        // Update document preview if it's a single document upload
+        if (fileInput.id === 'single-file-upload') {
+            console.log('Updating document preview');
+            updateDocumentPreview(selectedFile);
+        }
+
+        // For research sections, update the abstract preview if applicable
+        if (fileInput.id.startsWith('file-upload-') && selectedFile.type === 'application/pdf') {
+            console.log('Updating abstract preview for research section');
+            const section = fileInput.closest('.research-section');
+            if (section) {
+                const abstractContent = section.querySelector('.abstract-content');
+                const abstractPreviewSection = section.querySelector('.abstract-preview-section');
                 
-                console.log(`File selected for research section ${nextId}: ${fileName} (${fileSize} KB)`);
-                
-                // Also add a visual indication that the file was selected
-                const uploadContainer = newSection.querySelector(`#file-upload-container-${nextId}`);
-                if (uploadContainer) {
-                    uploadContainer.classList.add('border-primary', 'bg-primary-50');
-                    uploadContainer.classList.remove('border-gray-300', 'border-dashed');
-                    uploadContainer.innerHTML = `
-                        <div class="space-y-1 text-center">
-                            <i data-lucide="check-circle" class="mx-auto h-12 w-12 text-success"></i>
-                            <div class="text-sm text-success font-medium">File uploaded successfully</div>
-                            <div class="text-xs text-gray-500">${fileName} (${fileSize} KB)</div>
-                            <button type="button" class="mt-2 px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded" 
-                                onclick="document.getElementById('file-upload-${nextId}').click()">
-                                Replace File
-                            </button>
-                        </div>
-                    `;
+                if (abstractContent && abstractPreviewSection) {
+                    abstractContent.textContent = 'Extracting abstract...';
+                    abstractPreviewSection.classList.remove('hidden');
                     
-                    // Re-initialize Lucide icons
-                    if (window.lucide) {
-                        window.lucide.createIcons();
+                    if (window.extractPDFAbstractForCompiledDoc) {
+                        window.extractPDFAbstractForCompiledDoc(selectedFile, abstractContent);
                     }
                 }
             }
-        });
-        
-        // Add drag and drop support
-        const uploadContainer = newSection.querySelector(`#file-upload-container-${nextId}`);
-        if (uploadContainer) {
-            uploadContainer.addEventListener('dragover', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                uploadContainer.classList.add('border-primary');
-            });
-            
-            uploadContainer.addEventListener('dragleave', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                uploadContainer.classList.remove('border-primary');
-            });
-            
-            uploadContainer.addEventListener('drop', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                uploadContainer.classList.remove('border-primary');
-                
-                if (e.dataTransfer.files.length > 0) {
-                    fileInput.files = e.dataTransfer.files;
-                    
-                    // Trigger change event
-                    const event = new Event('change', { bubbles: true });
-                    fileInput.dispatchEvent(event);
-                }
-            });
         }
-    }
-    
-    console.log(`Added new research section ${nextId}`);
-    
-    // Update the studies list in the preview
-    if (typeof updateStudiesList === 'function') {
-        updateStudiesList();
-    }
-    
-    return newSection;
-}
 
-/**
- * Debug function to check if a file input has a file
- * @param {number} sectionId - The section ID
- */
-function checkFileInput(sectionId) {
-    const fileInput = document.getElementById(`file-upload-${sectionId}`);
-    if (!fileInput) {
-        Swal.fire({
-            icon: 'error',
-            title: 'Element Not Found',
-            text: `File input #file-upload-${sectionId} not found!`,
-            confirmButtonColor: '#10B981'
-        });
-        return;
-    }
-    
-    if (fileInput.files && fileInput.files.length > 0) {
-        const file = fileInput.files[0];
-        Swal.fire({
-            icon: 'info',
-            title: 'File Selected',
-            text: `File selected: ${file.name} (${(file.size/1024).toFixed(1)} KB)`,
-            confirmButtonColor: '#10B981'
-        });
-    } else {
-        Swal.fire({
-            icon: 'warning',
-            title: 'No File Selected',
-            text: 'No file selected yet!',
-            confirmButtonColor: '#10B981'
-        });
+    } catch (error) {
+        console.error('File preparation error:', error);
+        if (progressText) {
+            progressText.textContent = `Preparation failed: ${error.message}`;
+        }
+        if (progressBar) {
+            progressBar.style.backgroundColor = '#dc3545';
+        }
+        if (statusMessage) {
+            statusMessage.textContent = 'File preparation failed. Please try again.';
+            statusMessage.style.display = 'block';
+            statusMessage.style.color = '#dc3545';
+        }
         
-        // Try to help the user identify the file input
-        fileInput.classList.remove('sr-only');
-        fileInput.classList.add('border', 'border-red-500', 'p-2', 'block', 'mt-2');
+        // Clear file input
+        fileInput.value = '';
+        preparedFiles.delete(fileInput.id);
         
-        setTimeout(() => {
-            fileInput.classList.add('sr-only');
-            fileInput.classList.remove('border', 'border-red-500', 'p-2', 'block', 'mt-2');
-        }, 5000);
+        // Show error message
+        showError(error.message || 'Failed to prepare file');
     }
 }
 
@@ -2611,17 +2343,59 @@ function getDepartmentCode() {
  * @returns {string} - A valid document_type value
  */
 function mapCategoryToDocumentType(category) {
-    // Map category to one of the valid types: THESIS, DISSERTATION, CONFLUENCE, SYNERGY, HELLO
-    switch(category) {
-        case 'Thesis':
-            return 'THESIS';
-        case 'Dissertation':
-            return 'DISSERTATION';
-        case 'Confluence':
-            return 'CONFLUENCE';
-        case 'Synergy':
-            return 'SYNERGY';
-        default:
-            return 'HELLO'; // Default fallback
+    if (!category) return 'HELLO';
+    
+    // Normalize the category to uppercase for comparison
+    const normalizedCategory = category.toUpperCase();
+    
+    // Direct mapping of categories to document types
+    const mapping = {
+        'THESIS': 'THESIS',
+        'DISSERTATION': 'DISSERTATION',
+        'CONFLUENCE': 'CONFLUENCE',
+        'SYNERGY': 'SYNERGY'
+    };
+    
+    return mapping[normalizedCategory] || 'HELLO';
+}
+
+// Function to set up file upload UI components
+function setupFileUpload(fileInputId, fileLabelId, fileNameDisplayId, progressIndicatorId, progressBarId, progressTextId, statusMessageId) {
+    const fileInput = document.getElementById(fileInputId);
+    const fileLabel = document.getElementById(fileLabelId);
+    const fileNameDisplay = fileNameDisplayId ? document.getElementById(fileNameDisplayId) : 
+                           fileInput.closest('.file-input-container').querySelector('.file-name-display');
+    const progressIndicator = document.getElementById(progressIndicatorId);
+    const progressBar = document.getElementById(progressBarId);
+    const progressText = document.getElementById(progressTextId);
+    const statusMessage = document.getElementById(statusMessageId);
+    
+    // Handle file selection using the pre-upload handler
+    fileInput.addEventListener('change', handleFileSelection);
+
+    // Handle drag and drop
+    const dropZone = fileInput.closest('.file-input-container');
+    if (dropZone) {
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            
+            if (e.dataTransfer.files.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                // Trigger the change event to start pre-upload
+                const event = new Event('change', { bubbles: true });
+                fileInput.dispatchEvent(event);
+            }
+        });
     }
 }

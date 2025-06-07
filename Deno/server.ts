@@ -27,7 +27,7 @@ import { extractPdfMetadata } from "./services/pdfService.ts"; // Import PDF ser
 import { fetchDocuments, fetchChildDocuments } from "./services/documentService.ts"; // Import document service
 import documentAuthorRoutes from "./routes/documentAuthorRoutes.ts";
 import fileRoutes from "./routes/fileRoutes.ts"; // Import file routes
-import { uploadRoutes, uploadRoutesAllowedMethods } from "./routes/uploadRoutes.ts"; // Import upload routes
+import { uploadRouter, uploadRoutesAllowedMethods } from "./routes/uploadRoutes.ts"; // Import upload routes
 import reportsRoutes from "./routes/reportsRoutes.ts"; // Import reports routes
 import { handler as categoryHandler, countByCategory } from "./api/category.ts"; // Import category handler
 import { getDepartments } from "./api/departments.ts";
@@ -69,7 +69,10 @@ const PORT = Deno.env.get("PORT") || 8000;
 // -----------------------------
 // SECTION: Server Setup
 // -----------------------------
-const app = new Application();
+const app = new Application({
+  // Configure body parser with increased limits
+  maxRequestBodySize: 550_000_000, // 550MB total request size limit
+});
 const router = new Router();
 // Record when the server started
 export const SERVER_START_TIME = Date.now();
@@ -986,7 +989,7 @@ app.use(fileRoutes.routes());
 app.use(fileRoutes.allowedMethods());
 
 // Register upload routes
-app.use(uploadRoutes.routes());
+app.use(uploadRouter.routes());
 app.use(uploadRoutesAllowedMethods);
 
 // Add router to app

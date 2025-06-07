@@ -6,7 +6,7 @@
     <title>Document Upload - PEAS</title>
     <link rel="stylesheet" href="css/common.css">
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/lucide-static@latest/dist/lucide.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
     
     <!-- PDF.js Library for PDF text extraction -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
@@ -401,7 +401,10 @@
     <!-- SweetAlert2 for better notifications -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
-    <!-- Document upload functionality -->
+    <!-- Include required scripts -->
+    <script src="js/lucide.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <script src="js/chunked-upload.js"></script>
     <script src="js/upload_document.js"></script>
     
     <!-- Author search functionality -->
@@ -2252,130 +2255,6 @@
                 'research-status-message-1'
             );
             
-            // Function to set up file upload UI components
-            function setupFileUpload(fileInputId, fileLabelId, fileNameDisplayId, progressIndicatorId, progressBarId, progressTextId, statusMessageId) {
-                const fileInput = document.getElementById(fileInputId);
-                const fileLabel = document.getElementById(fileLabelId);
-                const fileNameDisplay = fileNameDisplayId ? document.getElementById(fileNameDisplayId) : 
-                                       fileInput.closest('.file-input-container').querySelector('.file-name-display');
-                const progressIndicator = document.getElementById(progressIndicatorId);
-                const progressBar = document.getElementById(progressBarId);
-                const progressText = document.getElementById(progressTextId);
-                const statusMessage = document.getElementById(statusMessageId);
-                
-                let selectedFile = null;
-                
-                // Handle file selection
-                fileInput.addEventListener('change', function(e) {
-                    if (e.target.files.length > 0) {
-                        selectedFile = e.target.files[0];
-                        fileNameDisplay.textContent = `Selected: ${selectedFile.name}`;
-                        
-                        // Hide the label as we'll show progress bar instead
-                        fileLabel.style.display = 'none';
-                        
-                        // Show progress indicator immediately
-                        progressIndicator.style.display = 'block';
-                        progressBar.style.width = '0%';
-                        progressBar.textContent = '0%';
-                        progressText.textContent = 'Preparing file...';
-                        
-                        // Automatically start upload process
-                        startUpload(selectedFile);
-                        
-                        // For research sections, update the abstract preview if applicable
-                        if (fileInputId.startsWith('file-upload-') && selectedFile.type === 'application/pdf') {
-                            const section = fileInput.closest('.research-section');
-                            if (section) {
-                                const abstractContent = section.querySelector('.abstract-content');
-                                const abstractPreviewSection = section.querySelector('.abstract-preview-section');
-                                
-                                if (abstractContent && abstractPreviewSection) {
-                                    abstractContent.textContent = 'Abstract will be extracted after upload...';
-                                    abstractPreviewSection.classList.remove('hidden');
-                                }
-                            }
-                        }
-                        
-                        // Update studies list if applicable
-                        if (typeof updateStudiesList === 'function' && document.getElementById('compiledDocPreview').classList.contains('active')) {
-                            setTimeout(updateStudiesList, 10);
-                        }
-                    } else {
-                        fileNameDisplay.textContent = 'No file selected';
-                        resetFileLabel();
-                    }
-                });
-                
-                // Function to reset the file label to "Choose File"
-                function resetFileLabel() {
-                    fileLabel.textContent = 'Choose File';
-                    fileLabel.classList.remove('upload-button');
-                    fileLabel.classList.add('file-input-label');
-                    fileLabel.onclick = null; // Remove the custom click handler
-                    selectedFile = null;
-                }
-                
-                // Function to handle the upload process
-                function startUpload(file) {
-                    if (!file) return;
-                    
-                    // Hide the upload button
-                    fileLabel.style.display = 'none';
-                    progressIndicator.style.display = 'block';
-                    
-                    let progress = 10; // Start at 10% immediately
-                    progressBar.style.width = progress + '%';
-                    progressBar.textContent = progress + '%';
-                    progressText.textContent = 'Initializing preparation...';
-                    
-                    // Simulate file preparation progress
-                    const interval = setInterval(() => {
-                        progress += 10;
-                        if (progress <= 100) {
-                            progressBar.style.width = progress + '%';
-                            progressBar.textContent = progress + '%';
-                            
-                            // Update progress text based on current progress
-                            if (progress < 30) {
-                                progressText.textContent = 'Initializing preparation...';
-                            } else if (progress < 70) {
-                                progressText.textContent = 'Processing metadata...';
-                            } else {
-                                progressText.textContent = 'Finalizing preparation...';
-                            }
-                        } else {
-                            // Preparation is complete
-                            clearInterval(interval);
-                            progressBar.style.width = '100%';
-                            progressBar.textContent = '100%';
-                            progressText.textContent = 'File preparation complete!';
-                            statusMessage.textContent = `"${file.name}" is ready for submission.`;
-                            statusMessage.style.display = 'block';
-                            
-                            // No longer show the Choose File button again
-                            // Just keep the progress bar visible to show completion status
-                            
-                            // Extract PDF abstract for research sections
-                            if (fileInputId.startsWith('file-upload-') && file.type === 'application/pdf') {
-                                const section = fileInput.closest('.research-section');
-                                if (section) {
-                                    const abstractContent = section.querySelector('.abstract-content');
-                                    if (abstractContent && window.extractPDFAbstractForCompiledDoc) {
-                                        window.extractPDFAbstractForCompiledDoc(file, abstractContent);
-                                    }
-                                }
-                            }
-                            
-                            // Update studies list if applicable
-                            if (typeof updateStudiesList === 'function') {
-                                setTimeout(updateStudiesList, 10);
-                            }
-                        }
-                    }, 300);
-                }
-            }
-            
             // Modify the addSectionBtn event handler to setup file upload UI for new sections
             const addSectionBtn = document.getElementById('add-research-section-btn');
             if (addSectionBtn) {
@@ -2393,42 +2272,17 @@
                         const newSection = sections[sections.length - 1];
                         if (newSection) {
                             const sectionId = newSection.dataset.sectionId;
-                            const fileInput = newSection.querySelector(`#file-upload-${sectionId}`);
-                            
-                            if (fileInput) {
-                                // Update the file input container HTML
-                                const fileContainer = fileInput.closest('div');
-                                if (fileContainer) {
-                                    fileContainer.className = 'file-input-container';
-                                    fileContainer.innerHTML = `
-                                        <label for="file-upload-${sectionId}" id="file-label-${sectionId}" class="file-input-label">Choose File</label>
-                                        <input id="file-upload-${sectionId}" name="research[${sectionId}][file]" type="file" class="hidden-file-input" required accept=".pdf">
-                                        <div class="file-name-display">No file selected</div>
-                                        
-                                        <div id="research-progress-indicator-${sectionId}" class="progress-indicator">
-                                            <div id="research-progress-text-${sectionId}" class="progress-text">Preparing file...</div>
-                                            <div class="progress-bar-container">
-                                                <div id="research-progress-bar-${sectionId}" class="progress-bar">0%</div>
-                                            </div>
-                                        </div>
-                                        
-                                        <div id="research-status-message-${sectionId}" class="status-message"></div>
-                                    `;
-                                    
-                                    // Setup the file upload UI for this new section
-                                    setupFileUpload(
-                                        `file-upload-${sectionId}`,
-                                        `file-label-${sectionId}`,
-                                        null,
-                                        `research-progress-indicator-${sectionId}`, 
-                                        `research-progress-bar-${sectionId}`,
-                                        `research-progress-text-${sectionId}`,
-                                        `research-status-message-${sectionId}`
-                                    );
-                                }
-                            }
+                            setupFileUpload(
+                                `file-upload-${sectionId}`,
+                                `file-label-${sectionId}`,
+                                null,
+                                `research-progress-indicator-${sectionId}`,
+                                `research-progress-bar-${sectionId}`,
+                                `research-progress-text-${sectionId}`,
+                                `research-status-message-${sectionId}`
+                            );
                         }
-                    }, 100);
+                    }, 100); // Small delay to ensure DOM is updated
                 };
             }
         });
