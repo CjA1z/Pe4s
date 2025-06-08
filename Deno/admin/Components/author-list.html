@@ -511,34 +511,42 @@
                 await populateDepartmentFilter();
                 populateAffiliationFilter();
                 
-                // Render authors first (for faster initial display)
-                renderAuthors(authors);
-                
-                // Then fetch works for each author (this will happen in the background)
-                const workFetchPromises = authors.map(async (author) => {
-                    if (author.id) {
-                        try {
-                            const worksData = await fetchAuthorWorks(author.id);
-                            
-                            // Update the author object with works data
-                            const authorIndex = authors.findIndex(a => a.id === author.id);
-                            if (authorIndex !== -1) {
-                                authors[authorIndex].works = worksData.works;
-                                authors[authorIndex].worksCount = worksData.worksCount;
-                                
-                                // Update the UI to reflect the new works count
-                                updateAuthorWorksUI(author.id, worksData.works, worksData.worksCount);
-                            }
-                        } catch (error) {
-                            console.error(`Error fetching works for author ${author.id}:`, error);
-                        }
+                // Fetch works for all authors first
+                const worksPromises = authors.map(async (author) => {
+                    if (!author.id) return { authorId: author.id, works: [] };
+                    
+                    try {
+                        const worksData = await fetchAuthorWorks(author.id);
+                        return {
+                            authorId: author.id,
+                            works: worksData.works.map(doc => ({
+                                id: doc.id,
+                                title: doc.title,
+                                category: doc.category || doc.document_type || 'Uncategorized',
+                                year: doc.year || (doc.publication_date ? new Date(doc.publication_date).getFullYear() : null),
+                                file_path: doc.file_path || null,
+                                researchAgenda: doc.topics ? doc.topics.map(t => t.name).join(', ') : (doc.tags || []).join(', ')
+                            }))
+                        };
+                    } catch (error) {
+                        console.error(`Error fetching works for author ${author.id}:`, error);
+                        return { authorId: author.id, works: [] };
                     }
                 });
-                
-                // Wait for all work fetches to complete
-                await Promise.all(workFetchPromises);
-                
-                // Re-render the author list to ensure all works are properly displayed
+
+                // Wait for all works to be fetched
+                const worksResults = await Promise.all(worksPromises);
+
+                // Update authors array with works data
+                worksResults.forEach(result => {
+                    const authorIndex = authors.findIndex(a => a.id === result.authorId);
+                    if (authorIndex !== -1) {
+                        authors[authorIndex].works = result.works;
+                        authors[authorIndex].worksCount = result.works.length;
+                    }
+                });
+
+                // Now render the authors with their works data
                 renderAuthors(authors);
                 
             } catch (error) {
@@ -619,7 +627,7 @@
                                         <span class="font-medium">${work.category || 'N/A'}</span>
                                         <span class="font-medium">${work.year || 'N/A'}</span>
                                     </div>
-                                    <a href="${work.url || '#'}" target="_blank" rel="noopener noreferrer" class="ad-work-title-link block text-sm mb-1">${work.title || 'Untitled'}</a>
+                                    <a href="#" onclick="openWork('${work.file_path}', '${work.title}', ${work.id}); return false;" class="ad-work-title-link block text-sm mb-1">${work.title || 'Untitled'}</a>
                                     <p class="text-xs text-gray-600"><span class="font-medium">Keywords:</span> ${work.researchAgenda || 'N/A'}</p>
                                 </div>`;
                         });
@@ -715,7 +723,7 @@
                                 <span class="font-medium">${work.category || 'N/A'}</span>
                                 <span class="font-medium">${work.year || 'N/A'}</span>
                             </div>
-                            <a href="${work.url || '#'}" target="_blank" rel="noopener noreferrer" class="ad-work-title-link block text-sm mb-1">${work.title || 'Untitled'}</a>
+                            <a href="#" onclick="openWork('${work.file_path}', '${work.title}', ${work.id}); return false;" class="ad-work-title-link block text-sm mb-1">${work.title || 'Untitled'}</a>
                             <p class="text-xs text-gray-600"><span class="font-medium">Keywords:</span> ${work.researchAgenda || 'N/A'}</p>
                         </div>`;
                 });
@@ -730,16 +738,16 @@
             authorListContainer.innerHTML = ''; // Clear existing list
 
             if (filteredAuthors.length === 0) {
-                noResultsMessage.classList.remove('hidden'); // Show no results message
-                authorListContainer.classList.add('hidden'); // Hide the list container
+                noResultsMessage.classList.remove('hidden');
+                authorListContainer.classList.add('hidden');
             } else {
-                noResultsMessage.classList.add('hidden'); // Hide no results message
-                authorListContainer.classList.remove('hidden'); // Show the list container
+                noResultsMessage.classList.add('hidden');
+                authorListContainer.classList.remove('hidden');
 
                 filteredAuthors.forEach((author, index) => {
                     const card = document.createElement('div');
                     card.className = 'ad-author-card bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col';
-                    card.setAttribute('data-author-id', author.id); // Add author ID for reference
+                    card.setAttribute('data-author-id', author.id);
 
                     // Unique IDs for elements within this author card
                     const worksSectionId = `works-${author.id}-${index}`;
@@ -747,36 +755,20 @@
                     const workFiltersId = `workFilters-${author.id}-${index}`;
                     const worksContainerId = `worksContainer-${author.id}-${index}`;
 
-                    // Generate initial HTML for the works list (shown when expanded)
-                    let initialWorksHtml = '<p class="text-sm text-gray-500 italic px-4">No works listed.</p>';
-                    if (author.works && author.works.length > 0) {
-                        initialWorksHtml = '<div class="space-y-2">'; // Container for work cards
-                        author.works.forEach(work => {
-                            // Create HTML for each work item
-                            initialWorksHtml += `
-                                <div class="ad-work-card">
-                                    <div class="flex justify-between items-center text-xs text-gray-500 mb-1">
-                                        <span class="font-medium">${work.category || 'N/A'}</span>
-                                        <span class="font-medium">${work.year || 'N/A'}</span>
-                                    </div>
-                                    <a href="${work.url || '#'}" target="_blank" rel="noopener noreferrer" class="ad-work-title-link block text-sm mb-1">${work.title || 'Untitled'}</a>
-                                    <p class="text-xs text-gray-600"><span class="font-medium">Keywords:</span> ${work.researchAgenda || 'N/A'}</p>
-                                </div>`;
-                        });
-                        initialWorksHtml += '</div>';
-                    }
-
                     // Use author's profile picture URL or the new default placeholder
                     const profilePic = author.profilePicUrl || DEFAULT_PROFILE_PIC;
-                    const profilePicPlaceholder = DEFAULT_PROFILE_PIC; // Use the constant for the fallback as well
+                    const profilePicPlaceholder = DEFAULT_PROFILE_PIC;
 
                     // Calculate works count
                     const worksCount = author.works?.length || author.worksCount || 0;
 
-                    // Construct the inner HTML of the author card
                     card.innerHTML = `
-                        <div class="p-4 flex-grow"> <div class="flex justify-between items-start mb-4"> <div class="flex items-start flex-grow pr-4"> <img src="${profilePic}" alt="Profile picture of ${author.full_name}" class="w-10 h-10 rounded-full mr-3 flex-shrink-0 object-cover border border-gray-300" onerror="this.src='${profilePicPlaceholder}'; this.onerror=null;">
-                                    <div class="flex-grow"> <div class="flex items-baseline mb-1">
+                        <div class="p-4 flex-grow">
+                            <div class="flex justify-between items-start mb-4">
+                                <div class="flex items-start flex-grow pr-4">
+                                    <img src="${profilePic}" alt="Profile picture of ${author.full_name}" class="w-10 h-10 rounded-full mr-3 flex-shrink-0 object-cover border border-gray-300" onerror="this.src='${profilePicPlaceholder}'; this.onerror=null;">
+                                    <div class="flex-grow">
+                                        <div class="flex items-baseline mb-1">
                                             <h3 class="text-lg font-semibold text-green-700 mr-2">${author.full_name}</h3>
                                             <span class="text-xs text-gray-500">(${author.spud_id || 'No ID'})</span>
                                         </div>
@@ -785,9 +777,10 @@
                                             <span class="mx-1 text-gray-400">|</span>
                                             <span>${author.affiliation || 'No Affiliation'}</span>
                                         </div>
-                                        </div>
+                                    </div>
                                 </div>
-                                <div class="flex-shrink-0"> <button class="ad-edit-icon-button text-gray-500 hover:text-green-600 focus:outline-none" onclick="openEditModal('${author.id}')" title="Edit Author">
+                                <div class="flex-shrink-0">
+                                    <button class="ad-edit-icon-button text-gray-500 hover:text-green-600 focus:outline-none" onclick="openEditModal('${author.id}')" title="Edit Author">
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
                                         </svg>
@@ -799,26 +792,51 @@
 
                             <div id="${worksSectionId}" class="ad-works-section border-t border-gray-200 pt-2 no-scrollbar" data-button-id="${toggleButtonId}">
                                 <div id="${workFiltersId}" class="ad-work-filters px-4">
-                                     <select id="workCategoryFilter-${author.id}-${index}" class="ad-work-filter-select" onchange="filterAndRenderWorks('${author.id}', ${index})"><option value="">All Categories</option></select>
-                                     <select id="workAgendaFilter-${author.id}-${index}" class="ad-work-filter-select" onchange="filterAndRenderWorks('${author.id}', ${index})"><option value="">All Keywords</option></select>
-                                     <select id="workYearFilter-${author.id}-${index}" class="ad-work-filter-select" onchange="filterAndRenderWorks('${author.id}', ${index})"><option value="">All Years</option></select>
-                                     <button onclick="refreshAuthorWorks('${author.id}', ${index})" class="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 rounded px-2 py-1 flex-shrink-0 ml-auto">
+                                    <select id="workCategoryFilter-${author.id}-${index}" class="ad-work-filter-select" onchange="filterAndRenderWorks('${author.id}', ${index})">
+                                        <option value="">All Categories</option>
+                                    </select>
+                                    <select id="workAgendaFilter-${author.id}-${index}" class="ad-work-filter-select" onchange="filterAndRenderWorks('${author.id}', ${index})">
+                                        <option value="">All Keywords</option>
+                                    </select>
+                                    <select id="workYearFilter-${author.id}-${index}" class="ad-work-filter-select" onchange="filterAndRenderWorks('${author.id}', ${index})">
+                                        <option value="">All Years</option>
+                                    </select>
+                                    <button onclick="refreshAuthorWorks('${author.id}', ${index})" class="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 rounded px-2 py-1 flex-shrink-0 ml-auto">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                         </svg>
                                         Refresh
-                                     </button>
+                                    </button>
                                 </div>
-                                <div id="${worksContainerId}" class="px-4">${initialWorksHtml}</div>
+                                <div id="${worksContainerId}" class="px-4">
+                                    ${author.works && author.works.length > 0 ? `
+                                        <div class="space-y-2">
+                                            ${author.works.map(work => `
+                                                <div class="ad-work-card">
+                                                    <div class="flex justify-between items-center text-xs text-gray-500 mb-1">
+                                                        <span class="font-medium">${work.category || 'N/A'}</span>
+                                                        <span class="font-medium">${work.year || 'N/A'}</span>
+                                                    </div>
+                                                    <a href="#" onclick="openWork('${work.file_path}', '${work.title}', ${work.id}); return false;" class="ad-work-title-link block text-sm mb-1">${work.title || 'Untitled'}</a>
+                                                    <p class="text-xs text-gray-600"><span class="font-medium">Keywords:</span> ${work.researchAgenda || 'N/A'}</p>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                    ` : '<p class="text-sm text-gray-500 italic">No works listed.</p>'}
+                                </div>
                             </div>
                         </div>
 
                         ${worksCount > 0 ? `
-                        <div class="ad-toggle-container flex justify-center bg-gray-50 border-t border-gray-200 rounded-b-lg"> <button id="${toggleButtonId}" class="ad-toggle-button inline-flex items-center py-1 px-3 rounded-md bg-green-100 hover:bg-green-200 text-xs text-green-800 font-medium focus:outline-none focus:ring-1 focus:ring-green-300" onclick="toggleWorks('${worksSectionId}', '${toggleButtonId}', '${workFiltersId}', '${author.id}', ${index})"> ${worksCount} Work${worksCount !== 1 ? 's' : ''} <span class="arrow ml-1">&#x25BC;</span> </button>
-                        </div>
+                            <div class="ad-toggle-container flex justify-center bg-gray-50 border-t border-gray-200 rounded-b-lg">
+                                <button id="${toggleButtonId}" class="ad-toggle-button inline-flex items-center py-1 px-3 rounded-md bg-green-100 hover:bg-green-200 text-xs text-green-800 font-medium focus:outline-none focus:ring-1 focus:ring-green-300" onclick="toggleWorks('${worksSectionId}', '${toggleButtonId}', '${workFiltersId}', '${author.id}', ${index})">
+                                    ${worksCount} Work${worksCount !== 1 ? 's' : ''} <span class="arrow ml-1">&#x25BC;</span>
+                                </button>
+                            </div>
                         ` : `
-                        <div class="flex justify-center bg-gray-50 py-2 border-t border-gray-200 rounded-b-lg"> <span class="text-xs text-gray-500 italic">No works listed</span>
-                        </div>
+                            <div class="flex justify-center bg-gray-50 py-2 border-t border-gray-200 rounded-b-lg">
+                                <span class="text-xs text-gray-500 italic">No works listed</span>
+                            </div>
                         `}
                     `;
 
@@ -947,7 +965,7 @@
                     return false; // Indicate failure
                 }
 
-                const result = await response.json(); // Or response.text() if no JSON body is returned
+                const result = await response.json();
                 console.log("Backend save successful:", result);
                 // Optionally, show a success message to the user
                 // alert("Author data saved successfully!");
@@ -1262,16 +1280,27 @@
                 // Explicitly fetch works for this author
                 const worksData = await fetchAuthorWorks(authorId);
                 
+                // Process the documents to match the expected format
+                const authorData = {
+                    id: authorId,
+                    publications: worksData.works.map(doc => ({
+                        id: doc.id,
+                        title: doc.title,
+                        category: doc.category || doc.document_type || 'Uncategorized',
+                        year: doc.year || (doc.publication_date ? new Date(doc.publication_date).getFullYear() : null),
+                        file_path: doc.file_path || null,
+                        researchAgenda: doc.topics ? doc.topics.map(t => t.name).join(', ') : (doc.tags || []).join(', ')
+                    }))
+                };
+
                 // Update the author object with works data
                 const authorIndex = authors.findIndex(a => a.id === authorId);
                 if (authorIndex !== -1) {
-                    authors[authorIndex].works = worksData.works;
-                    authors[authorIndex].worksCount = worksData.worksCount;
+                    authors[authorIndex].works = authorData.publications;
+                    authors[authorIndex].worksCount = authorData.publications.length;
                     
-                    // Update the UI to reflect the new works count
-                    updateAuthorWorksUI(authorId, worksData.works, worksData.worksCount);
-                    
-                    console.log(`Refreshed works for author ${authorId}: found ${worksData.worksCount} works`);
+                    // Re-render just this author's works
+                    updateAuthorWorksUI(authorId, authorData.publications, authorData.publications.length);
                 }
             } catch (error) {
                 console.error(`Error refreshing works for author ${authorId}:`, error);
@@ -1305,7 +1334,90 @@
                 }, 300);
             }, 3000);
         }
+
+        // Add the formatFilePath helper function
+        function formatFilePath(filePath) {
+            if (!filePath) return '#';
+            
+            // If the path already starts with http or https, return it as is
+            if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+                return filePath;
+            }
+            
+            // Remove absolute path if present (starting with drive letter like C:/)
+            if (filePath.match(/^[A-Za-z]:\//)) {
+                // Extract just the part after the workspace root
+                const parts = filePath.split('/');
+                const storageIndex = parts.findIndex(part => part === 'storage');
+                
+                if (storageIndex !== -1) {
+                    // Reconstruct the path starting from 'storage'
+                    filePath = '/' + parts.slice(storageIndex).join('/');
+                } else {
+                    console.error('Could not find storage directory in path:', filePath);
+                }
+            }
+            
+            // Remove any leading slashes
+            filePath = filePath.replace(/^\/+/, '');
+            
+            // If the path doesn't start with 'storage/', add it
+            if (!filePath.startsWith('storage/')) {
+                filePath = 'storage/' + filePath;
+            }
+            
+            // Add leading slash
+            filePath = '/' + filePath;
+            
+            // Get the current origin (e.g., http://localhost:8000)
+            const origin = window.location.origin;
+            
+            // Return the full URL
+            return `${origin}${filePath}`;
+        }
+
+        // Update the openWork function to fetch document details first
+        async function openWork(filePath, title, docId) {
+            if (!docId) {
+                showToast(`Cannot open document: Missing document ID`, 'error');
+                return;
+            }
+
+            try {
+                // First fetch the document details to get the file path
+                const response = await fetch(`/api/documents/${docId}`);
+                if (!response.ok) {
+                    throw new Error(`Error fetching document: ${response.status}`);
+                }
+                
+                const document = await response.json();
+                if (!document || !document.file_path) {
+                    showToast(`No file available for "${title}"`, 'error');
+                    return;
+                }
+
+                // Format the file path
+                let pdfPath = document.file_path;
+                
+                // If the path doesn't start with http or /, add the leading /
+                if (!pdfPath.startsWith('http') && !pdfPath.startsWith('/')) {
+                    pdfPath = '/' + pdfPath;
+                }
+                
+                // If the path is relative (starts with /), prepend the current origin
+                if (pdfPath.startsWith('/')) {
+                    pdfPath = window.location.origin + pdfPath;
+                }
+                
+                console.log(`Opening document with path: ${pdfPath}`);
+                window.open(pdfPath, '_blank');
+            } catch (error) {
+                console.error('Error opening work:', error);
+                showToast(`Error opening "${title}": ${error.message}`, 'error');
+            }
+        }
     </script>
+    
     <script>
         fetch('side_bar.html')
           .then(response => response.text())
@@ -1313,7 +1425,7 @@
             document.getElementById('side-bar').innerHTML = data;
           })
           .catch(error => console.error('Error loading header:', error));
-      </script>
+    </script>
     
     <script>
         fetch('navbar_header.html')
@@ -1322,7 +1434,7 @@
             document.getElementById('navbar-header').innerHTML = data;
           })
           .catch(error => console.error('Error loading header:', error));
-      </script>
+    </script>
 
 </body>
 </html>

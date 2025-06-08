@@ -334,106 +334,108 @@ async function handleSingleDocumentSubmit(e) {
     const fileInput = form.querySelector('input[type="file"]');
     const categorySelect = form.querySelector('#single-category');
     
-    // Debug logging
-    console.log('Form submission started');
-    console.log('File input found:', fileInput?.id);
-    console.log('Category selected:', categorySelect?.value);
-    console.log('Prepared files map:', preparedFiles);
-    console.log('Looking for prepared file with ID:', fileInput?.id);
-    
-    // Check if we have a file input
-    if (!fileInput) {
-        showError('No file input found in form');
-            return;
-        }
-        
-    // Get the prepared file info
-    const preparedFile = preparedFiles.get(fileInput.id);
-    console.log('Found prepared file:', preparedFile);
-    
-    if (!preparedFile || !preparedFile.fileId) {
-        showError('Please select and prepare a file first');
+    // Check if we have a file input and file
+    if (!fileInput || !fileInput.files || !fileInput.files.length) {
+        showError('Please select a file to upload');
         return;
     }
-        
+    
     try {
         showLoading('Uploading document...');
-        console.log('Starting upload with prepared file ID:', preparedFile.fileId);
-
-        // Create form data with all form fields EXCEPT the file input
-        const formData = new FormData();
         
-        // Get all form fields except file inputs
-        const formFields = Array.from(form.elements).filter(element => 
-            element.name && 
-            element.type !== 'file' && 
-            !element.name.includes('file-upload')
-        );
-
-        // Add each form field to formData
-        formFields.forEach(field => {
-            if (field.type === 'select-multiple') {
-                // Handle multiple select
-                Array.from(field.selectedOptions).forEach(option => {
-                    formData.append(field.name, option.value);
-                });
-            } else {
-                formData.append(field.name, field.value);
-            }
-        });
+        // Get form data
+        const formData = new FormData(form);
         
-        // Map category to document type
+        // Get the file and add it to form data
+        const file = fileInput.files[0];
+        formData.append('file', file);
+        
+        // Get category and document type
         const category = categorySelect?.value || '';
         const documentType = mapCategoryToDocumentType(category);
+        
+        // Add document type to form data
         formData.append('document_type', documentType);
         
-        // Add the prepared file info
-        formData.append('preparedFileId', preparedFile.fileId);
-        formData.append('fileName', preparedFile.fileName);
-        formData.append('fileSize', preparedFile.fileSize);
-        formData.append('fileType', preparedFile.fileType);
+        // Determine storage path
+        const storagePath = `storage/${documentType.toLowerCase()}`;
+        formData.append('storagePath', storagePath);
         
-        // Debug: Log all form data
-        console.log('Form data being sent:');
-        for (let [key, value] of formData.entries()) {
-            console.log(key + ':', value);
-        }
-
-        // Send the form data
+        // Upload the file
         const response = await fetch('/api/upload', {
             method: 'POST',
-            headers: {
-                'Accept': 'application/json'
-            },
             body: formData
         });
+
+        if (!response.ok) {
+            const result = await response.json();
+            throw new Error(result.error || 'Failed to upload document');
+        }
 
         const result = await response.json();
         console.log('Upload response:', result);
 
-        if (!response.ok) {
-            throw new Error(result.error || 'Failed to upload document');
-        }
+        // Create document data
+        const documentData = {
+            title: formData.get('title'),
+            abstract: formData.get('abstract') || '',
+            publication_date: formData.get('date_published') || new Date().toISOString().split('T')[0],
+            document_type: documentType,
+            file_path: result.filePath,
+            category_id: parseInt(category) || null,
+            pages: result.metadata?.pageCount || 0,
+            is_public: true
+        };
 
-        // Clean up the prepared file
-        console.log('Cleaning up prepared file:', preparedFile.fileId);
-        const cleanupResponse = await fetch(`/api/pre-upload/cleanup/${preparedFile.fileId}`, {
-            method: 'DELETE'
+        // Save document to database
+        const documentResponse = await fetch('/api/documents', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(documentData)
         });
-        
-        if (!cleanupResponse.ok) {
-            console.warn('Failed to cleanup prepared file:', preparedFile.fileId);
+
+        if (!documentResponse.ok) {
+            const errorData = await documentResponse.json();
+            throw new Error(errorData.error || 'Failed to save document in database');
         }
 
-        // Remove from prepared files map
-        preparedFiles.delete(fileInput.id);
-        console.log('Removed file from prepared files map');
+        const documentResult = await documentResponse.json();
+        console.log('Document saved:', documentResult);
+
+        // Process authors if provided
+        const authorInput = form.querySelector('input[name="author"]');
+        if (authorInput && authorInput.value.trim()) {
+            const authors = authorInput.value.split(';').map(name => name.trim()).filter(name => name);
+            if (authors.length > 0) {
+                const authorData = {
+                    document_id: documentResult.id,
+                    authors: authors
+                };
+
+                try {
+                    const authorResponse = await fetch('/document-authors', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(authorData)
+                    });
+
+                    if (!authorResponse.ok) {
+                        console.warn('Warning: Authors may not have been saved correctly');
+                    }
+                } catch (authorError) {
+                    console.error('Error saving authors:', authorError);
+                }
+            }
+        }
 
         // Clear form and file input
         form.reset();
         if (fileInput) {
             fileInput.value = '';
-            // Also clear the file name display if it exists
             const fileNameDisplay = document.getElementById(`${fileInput.id.split('-')[0]}-fileNameDisplay`);
             if (fileNameDisplay) {
                 fileNameDisplay.textContent = '';
@@ -459,8 +461,7 @@ async function handleSingleDocumentSubmit(e) {
 
         // Update UI
         hideLoading();
-        showSuccess('Document uploaded successfully', () => {
-            // Reset form and clear file inputs
+        showSuccess('Document uploaded and saved successfully', () => {
             form.reset();
             resetFileInputs();
         });
